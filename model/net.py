@@ -208,17 +208,6 @@ class RVOPolicy(nn.Module):
         #print('speed:',speed)
         #print('pose:',pose)
 
-        #### ORCA PART ####
-        '''
-        params = self.neighbor_dist, self.max_neighbors, self.time_horizon, self.time_horizon_obst
-        
-        if self.sim is not None:
-            del self.sim
-            self.sim = None
-        if self.sim is None:
-            self.sim = rvo2.pyRVOSimulator()
-        '''
-
         a = torch.cat((a, goal, speed), dim=-1)
         a = F.relu(self.act_fc2(a))
         mean1 = F.sigmoid(self.actor1(a))
