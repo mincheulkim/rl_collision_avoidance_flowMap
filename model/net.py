@@ -230,11 +230,9 @@ class RVOPolicy(nn.Module):
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)
 
-
         return v, action, logprob, mean
 
     def evaluate_actions(self, x, goal, speed, action):
-
         #v, _, _, mean = self.forward(x, goal, speed)
         v, _, _, mean = self.forward(x, goal, speed, speed)
         logstd = self.logstd.expand_as(mean)
@@ -295,6 +293,8 @@ class RVOPolicy_LM(nn.Module):
         #print('speed:',speed)
         #print('pose:',pose)
 
+        # TODO. concat LocalMap 
+        #TODO a = torch.cat((a, goal, speed, localmap), dim=-1)   # concat localmap
         a = torch.cat((a, goal, speed), dim=-1)   # concat feature lidar, local goal, speed
         a = F.relu(self.act_fc2(a))
         mean1 = F.sigmoid(self.actor1(a))
@@ -313,6 +313,9 @@ class RVOPolicy_LM(nn.Module):
         v = F.relu(self.crt_fea_cv2(v))
         v = v.view(v.shape[0], -1)
         v = F.relu(self.crt_fc1(v))
+
+        # TODO. concat LocalMap 
+        #TODO v = torch.cat((v, goal, speed, localmap), dim=-1)   # concat localmap
         v = torch.cat((v, goal, speed), dim=-1)
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)

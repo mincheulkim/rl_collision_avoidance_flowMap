@@ -159,7 +159,7 @@ class StageWorld():
 
     def get_local_goal(self):
         [x, y, theta] = self.get_self_stateGT()   # robot state
-        [goal_x, goal_y] = self.goal_point        # robot generated goal
+        [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
         return [local_x, local_y]
@@ -184,7 +184,7 @@ class StageWorld():
         '''
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         #[x_g, y_g] = [0, 0]
-        self.goal_point = [x_g, y_g]                 # set global goal
+        self.goal_point = [x_g, y_g]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
@@ -206,17 +206,17 @@ class StageWorld():
         result = 0
         is_crash = self.get_crash_state()   # return self.is_crashed
 
-        if self.distance < self.goal_size:
+        if self.distance < self.goal_size:  # success reward
             terminate = True
             reward_g = 15
             result = 'Reach Goal'
 
-        if is_crash == 1:
+        if is_crash == 1:                   # collision penalty
             terminate = True
             reward_c = -15.
             result = 'Crashed'
 
-        if np.abs(w) >  1.05:   # rotation penalty
+        if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
         ## ADD propositional reward

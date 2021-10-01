@@ -400,6 +400,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
+        #print(v, a, logprob, mean)
 
         '''
         # 211028 For NO-SAMPLING(TEST)
@@ -545,7 +546,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
     return mean, scaled_action
     '''
     
-
+    #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
 def generate_action_human_localmap(env, state_list, pose_list, policy, action_bound):   # 211001 for local mapping
@@ -952,7 +953,7 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
     speeds = speeds.reshape((num_step*num_env, 2))  # 128*5, 2(vx,vy)
     actions = actions.reshape(num_step*num_env, act_size)  # 128*5, 2
     logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
-    advs = advs.reshape(num_step*num_env, 1)  # same
+    advs = advs.reshape(num_step*num_env, 1)  # 128*5, 1
     targets = targets.reshape(num_step*num_env, 1)  # targets?
 
     for update in range(epoch):  # 0, 1, 2

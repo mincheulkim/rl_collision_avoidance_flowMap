@@ -27,12 +27,7 @@ from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX
 # 1) tensorboard --logdir runs/
 # 2) google-chrome -> http://desktop-26msce9:6006/
 
-writer = SummaryWriter()
-
-
- 
-
-
+#writer = SummaryWriter()
 
 MAX_EPISODES = 5000
 LASER_BEAM = 512
@@ -51,9 +46,7 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 
-
 def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
-
     # rate = rospy.Rate(5)
     buff = []
     global_update = 0  # for memory update(128)
@@ -128,10 +121,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('scaled action:',scaled_action)
             # v: array[[-0.112323],[0.2323],[0.123123],[-1.2323],[-0.023232]] like dummy_vec, a: array({[[0.123,0.23],[0.23,0.23],..,[0.232,0.2323]]})  total 5 like dummy_vec, log_prob:[[-2],...,[-2]] as dummy_vec 5, scaled_action: array([[0.232, 0.2323], [0.2323, 0.2323], ..., [0.2323, 0.2323]]) as 5 agent's action
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
-            #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
-
+            
+            # 20 [], 20[,], 20[-], 20(,)
+            if env.index ==0:
+                print('================')
+                #print(state_list, pose_list)
+                print('state:', state, 'pose:', pose)
+            
             v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
             #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
+
+            #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
             # TODO 1. generate_action_human with local_flowmap
             # TODO 2. generate_action_human with global_flowmap
             '''
@@ -159,15 +159,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('step:',step, 'r:',r, 'terminal:',terminal, 'result:',result, 'ep_reward:',ep_reward,'global_step:',global_step)
             #e.g.
             #Env 00 ('step:', 1, 'r:', -0.062560365832449172, 'terminal:', False, 'result:', 0, 'ep_reward:', -0.062560365832449172, 'global_step:', 1)
-            #Env 01 ('step:', 1, 'r:', 13.337030629721486, 'terminal:', False, 'result:', 0, 'ep_reward:', 13.337030629721486, 'global_step:', 1)       
-            #Env 02 ('step:', 1, 'r:', -0.20109885838264674, 'terminal:', False, 'result:', 0, 'ep_reward:', -0.20109885838264674, 'global_step:', 1)
-            #Env 03 ('step:', 1, 'r:', -13.016827513449938, 'terminal:', False, 'result:', 0, 'ep_reward:', -13.016827513449938, 'global_step:', 1)
-            #Env 04 ('step:', 1, 'r:', -8.7319593604756527, 'terminal:', False, 'result:', 0, 'ep_reward:', -8.7319593604756527, 'global_step:', 1)
+            #Env 01 ('step:', 1, 'r:',    13.337030629721486, 'terminal:', False, 'result:', 0, 'ep_reward:', 13.337030629721486, 'global_step:', 1)       
+            #Env 02 ('step:', 1, 'r:',  -0.20109885838264674, 'terminal:', False, 'result:', 0, 'ep_reward:', -0.20109885838264674, 'global_step:', 1)
+            #Env 03 ('step:', 1, 'r:',   -13.016827513449938, 'terminal:', False, 'result:', 0, 'ep_reward:', -13.016827513449938, 'global_step:', 1)
+            #Env 04 ('step:', 1, 'r:',   -8.7319593604756527, 'terminal:', False, 'result:', 0, 'ep_reward:', -8.7319593604756527, 'global_step:', 1)
 
 
             # 4. get next state
             s_next = env.get_laser_observation()   # get new lidar obs
-            left = obs_stack.popleft()   # remove left stack(3 consequence data use)  # obs_stack:deque[obs, obs, obs]
+            left = obs_stack.popleft()   # remove left stack(3 consequence data use)  # obs_stack:deque[obs, obs, obs], left = trash(don't use)
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
             speed_next = np.asarray(env.get_self_speed())  # ???
@@ -191,12 +191,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                         flow_map = get_flowmap(robot_curr_pose,humans_pose,update=true)
                         # flow_map : 12*12 dig0 matrix. axis=1 means the weights? or direction
                 '''
-
+                
                 # TODO 1. generate_action_human with local_flowmap
                 #last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
                 last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
                 #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
-
+                #print('last_v:',last_v)
                 
                 # TODO 2. generate_action_human with global_flowmap
 
@@ -206,12 +206,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                 
             # 5. add transitons in buff and update policy
             r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
-            terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F]
+            terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F] in case agent = 5
             #print('terminal list:',terminal_list)
+            #print('r_list:',r_list)
 
             if env.index == 0:  # maybe env.index=0 means robot? or just one(VIP) act as?
+                # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
                 buff.append((state_list, a, r_list, terminal_list, logprob, v))   # intial buff = []  cummulnatively stacking buff for 128
                 # 3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
+                #                  state                                                         r_list           terminal_list         logprob                   v
                 #print(env.index,'mmm,',buff)
                 if len(buff) > HORIZON - 1:   # buffer exceed 128   # this part is for PPO
                     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
@@ -253,6 +256,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
             logger_cal.info(ep_reward)
 
+        '''
+        # 211101, unabling tensorboardX writing(just use log/ dir)
         # 211026, for tensorboardX
         if env.index ==0:
             writer.add_scalar('episode reward of robot 0', ep_reward,global_step=global_update)
@@ -265,7 +270,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             writer.add_scalar('Value Loss, ???', info_v_lossss,global_step=global_update)
             writer.add_scalar('Entropy: How stochatic decisions of brain, decrease steady', info_entropyss,global_step=global_update)
             #writer.add_scalar('Total Loss', total_lossss,global_step=global_update)
-            
+        '''
 
 
         # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
