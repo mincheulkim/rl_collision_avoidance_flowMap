@@ -95,6 +95,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         print(env,'s pos:',pose_ori)
         '''
         #print(env.index, 'goal:',goal)
+
+        # local map(adjacency position)
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
             state_list = comm.gather(state, root=0)   # incorporate observation state
@@ -129,6 +131,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
 
             v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
             # TODO 1. generate_action_human with local_flowmap
             # TODO 2. generate_action_human with global_flowmap
             '''
@@ -189,14 +192,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                         # flow_map : 12*12 dig0 matrix. axis=1 means the weights? or direction
                 '''
 
-                #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                # TODO 1. generate_action_human with local_flowmap
                 #last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
                 last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
-<<<<<<< HEAD
-=======
-                # TODO 1. generate_action_human with local_flowmap
+                #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
+
+                
                 # TODO 2. generate_action_human with global_flowmap
->>>>>>> fc42b04106b33dc3daa19f8f45dfb1a62af5b788
+
                 '''
                 generate_action_rvo_dense(...,+flow_map)
                 '''
