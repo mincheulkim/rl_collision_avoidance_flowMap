@@ -156,7 +156,6 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 env.control_vel(scaled_action_r)
             else:
                 env.control_vel(real_action)
-
             # rate.sleep()
             rospy.sleep(0.001)
 
@@ -187,8 +186,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
 
             if global_step % HORIZON == 0:   # every 128, estimate future V???
-                state_next_list = comm.gather(state_next, root=0)
-                pose_next_list = comm.gather(pose_next, root=0)   # 211027, for future usage
+                #state_next_list = comm.gather(state_next, root=0)
+                #pose_next_list = comm.gather(pose_next, root=0)   # 211027, for future usage
                 '''
                 if env.index == 0:
                     if flow_map is None:  # create flowmap
@@ -218,8 +217,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 '''
                 
             # 5. add transitons in buff and update policy
-            r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
-            terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F] in case agent = 5
+            #r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
+            #terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F] in case agent = 5
             #print('terminal list:',terminal_list)
             #print('r_list:',r_list)
 
@@ -278,7 +277,7 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
         # after terminate = True(end step)
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
-                torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
+                #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps#########'
                             '################'.format(global_update, step))
@@ -362,14 +361,16 @@ if __name__ == '__main__':
         policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211001 for robot
         
         policy.cuda()
-        opt = Adam(policy.parameters(), lr=LEARNING_RATE)
+        policy_r.cuda()
+        #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
+        opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
 
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
-        file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
+        #file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
         file_r = policy_path + '/Robot_Stage_city_dense_glb_1620_step_244.pth'
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)

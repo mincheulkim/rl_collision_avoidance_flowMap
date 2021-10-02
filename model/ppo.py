@@ -629,9 +629,9 @@ def generate_action_robot(env, state, pose, policy, action_bound):   # policy = 
         #s_list = Variable(torch.from_numpy(s_list)).float().cuda()
         #goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
         #speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-        s_list = Variable(torch.from_numpy(s_list).unsqueeze(dim=0)).float()   # (3, 512)   -> make (1, 3, 512)   # 1: num of agent(gather)
-        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float()
-        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float()   # erase cuda()
+        s_list = Variable(torch.from_numpy(s_list).unsqueeze(dim=0)).float().cuda()   # (3, 512)   -> make (1, 3, 512)   # 1: num of agent(gather)
+        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()
+        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # erase cuda()
 
         #print('policy:',policy)
         # Get action for robot(RobotPolicy)
@@ -1177,14 +1177,14 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
         sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,
                                drop_last=False)
         for i, index in enumerate(sampler):
-            sampled_obs = Variable(torch.from_numpy(obss[index])).float()
-            sampled_goals = Variable(torch.from_numpy(goals[index])).float()
-            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float()
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
 
-            sampled_actions = Variable(torch.from_numpy(actions[index])).float()
-            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float()
-            sampled_targets = Variable(torch.from_numpy(targets[index])).float()
-            sampled_advs = Variable(torch.from_numpy(advs[index])).float()
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
 
 
             new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
