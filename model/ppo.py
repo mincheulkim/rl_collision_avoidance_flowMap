@@ -57,6 +57,49 @@ def transform_buffer(buff):    # from 5 step at ppo_stage3.py
 
     return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
 
+def transform_buffer_r(buff_r):    # 211101, for robot
+    # buff=3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
+    # buff = state, a_r, r, terminal, logprob_r, v_r
+    s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
+    v_batch = [], [], [], [], [], [], [], []
+    s_temp, goal_temp, speed_temp = [], [], []
+
+    for e in buff_r:
+        #print(e[0][0],e[0][1],e[0][2])
+        '''
+        for state in e[0]:   # states data
+            s_temp.append(state[0])   # 1. lidar
+            goal_temp.append(state[1])   # 2. local goal
+            speed_temp.append(state[2])   # 3. velocity
+        '''
+        s_temp.append(e[0][0])   # 1. lidar
+        goal_temp.append(e[0][1])   # 2. local goal
+        speed_temp.append(e[0][2])   # 3. velocity
+            
+        s_batch.append(s_temp)
+        goal_batch.append(goal_temp)
+        speed_batch.append(speed_temp)
+        s_temp = []
+        goal_temp = []
+        speed_temp = []
+
+        a_batch.append(e[1])   # A
+        r_batch.append(e[2])   # reward
+        d_batch.append(e[3])   # terminal(T or F)
+        l_batch.append(e[4])   # logprob
+        v_batch.append(e[5])   # V
+
+    s_batch = np.asarray(s_batch)
+    goal_batch = np.asarray(goal_batch)
+    speed_batch = np.asarray(speed_batch)
+    a_batch = np.asarray(a_batch)
+    r_batch = np.asarray(r_batch)
+    d_batch = np.asarray(d_batch)
+    l_batch = np.asarray(l_batch)
+    v_batch = np.asarray(v_batch)
+
+    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
+
 
 def generate_action(env, state_list, policy, action_bound):
     if env.index == 0:
@@ -374,6 +417,7 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
 
 def generate_action_human(env, state_list, pose_list, policy, action_bound):   # pose_list added
     if env.index == 0:
+        
         s_list, goal_list, speed_list = [], [], []
         for i in state_list:
             s_list.append(i[0])      # lidar state
@@ -395,12 +439,13 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         for i in pose_list:
             p_list.append(i)
         p_list = np.asarray(p_list)
-
-        # Get action for robot(RVOPolicy)
+        '''
+        # Get action for robot(RVOPolicy)   # s_list.shape: (20, 3, 512)
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
         #print(v, a, logprob, mean)
+        '''
 
         '''
         # 211028 For NO-SAMPLING(TEST)
@@ -460,7 +505,8 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h19v = goal_list_new[19]
 
         #h0s = np.linalg.norm(h0v)   
-        h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
+        #h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
+        h0s = np.linalg.norm(h0v)     # 211027   get raw_scaled action from learned policy
         h1s = np.linalg.norm(h1v)
         h2s = np.linalg.norm(h2v)
         h3s = np.linalg.norm(h3v)
@@ -525,7 +571,86 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
 
         sim.doStep()
 
-        scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        #scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        v = None
+        a = None
+        logprob = None
+        
+    else:  # env.index =! 0
+        v = None
+        a = None
+        scaled_action = None
+        logprob = None
+
+
+    # FOR NO-SAMPLING(TEST)
+    '''
+        _, _, _, mean = policy(s_list, goal_list, speed_list)
+        mean = mean.data.cpu().numpy()
+        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+    else:
+        mean = None
+        scaled_action = None
+    
+    return mean, scaled_action
+    '''
+    
+    #print(v, a, logprob, scaled_action)
+    return v, a, logprob, scaled_action
+
+def generate_action_robot(env, state, pose, policy, action_bound):   # policy = RobotPolicy
+    if env.index == 0:
+        s_list, goal_list, speed_list, p_list = [], [], [], []
+        #print('state_list:',state, pose)
+        #print('PPPPPOOOLICIY:',policy)
+        '''
+        for i in state:
+            s_list.append(i[0])      # lidar state
+            goal_list.append(i[1])   # local goal
+            speed_list.append(i[2])  # veloclity
+        '''
+        #print('state:',state)
+        
+        s_list = state[0]
+        goal_list = state[1]
+        speed_list = state[2]
+        p_list = pose
+
+             
+        s_list = np.asarray(s_list)
+        goal_list = np.asarray(goal_list)
+        speed_list = np.asarray(speed_list)
+        p_list = np.asarray(p_list)
+
+        #print(s_list, goal_list, speed_list, p_list)
+        
+
+        #s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+        #goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+        #speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+        s_list = Variable(torch.from_numpy(s_list).unsqueeze(dim=0)).float()   # (3, 512)   -> make (1, 3, 512)   # 1: num of agent(gather)
+        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float()
+        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float()   # erase cuda()
+
+        #print('policy:',policy)
+        # Get action for robot(RobotPolicy)
+
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
+        #print(v, a, logprob, mean)
+
+        '''
+        # 211028 For NO-SAMPLING(TEST)
+        mean = mean.data.cpu().numpy()
+        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+        '''
+        
+        # Get action for humans(RVO)
+        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
+        #print(v, a, logprob, raw_scaled_action)
+        scaled_action = raw_scaled_action
         
     else:  # env.index =! 0
         v = None
@@ -758,6 +883,30 @@ def generate_train_data(rewards, gamma, values, last_value, dones, lam):
     advs = targets - values[:-1, :]
     return targets, advs
 
+def generate_train_data_r(rewards, gamma, values, last_value, dones, lam):   # rewards=r_batch_r, gamma=0.99, values=v_batch_r, last_value=last_v_r, dones=d_batch_r, lam=LAMDA
+    #print('rewards:',rewards.shape)
+    num_step = rewards.shape[0]
+    #num_env = rewards.shape[1]
+    num_env = 1
+    values = list(values)
+    values.append(last_value)
+    values = np.asarray(values).reshape((num_step+1,num_env))
+
+    targets = np.zeros((num_step, num_env))
+    gae = np.zeros((num_env,))
+
+    for t in range(num_step - 1, -1, -1):
+        #delta = rewards[t, :] + gamma * values[t + 1, :] * (1 - dones[t, :]) - values[t, :]  # 211102 because indices error
+        #gae = delta + gamma * lam * (1 - dones[t, :]) * gae
+        delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
+        gae = delta + gamma * lam * (1 - dones[t]) * gae
+
+        #targets[t, :] = gae + values[t, :]
+        targets[t] = gae + values[t]
+
+    #advs = targets - values[:-1, :]
+    advs = targets - values[:-1]
+    return targets, advs
 
 
 def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
@@ -989,7 +1138,7 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             optimizer.step()
             info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
                                                      float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
-            logger_ppo.info('p_loss: {}, v_loss: {}, entropy: {}'.format(info_p_loss, info_v_loss, info_entropy))
+            # logger_ppo.info('p_loss: {}, v_loss: {}, entropy: {}'.format(info_p_loss, info_v_loss, info_entropy))
             
             # 211027 for logging     # https://www.infoking.site/64
             #global info_p_losss   
@@ -1006,6 +1155,73 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             
 
     print('update_city')
+
+def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPolicy, Adam, 1024, above lie about memory, epoch=2
+               coeff_entropy=0.02, clip_value=0.2,    #  coeff_entropy= 5e-4, clip_val = 0.1
+               num_step=2048, num_env=1, frames=1, obs_size=24, act_size=4):  # num_step= 128, num_env=5, frames(laser_hist)=3, obs_size=512, act_size=2
+    # num_env=12 is default, ppo_stage2.py line 33 is real
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+
+    advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
+
+    # 128= batch training data, num_env = agent num
+    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*5, 3, 512
+    goals = goals.reshape((num_step*num_env, 2))   # 128*5, 2(x,y)
+    speeds = speeds.reshape((num_step*num_env, 2))  # 128*5, 2(vx,vy)
+    actions = actions.reshape(num_step*num_env, act_size)  # 128*5, 2
+    logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
+    advs = advs.reshape(num_step*num_env, 1)  # 128*5, 1
+    targets = targets.reshape(num_step*num_env, 1)  # targets?
+
+    for update in range(epoch):  # 0, 1, 2
+        sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,
+                               drop_last=False)
+        for i, index in enumerate(sampler):
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float()
+
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float()
+
+
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+
+            sampled_logprobs = sampled_logprobs.view(-1, 1)
+            ratio = torch.exp(new_logprob - sampled_logprobs)
+
+            sampled_advs = sampled_advs.view(-1, 1)
+            surrogate1 = ratio * sampled_advs
+            surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()   # same as action loss @ 211027
+
+            sampled_targets = sampled_targets.view(-1, 1)
+            value_loss = F.mse_loss(new_value, sampled_targets)       # value loss @ 211027
+
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
+            logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}'.format(info_p_loss, info_v_loss, info_entropy))
+            
+            # 211027 for logging     # https://www.infoking.site/64
+            #global info_p_losss   
+            #global info_v_losss
+            #global info_entropys
+            #global total_loss
+            global info_p_losss
+            info_p_losss = info_p_loss
+            global info_v_losss
+            info_v_losss = info_v_loss
+            global info_entropys
+            info_entropys = info_entropy
+        
+    print('update_city_r')
+
 
 #total_losss = None
 

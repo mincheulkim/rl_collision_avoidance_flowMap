@@ -12,14 +12,14 @@ from mpi4py import MPI
 from torch.optim import Adam
 from collections import deque
 
-from model.net import MLPPolicy, CNNPolicy, RVOPolicy
+from model.net import MLPPolicy, CNNPolicy, RVOPolicy, RobotPolicy
 from stage_city_dense import StageWorld
-from model.ppo import ppo_update_city, generate_train_data
+from model.ppo import ppo_update_city, generate_train_data, generate_train_data_r, ppo_update_city_r
 from model.ppo import get_parameters
 from model.ppo import generate_action
-from model.ppo import transform_buffer
+from model.ppo import transform_buffer, transform_buffer_r
 
-from model.ppo import generate_action_rvo_dense, generate_action_human   # 211027
+from model.ppo import generate_action_rvo_dense, generate_action_human, generate_action_robot   # 211027
 
 #import model.orca as orcas  # 211020
 from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX/issues/638
@@ -46,9 +46,10 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 
-def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
+def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
     # rate = rospy.Rate(5)
     buff = []
+    buff_r = [] # 211101
     global_update = 0  # for memory update(128)
     global_step = 0   # just for counting total step
 
@@ -123,13 +124,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
             
             # 20 [], 20[,], 20[-], 20(,)
-            if env.index ==0:
-                print('================')
+            #if env.index ==0:
+                #print('================')
                 #print(state_list, pose_list)
-                print('state:', state, 'pose:', pose)
+                #print('state:', state, 'pose:', pose)
             
             v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
             #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
+
+            # for robot  211101
+            v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound)
+
 
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
             # TODO 1. generate_action_human with local_flowmap
@@ -147,7 +152,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             #print('real action:',real_action)
-            env.control_vel(real_action)
+            if env.index ==0:
+                env.control_vel(scaled_action_r)
+            else:
+                env.control_vel(real_action)
 
             # rate.sleep()
             rospy.sleep(0.001)
@@ -194,9 +202,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                 
                 # TODO 1. generate_action_human with local_flowmap
                 #last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                '''
                 last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
+                '''
                 #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
                 #print('last_v:',last_v)
+                # For Robot 211001
+                last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound)
+                
                 
                 # TODO 2. generate_action_human with global_flowmap
 
@@ -212,10 +225,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
             if env.index == 0:  # maybe env.index=0 means robot? or just one(VIP) act as?
                 # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
+                '''
                 buff.append((state_list, a, r_list, terminal_list, logprob, v))   # intial buff = []  cummulnatively stacking buff for 128
+                '''
+                buff_r.append((state, a_r, r, terminal, logprob_r, v_r))   # for robot buffer
+                #print(buff_r)
                 # 3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
                 #                  state                                                         r_list           terminal_list         logprob                   v
                 #print(env.index,'mmm,',buff)
+                '''
                 if len(buff) > HORIZON - 1:   # buffer exceed 128   # this part is for PPO
                     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         transform_buffer(buff=buff)   # from model.ppo, batched buffer
@@ -230,6 +248,25 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                     #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
 
                     buff = []    # clean buffer
+                
+                    global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
+                '''
+
+                if len(buff_r) > HORIZON - 1:   # FOR ROBOT
+                    #print(buff_r)
+                    s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, r_batch_r, d_batch_r, l_batch_r, v_batch_r = \
+                        transform_buffer_r(buff_r=buff_r)   # from model.ppo, batched buffer
+                    t_batch_r, advs_batch_r = generate_train_data_r(rewards=r_batch_r, gamma=GAMMA, values=v_batch_r,  # r_batch, 0.99, v_batch
+                                                              last_value=last_v_r, dones=d_batch_r, lam=LAMDA)   # last_v(every 128, future v), terminal list, 0.95
+                    memory_r = (s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, l_batch_r, t_batch_r, v_batch_r, r_batch_r, advs_batch_r)
+                    # TODO Real training part
+                    ppo_update_city_r(policy=policy_r, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory_r,  # CNNPolicy, Adam, 1024, above lie about memory
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,  # 2, 5e-4, 0.1, 128
+                                            num_env=1, frames=LASER_HIST,   # 20, 3
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
+                    #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
+
+                    buff_r = []    # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
 
             step += 1   # time goes on +1
@@ -242,6 +279,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
                 torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
+                torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps#########'
                             '################'.format(global_update, step))
         
@@ -321,6 +359,7 @@ if __name__ == '__main__':
         # policy = MLPPolicy(obs_size, act_size)    # 512, 2   # from model/net.py
         #policy = CNNPolicy(frames=LASER_HIST, action_space=2)   # 3, 2   # TODO: callback to this funct
         policy = RVOPolicy(frames=LASER_HIST, action_space=2)   # 3, 2
+        policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211001 for robot
         
         policy.cuda()
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
@@ -331,28 +370,30 @@ if __name__ == '__main__':
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
         file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
+        file_r = policy_path + '/Robot_Stage_city_dense_glb_1620_step_244.pth'
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
-        if os.path.exists(file):
+        #if os.path.exists(file):
+        if os.path.exists(file_r):
             logger.info('####################################')
-            logger.info('############Loading Model###########')
-            logger.info(file)   # which file is loaded
+            logger.info('#########Loading Robot Model########')
+            logger.info(file_r)   # which file is loaded
             logger.info('####################################')
-            state_dict = torch.load(file)
-            policy.load_state_dict(state_dict)
+            state_dict = torch.load(file_r)
+            policy_r.load_state_dict(state_dict)
         else:
             logger.info('#####################################')
             logger.info('############Start Training###########')
             logger.info('#####################################')
     else:
         policy = None
+        policy_r = None  # 211001
         policy_path = None
         opt = None
 
     try:
-        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
+        run(comm=comm, env=env, policy=policy, policy_r=policy_r, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
     except KeyboardInterrupt:
         pass
 
 
-writer.close()
