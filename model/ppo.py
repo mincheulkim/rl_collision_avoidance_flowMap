@@ -439,6 +439,9 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         for i in pose_list:
             p_list.append(i)
         p_list = np.asarray(p_list)
+        #print('p_list:',p_list)
+        #print('goal_list:',goal_list_new)
+        
         '''
         # Get action for robot(RVOPolicy)   # s_list.shape: (20, 3, 512)
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
@@ -485,11 +488,12 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         #sim.processObstacles()
         # TODO concern about local obstacle
 
-        h0v = goal_list_new[0]   # TODO because goal's here is local goal, there is no need to minus current position
-        h1v = goal_list_new[1]
-        h2v = goal_list_new[2]
-        h3v = goal_list_new[3]
-        h4v = goal_list_new[4]
+        h0v = goal_list_new[0] - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
+        h1v = goal_list_new[1] - p_list[1]
+        h2v = goal_list_new[2] - p_list[2]
+        h3v = goal_list_new[3] - p_list[3]
+        h4v = goal_list_new[4] - p_list[4]
+        #print(h0v,h1v,h2v,h3v,h4v)
         '''
         h5v = goal_list_new[5]  
         h6v = goal_list_new[6]
@@ -538,6 +542,8 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         prefv2=h2v/h2s if h2s >1 else h2v
         prefv3=h3v/h3s if h3s >1 else h3v
         prefv4=h4v/h4s if h4s >1 else h4v
+        #print(prefv0,prefv1,prefv2,prefv3,prefv4)
+
         '''
         prefv5=h5v/h5s if h5s >1 else h5v
         prefv6=h6v/h6s if h6s >1 else h6v
@@ -631,6 +637,9 @@ def generate_action_robot(env, state, pose, policy, action_bound):   # policy = 
         speed_list = state[2]
         p_list = pose
 
+        #print('input:',s_list, goal_list, speed_list, p_list)
+        #print('input:',goal_list)
+
              
         s_list = np.asarray(s_list)
         goal_list = np.asarray(goal_list)
@@ -665,6 +674,7 @@ def generate_action_robot(env, state, pose, policy, action_bound):   # policy = 
         #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
         #print(v, a, logprob, raw_scaled_action)
         scaled_action = raw_scaled_action
+        #print('v':,v, 'a:',a,'logprob:',logprob,'seacled_Action:',s)
         
     else:  # env.index =! 0
         v = None

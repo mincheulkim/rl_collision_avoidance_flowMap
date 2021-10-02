@@ -4,6 +4,7 @@ import sys
 import socket
 import numpy as np
 from numpy.lib.type_check import real
+from model.utils import get_goal_point
 import rospy
 import torch
 import torch.nn as nn
@@ -75,6 +76,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
         #print('laser scan: ',len(obs))
         obs_stack = deque([obs, obs, obs])
         goal = np.asarray(env.get_local_goal())   # local goal: perspective of robot coordinate
+        if env.index ==0:
+            print('init goal:',goal)
         speed = np.asarray(env.get_self_speed())
     
         pose_ori = env.get_self_stateGT()   # 211019
@@ -163,6 +166,7 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
 
             # 3. get informtion after action(reward, info)
             r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
+            #print('step reward:',r)
             ep_reward += r   # for one episode culm reward
             global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
             #print('step:',step, 'r:',r, 'terminal:',terminal, 'result:',result, 'ep_reward:',ep_reward,'global_step:',global_step)
@@ -176,9 +180,15 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
 
             # 4. get next state
             s_next = env.get_laser_observation()   # get new lidar obs
+            #if env.index ==0:
+            #    print('s_next:',s_next)
+            #print('s_next:',s_next)
             left = obs_stack.popleft()   # remove left stack(3 consequence data use)  # obs_stack:deque[obs, obs, obs], left = trash(don't use)
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
+            if env.index ==0:
+                print('GT global goal:',get_goal_point)
+                print('local_goal:',goal_next)
             speed_next = np.asarray(env.get_self_speed())  # ???
             #print('env.index:',env.index, goal_next, speed_next)
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'

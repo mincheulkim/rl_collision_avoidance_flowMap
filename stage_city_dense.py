@@ -135,6 +135,7 @@ class StageWorld():
         for x in xrange(int(sparse_beam_num / 2)):   # routine 256
             sparse_scan_left.append(scan[int(index)])
             index += step
+
         sparse_scan_right = []   # right scan
         index = raw_beam_num - 1.
         for x in xrange(int(sparse_beam_num / 2)):
@@ -142,7 +143,8 @@ class StageWorld():
             index -= step
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan
         #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        return scan_sparse / 6.0 - 0.5
+        #return scan_sparse / 6.0 - 0.5
+        return scan_sparse / 6.0  # ????   211102 TODO fliped input
 
 
     def get_self_speed(self):
@@ -157,11 +159,22 @@ class StageWorld():
     def get_sim_time(self):
         return self.sim_time
 
+    def get_goal_point(self):  # 211102
+        return self.goal_point
+
     def get_local_goal(self):
         [x, y, theta] = self.get_self_stateGT()   # robot state
         [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
+        return [local_x, local_y]
+        #return [goal_x, goal_y]
+
+    def get_local_goal_new(self):   # 211102, do not consider robot's rotation(Theta). perspective to global view
+        [x, y, theta] = self.get_self_stateGT()   # robot state
+        [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
+        local_x = goal_x - x
+        local_y = goal_y - y
         return [local_x, local_y]
         #return [goal_x, goal_y]
 
@@ -186,6 +199,7 @@ class StageWorld():
         #[x_g, y_g] = [0, 0]
         self.goal_point = [x_g, y_g]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
+        #[x, y] = self.get_local_goal_new()               # calculate local(robot's coord) goal
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)
@@ -359,8 +373,3 @@ class StageWorld():
         #    dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
 
         return [x, y]
-
-
-
-
-
