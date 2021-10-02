@@ -281,6 +281,7 @@ class StageWorld():
             x = 0
             y = -8
         # for humans
+        '''
         elif self.index > 14:
             x = np.random.uniform(-5, -7)
             y = np.random.uniform(5, 7)
@@ -293,7 +294,19 @@ class StageWorld():
         else:
             x = np.random.uniform(-7, -5)
             y = np.random.uniform(-7, -5)
-        
+        '''
+        if self.index == 1:
+            x= -5.5
+            y=-5.5
+        elif self.index == 2:
+            x= 6
+            y=-6
+        elif self.index == 3:
+            x= 5
+            y= 5
+        if self.index == 4:
+            x= -6
+            y= 6
         #dis = np.sqrt(x ** 2 + y ** 2)
         #while (dis > 9) and not rospy.is_shutdown():
         #    x = np.random.uniform(-9, 9)
@@ -309,6 +322,7 @@ class StageWorld():
             x = 0
             y = 8
         # For humans
+        '''
         elif self.index > 14:
             x = np.random.uniform(5, 7)
             y = np.random.uniform(-5, -7)
@@ -321,6 +335,19 @@ class StageWorld():
         else:
             x = np.random.uniform(5, 7)
             y = np.random.uniform(5, 7)
+        '''
+        if self.index == 1:
+            x= 5.5
+            y=5.5
+        elif self.index == 2:
+            x= -6
+            y=6
+        elif self.index == 3:
+            x= -5
+            y= -5
+        if self.index == 4:
+            x= 6
+            y= -6
         #x = np.random.uniform(6, 9)
         #y = np.random.uniform(6, 9)
         dis_origin = np.sqrt(x ** 2 + y ** 2)

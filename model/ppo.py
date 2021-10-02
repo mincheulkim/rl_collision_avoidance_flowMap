@@ -462,6 +462,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         a2=sim.addAgent(tuple(p_list[2]))
         a3=sim.addAgent(tuple(p_list[3]))
         a4=sim.addAgent(tuple(p_list[4]))
+        '''
         a5=sim.addAgent(tuple(p_list[5]))
         a6=sim.addAgent(tuple(p_list[6]))
         a7=sim.addAgent(tuple(p_list[7]))
@@ -477,6 +478,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         a17=sim.addAgent(tuple(p_list[17]))
         a18=sim.addAgent(tuple(p_list[18]))
         a19=sim.addAgent(tuple(p_list[19]))
+        '''
 
         # Obstacles are also supported # 211022   https://gamma.cs.unc.edu/RVO2/documentation/2.0/class_r_v_o_1_1_r_v_o_simulator.html#a0f4a896c78fc09240083faf2962a69f2
         #o1 = sim.addObstacle([(2.0, 2.0), (-2.0, 2.0), (-2.0, -2.0), (2.0, -2.0)])
@@ -488,6 +490,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h2v = goal_list_new[2]
         h3v = goal_list_new[3]
         h4v = goal_list_new[4]
+        '''
         h5v = goal_list_new[5]  
         h6v = goal_list_new[6]
         h7v = goal_list_new[7]
@@ -503,6 +506,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h17v = goal_list_new[17]
         h18v = goal_list_new[18]
         h19v = goal_list_new[19]
+        '''
 
         #h0s = np.linalg.norm(h0v)   
         #h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
@@ -511,6 +515,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h2s = np.linalg.norm(h2v)
         h3s = np.linalg.norm(h3v)
         h4s = np.linalg.norm(h4v)
+        '''
         h5s = np.linalg.norm(h5v)     
         h6s = np.linalg.norm(h6v)
         h7s = np.linalg.norm(h7v)
@@ -526,12 +531,14 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h17s = np.linalg.norm(h17v)
         h18s = np.linalg.norm(h18v)
         h19s = np.linalg.norm(h19v)
+        '''
 
         prefv0=h0v/h0s if h0s >1 else h0v
         prefv1=h1v/h1s if h1s >1 else h1v
         prefv2=h2v/h2s if h2s >1 else h2v
         prefv3=h3v/h3s if h3s >1 else h3v
         prefv4=h4v/h4s if h4s >1 else h4v
+        '''
         prefv5=h5v/h5s if h5s >1 else h5v
         prefv6=h6v/h6s if h6s >1 else h6v
         prefv7=h7v/h7s if h7s >1 else h7v
@@ -547,12 +554,14 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         prefv17=h17v/h17s if h17s >1 else h17v
         prefv18=h18v/h18s if h18s >1 else h18v
         prefv19=h19v/h19s if h19s >1 else h19v
+        '''
 
         sim.setAgentPrefVelocity(a0, tuple(prefv0))
         sim.setAgentPrefVelocity(a1, tuple(prefv1))
         sim.setAgentPrefVelocity(a2, tuple(prefv2))
         sim.setAgentPrefVelocity(a3, tuple(prefv3))
         sim.setAgentPrefVelocity(a4, tuple(prefv4))
+        '''
         sim.setAgentPrefVelocity(a5, tuple(prefv5))
         sim.setAgentPrefVelocity(a6, tuple(prefv6))
         sim.setAgentPrefVelocity(a7, tuple(prefv7))
@@ -568,11 +577,16 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         sim.setAgentPrefVelocity(a17, tuple(prefv17))
         sim.setAgentPrefVelocity(a18, tuple(prefv18))
         sim.setAgentPrefVelocity(a19, tuple(prefv19))
+        '''
+
 
         sim.doStep()
 
         #scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        '''
         scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        '''
+        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)
         v = None
         a = None
         logprob = None
