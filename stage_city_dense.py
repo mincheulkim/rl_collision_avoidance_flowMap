@@ -205,14 +205,14 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
         
         
-
-
+        # TODO: Reward reshape: penalty for circuling around
     def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state
         [v, w] = self.get_self_speedGT()            # updated current velocity
         self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
+        # Propotional Reward
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
         reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)
         reward_c = 0  # collision penalty
@@ -233,13 +233,15 @@ class StageWorld():
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
-        ## ADD propositional reward
+        ## TODO ADD must to reward(penalty proportional with rotation)  211102
+        reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
         if t > 450:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
+        #reward = reward_g + reward_c + reward_w + reward_spin
 
         return reward, terminate, result   # float, T or F(base), description
 

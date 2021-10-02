@@ -186,9 +186,9 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             left = obs_stack.popleft()   # remove left stack(3 consequence data use)  # obs_stack:deque[obs, obs, obs], left = trash(don't use)
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
-            if env.index ==0:
-                print('GT global goal:',get_goal_point)
-                print('local_goal:',goal_next)
+            #if env.index ==0:
+            #    print('GT global goal:',env.get_goal_point())
+            #    print('local_goal:',goal_next)
             speed_next = np.asarray(env.get_self_speed())  # ???
             #print('env.index:',env.index, goal_next, speed_next)
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'
@@ -285,12 +285,20 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             
             pose = pose_next   # 2l.,j,j,11020
             #print(env.goal_point[0], env.init_pose[0], env.goal_point[1], env.init_pose[1])
+            '''
+            if env.index==0:
+                print('state:',state)
+                print('pose:',pose)
+                print('sampled_action:',scaled_action_r)
+                print('reward:',r)
+                print('culm.reward:',ep_reward)
+            '''
 
         # after terminate = True(end step)
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
                 #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
-                torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
+                torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_global:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps#########'
                             '################'.format(global_update, step))
         
@@ -383,7 +391,7 @@ if __name__ == '__main__':
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
-        file_r = policy_path + '/Robot_Stage_city_dense_glb_1620_step_244.pth'
+        file_r = policy_path + '/Robot_Stage_city_dense_global_1620.pth'
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         #if os.path.exists(file):

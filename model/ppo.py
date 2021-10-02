@@ -488,11 +488,11 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         #sim.processObstacles()
         # TODO concern about local obstacle
 
-        h0v = goal_list_new[0] - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
-        h1v = goal_list_new[1] - p_list[1]
-        h2v = goal_list_new[2] - p_list[2]
-        h3v = goal_list_new[3] - p_list[3]
-        h4v = goal_list_new[4] - p_list[4]
+        h0v = goal_list_new[0]# - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
+        h1v = goal_list_new[1]# - p_list[1]
+        h2v = goal_list_new[2]# - p_list[2]
+        h3v = goal_list_new[3]# - p_list[3]
+        h4v = goal_list_new[4]# - p_list[4]
         #print(h0v,h1v,h2v,h3v,h4v)
         '''
         h5v = goal_list_new[5]  

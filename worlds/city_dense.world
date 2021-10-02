@@ -2,7 +2,9 @@ show_clock 0
 show_clock_interval 10000
 resolution 0.2
 threads 16
-speedup 1
+#speedup 1
+# -1: for maximum run time
+speedup -1
 
 
 define sicklaser ranger
