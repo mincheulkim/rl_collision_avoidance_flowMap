@@ -138,7 +138,9 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
 
             # for robot  211101
-            v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound)
+            #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound)
+            v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
+            #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for test
 
 
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
@@ -219,7 +221,9 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
                 #print('last_v:',last_v)
                 # For Robot 211001
-                last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound)
+                #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound)
+                last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
+                #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
                 
                 
                 # TODO 2. generate_action_human with global_flowmap
@@ -313,23 +317,6 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
             logger_cal.info(ep_reward)
 
-        '''
-        # 211101, unabling tensorboardX writing(just use log/ dir)
-        # 211026, for tensorboardX
-        if env.index ==0:
-            writer.add_scalar('episode reward of robot 0', ep_reward,global_step=global_update)
-            # TODO: no save timestamp as global update, change as episode time like A, V, entropy
-
-            info_p_lossss, info_v_lossss, info_entropyss = get_parameters()
-            #info_p_lossss, info_v_lossss, info_entropyss, total_lossss = get_parameters()
-            #print(info_p_lossss,info_v_lossss,info_entropyss)  # for sanity check
-            writer.add_scalar('Policy(actor) Loss, vibrate, less then 1', info_p_lossss,global_step=global_update)
-            writer.add_scalar('Value Loss, ???', info_v_lossss,global_step=global_update)
-            writer.add_scalar('Entropy: How stochatic decisions of brain, decrease steady', info_entropyss,global_step=global_update)
-            #writer.add_scalar('Total Loss', total_lossss,global_step=global_update)
-        '''
-
-
         # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
 
 
@@ -391,7 +378,7 @@ if __name__ == '__main__':
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
-        file_r = policy_path + '/Robot_Stage_city_dense_global_1620.pth'
+        file_r = policy_path + '/final.pth'
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         #if os.path.exists(file):

@@ -619,7 +619,8 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
     #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
-def generate_action_robot(env, state, pose, policy, action_bound):   # policy = RobotPolicy
+#def generate_action_robot(env, state, pose, policy, action_bound):   # policy = RobotPolicy
+def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   # policy = RobotPolicy
     if env.index == 0:
         s_list, goal_list, speed_list, p_list = [], [], [], []
         #print('state_list:',state, pose)
@@ -661,7 +662,14 @@ def generate_action_robot(env, state, pose, policy, action_bound):   # policy = 
 
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # [0,-1], [1, 1]
+                            # TODO. a[0]? or a?
+
+        # for evaluate(best action)
+        if evaluate:
+            mean = mean.data.cpu().numpy()
+            scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+            
         #print(v, a, logprob, mean)
 
         '''
@@ -676,24 +684,12 @@ def generate_action_robot(env, state, pose, policy, action_bound):   # policy = 
         scaled_action = raw_scaled_action
         #print('v':,v, 'a:',a,'logprob:',logprob,'seacled_Action:',s)
         
+        
     else:  # env.index =! 0
         v = None
         a = None
         scaled_action = None
         logprob = None
-
-
-    # FOR NO-SAMPLING(TEST)
-    '''
-        _, _, _, mean = policy(s_list, goal_list, speed_list)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-    else:
-        mean = None
-        scaled_action = None
-    
-    return mean, scaled_action
-    '''
     
     #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
@@ -1228,9 +1224,13 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
-                                                     float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
-            logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}'.format(info_p_loss, info_v_loss, info_entropy))
+            #info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+            #                                         float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
+            #logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}'.format(info_p_loss, info_v_loss, info_entropy))
+            # 211103 add total loss
+            info_p_loss, info_v_loss, info_entropy, info_total_loss = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy()), float(loss.detach().cpu().numpy())
+            logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}, total_loss_R: {}'.format(info_p_loss, info_v_loss, info_entropy, info_entropy))
             
             # 211027 for logging     # https://www.infoking.site/64
             #global info_p_losss   
