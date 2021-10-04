@@ -385,6 +385,7 @@ if __name__ == '__main__':
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         #if os.path.exists(file):
+        print('current Robot policy:',policy_r)
         if os.path.exists(file_r):
             logger.info('####################################')
             logger.info('#########Loading Robot Model########')

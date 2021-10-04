@@ -4,7 +4,8 @@ resolution 0.2
 threads 16
 #speedup 1
 # -1: for maximum run time
-speedup -1.000
+#speedup -1.000
+speedup 10
 
 
 define sicklaser ranger
@@ -60,8 +61,10 @@ window
   
 # Camera options 
   scale 35.000          
-  center [-2.661  -1.640]
-  rotate [ 0.000  -32.000 ]
+  #center [-2.661  -1.640]
+  center [ 0.000  0.000]
+  #rotate [ 0.000  -32.000 ]
+  rotate [ 0.000  0.000 ]
 
 
 # GUI options
@@ -110,26 +113,26 @@ define agent position
 
 # for init fixed pose start
 # For robot(index=0)
-agent( pose [-2.815 -6.034 0.000 -3.575])
+agent( pose [0.00 -8.00 0.00 90.00])
 # For humans(index>0)
-agent( pose [-1.476 -5.693 0.000 -89.518])
+agent( pose [-5.50 -5.50 0.00 45.00])
 #agent( pose [-5.50 -6.00 0.00 45.00])
 #agent( pose [-6.00 -5.50 0.00 45.00])
 #agent( pose [-5.00 -5.00 0.00 45.00])
 
-agent( pose [-0.566 0.561 0.000 131.456])
+agent( pose [6.00 -6.00 0.00 135.00])
 #agent( pose [5.50 -5.50 0.00 135.00])
 #agent( pose [5.50 -6.00 0.00 135.00])
 #agent( pose [6.00 -5.50 0.00 135.00])
 #agent( pose [5.00 -5.00 0.00 135.00])
 
-agent( pose [5.024 4.410 0.000 122.360])
+agent( pose [5.00 5.00 0.00 225.00])
 #agent( pose [5.50 5.50 0.00 225.00])
 #agent( pose [6.50 6.00 0.00 225.00])
 #agent( pose [6.00 5.50 0.00 225.00])
 #agent( pose [6.00 6.00 0.00 225.00])
 
-agent( pose [6.052 -5.134 0.000 -93.443])
+agent( pose [-6.00 6.00 0.00 315.00])
 #agent( pose [-5.50 5.50 0.00 315.00])
 #agent( pose [-5.50 6.00 0.00 315.00])
 #agent( pose [-6.00 5.50 0.00 315.00])

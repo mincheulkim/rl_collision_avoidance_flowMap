@@ -72,12 +72,13 @@ tensorboard --logdir runs/
 ```
 # TODOList
 ```
--[x] seperate human and robot policy
--[ ] create flowmap(global/local)
--[ ] seperate train / test function for ppo --> ppo.py
--[ ] modify model's pth file name from global step to episodes
--[ ] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
--[ ] check whether get_laser_observation need -0.5
+- [x] seperate human and robot policy: generate_action_human(), generate_action_robot() or generate_action_robot_localmap()
+- [ ] create flowmap(global/local)
+- [x] seperate train / test function for ppo: argument evaluate=True(test), False(train)
+- [ ] modify model's pth file name from global step to episodes
+- [ ] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
+- [ ] check whether get_laser_observation need -0.5
+- [ ] enlarge local map(current 4*4)
 ```
 # checklist
 ```
