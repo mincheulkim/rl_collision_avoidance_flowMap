@@ -98,9 +98,8 @@ class StageWorld():
         v_y = GT_odometry.twist.twist.linear.y
         v = np.sqrt(v_x**2 + v_y**2)
         self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
-        #self.speed_poly = [v_x, v_y]
-        self.speed_poly = GT_odometry.header.frame_id
-        #print(GT_odometry.child_frame_id)
+        self.speed_poly = [v_x, v_y]
+
 
     def laser_scan_callback(self, scan):
         self.scan_param = [scan.angle_min, scan.angle_max, scan.angle_increment, scan.time_increment,
@@ -280,6 +279,16 @@ class StageWorld():
         move_cmd.angular.y = 0.
         move_cmd.angular.z = action[1]
         self.cmd_vel.publish(move_cmd)
+    
+    def control_vel_rvo(self, action):   # 211103
+        move_cmd = Twist()
+        move_cmd.linear.x = action[0]
+        move_cmd.linear.y = action[1]
+        move_cmd.linear.z = 0.
+        move_cmd.angular.x = 0.
+        move_cmd.angular.y = 0.
+        move_cmd.angular.z = 0.
+        self.cmd_vel.publish(move_cmd)
 
 
     def control_pose(self, pose):    # pose = [x, y, theta]
@@ -336,6 +345,8 @@ class StageWorld():
         #    y = np.random.uniform(-9, 9)
         #    dis = np.sqrt(x ** 2 + y ** 2)
         theta = np.random.uniform(0, 0.5 * np.pi)
+        #if self.index ==0:
+        #    theta = np.pi*0.5
         return [x, y, theta]
 
     def generate_random_goal(self):

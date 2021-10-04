@@ -280,7 +280,7 @@ class RobotPolicy(nn.Module):
         self.max_speed = 1
         self.sim = None
 
-    def forward(self, x, goal, speed, pose):   # now create velocity
+    def forward(self, x, goal, speed, occupancy_map):   # now create velocity
         """
             parameter
                 x: 
@@ -289,15 +289,18 @@ class RobotPolicy(nn.Module):
             returns value estimation, action, log_action_prob
 
         """
+        '''
+        print('x:',x)
+        print('goal:',goal)
+        print('speed:',speed)
+        print('occupancy_map:',occupancy_map)
+        '''
+
         # action
         a = F.relu(self.act_fea_cv1(x))
         a = F.relu(self.act_fea_cv2(a))
         a = a.view(a.shape[0], -1)
         a = F.relu(self.act_fc1(a))
-        #print('x:',x)
-        #print('goal:',goal)
-        #print('speed:',speed)
-        #print('pose:',pose)
 
         a = torch.cat((a, goal, speed), dim=-1)
         a = F.relu(self.act_fc2(a))
@@ -338,9 +341,9 @@ class RobotPolicy(nn.Module):
 #####  RVO Policy with Local Map #######
 ########################################
 
-class RVOPolicy_LM(nn.Module):
+class RobotPolicy_LM(nn.Module):
     def __init__(self, frames, action_space):    # frames= 3, action_space= 2    from ppo_stage3.py/main()
-        super(RVOPolicy, self).__init__()
+        super(RobotPolicy_LM, self).__init__()
         self.logstd = nn.Parameter(torch.zeros(action_space))
 
         # nn.Conv1D description
@@ -349,10 +352,12 @@ class RVOPolicy_LM(nn.Module):
         # kernel_size : how much see time step(=frame_size=filter_size)
         # stride: how much moving kernel to see
         # 1. for actor net
-        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
-        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
-        self.act_fc1 = nn.Linear(128*32, 256)
-        self.act_fc2 =  nn.Linear(256+2+2, 128)
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)   # lidar
+        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)       # lidar
+        self.act_fc1 = nn.Linear(128*32, 256)     # lidar.fc
+        self.act_LM = nn.Linear(48, 16)    # localmap
+        #self.act_fc2 =  nn.Linear(256+2+2, 128)
+        self.act_fc2 =  nn.Linear(256+2+2+16, 128)  # w localmap, 211104
         self.actor1 = nn.Linear(128, 1)
         self.actor2 = nn.Linear(128, 1)
 
@@ -360,33 +365,40 @@ class RVOPolicy_LM(nn.Module):
         self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
-        self.crt_fc2 = nn.Linear(256+2+2, 128)
+        self.crt_LM = nn.Linear(48, 16)    # localmap
+        #self.crt_fc2 = nn.Linear(256+2+2, 128)
+        self.crt_fc2 = nn.Linear(256+2+2+16, 128)
         self.critic = nn.Linear(128, 1)
 
-    def forward(self, x, goal, speed, pose, localmap):   # with localmap
+    def forward(self, x, goal, speed, occupancy_map):   # with localmap
         """
             parameter
-                x: s_list(lidar?)
-                (local)goal: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')
-                speed: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')
-                pose: pose_list
-                localmap: 48*3, i hope
+                x: s_list(lidar)  (1,3,512)
+                (local)goal: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')   (1,2)
+                speed: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')         (1,2)
+                localmap: (1,48)
 
             returns value estimation, action, log_action_prob
         """
-        # 1. action(policy)
-        a = F.relu(self.act_fea_cv1(x))
-        a = F.relu(self.act_fea_cv2(a))
-        a = a.view(a.shape[0], -1)
-        a = F.relu(self.act_fc1(a))
-        #print('x:',x)
-        #print('goal:',goal)
-        #print('speed:',speed)
-        #print('pose:',pose)
+        '''
+        print('x:',x)
+        print('goal:',goal)
+        print('speed:',speed)
+        print('LM:',occupancy_map)
+        '''
+
+        # 1. action(policy)\
+        a = F.relu(self.act_fea_cv1(x))   # (1,3,512) -> (1,32,255)
+        a = F.relu(self.act_fea_cv2(a))   # (1,3,255) -> (1,32,128)
+        a = a.view(a.shape[0], -1)        # (1,32,128) -> (1,4096)
+        a = F.relu(self.act_fc1(a))       # (1,4096) -> (1, 256)
 
         # TODO. concat LocalMap 
+        lm_a = F.relu(self.act_LM(occupancy_map))   # (1,48) -> (1,16)
         #TODO a = torch.cat((a, goal, speed, localmap), dim=-1)   # concat localmap
-        a = torch.cat((a, goal, speed), dim=-1)   # concat feature lidar, local goal, speed
+        #a = torch.cat((a, goal, speed), dim=-1)   # concat feature lidar, local goal, speed
+        
+        a = torch.cat((a, goal, speed, lm_a), dim=-1)   # concat feature lidar, local goal, speed and local map # 211104
         a = F.relu(self.act_fc2(a))
         mean1 = F.sigmoid(self.actor1(a))
         mean2 = F.tanh(self.actor2(a))
@@ -407,17 +419,20 @@ class RVOPolicy_LM(nn.Module):
 
         # TODO. concat LocalMap 
         #TODO v = torch.cat((v, goal, speed, localmap), dim=-1)   # concat localmap
-        v = torch.cat((v, goal, speed), dim=-1)
+        lm_c = F.relu(self.crt_LM(occupancy_map))   # (1,48) -> (1,16)
+        #v = torch.cat((v, goal, speed), dim=-1)
+        v = torch.cat((v, goal, speed, lm_c), dim=-1)
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)
 
 
         return v, action, logprob, mean
 
-    def evaluate_actions(self, x, goal, speed, action):
+    def evaluate_actions(self, x, goal, speed, action, occupancy_map):
 
         #v, _, _, mean = self.forward(x, goal, speed)
-        v, _, _, mean = self.forward(x, goal, speed, speed)
+        #v, _, _, mean = self.forward(x, goal, speed, speed)
+        v, _, _, mean = self.forward(x, goal, speed, occupancy_map)
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
         # evaluate

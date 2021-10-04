@@ -77,4 +77,10 @@ tensorboard --logdir runs/
 -[ ] seperate train / test function for ppo --> ppo.py
 -[ ] modify model's pth file name from global step to episodes
 -[ ] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
+-[ ] check whether get_laser_observation need -0.5
+```
+# checklist
+```
+-1. [ppo_city_dense.py]policy_r=RobotPolicy or RobotPolicy_LM
+-2. [ppo_city_desne.py] evaluate=true or false (test/training)
 ```

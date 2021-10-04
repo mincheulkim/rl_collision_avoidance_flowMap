@@ -4,7 +4,7 @@ resolution 0.2
 threads 16
 #speedup 1
 # -1: for maximum run time
-speedup -1
+speedup -1.000
 
 
 define sicklaser ranger
@@ -38,7 +38,7 @@ define floorplan model
   gui_outline 0
   gripper_return 0
   fiducial_return 0
-  ranger_return 1
+  ranger_return 1.000
   obstacle_return 1
 )
 
@@ -56,12 +56,12 @@ floorplan
 
 window
 (
-  size [800 800]         # (important) total window size
+  size [799 800]         # (important) total window size
   
 # Camera options 
-  scale 35          
-  center [0  0]
-  rotate [ 0.000  0.000 ]
+  scale 35.000          
+  center [-2.661  -1.640]
+  rotate [ 0.000  -32.000 ]
 
 
 # GUI options
@@ -84,11 +84,11 @@ window
 define agent position
 (
   # actual size
-  size [0.44 0.38 0.22] # sizes from MobileRobots' web site
+  size [0.440 0.380 0.220] # sizes from MobileRobots' web site
 
   localization "gps"
   # the pioneer's center of rotation is offset from its center of area
-  origin [0 0 0 0]
+  origin [0.000 0.000 0.000 0.000]
 
   # draw a nose on the robot so we can see which way it points
   gui_nose 1
@@ -96,11 +96,11 @@ define agent position
   color "random"
   drive "diff"		 	# Differential steering model.
   obstacle_return 1           	# Can hit things.
-  ranger_return 0.5            	# reflects sonar beams
+  ranger_return 0.500            	# reflects sonar beams
   blob_return 1               	# Seen by blobfinders  
   fiducial_return 1           	# Seen as "1" fiducial finders
   sicklaser(
-	pose [ 0 0 0 0 ] 
+	pose [ 0.000 0.000 0.000 0.000 ] 
   )
   
   # [ xmin xmax ymin ymax zmin zmax amin amax ]				
@@ -110,26 +110,26 @@ define agent position
 
 # for init fixed pose start
 # For robot(index=0)
-agent( pose [0.00 -8.00 0.00 90.00])
+agent( pose [-2.815 -6.034 0.000 -3.575])
 # For humans(index>0)
-agent( pose [-5.50 -5.50 0.00 45.00])
+agent( pose [-1.476 -5.693 0.000 -89.518])
 #agent( pose [-5.50 -6.00 0.00 45.00])
 #agent( pose [-6.00 -5.50 0.00 45.00])
 #agent( pose [-5.00 -5.00 0.00 45.00])
 
-agent( pose [6.00 -6.00 0.00 135.00])
+agent( pose [-0.566 0.561 0.000 131.456])
 #agent( pose [5.50 -5.50 0.00 135.00])
 #agent( pose [5.50 -6.00 0.00 135.00])
 #agent( pose [6.00 -5.50 0.00 135.00])
 #agent( pose [5.00 -5.00 0.00 135.00])
 
-agent( pose [5.00 5.00 0.00 225.00])
+agent( pose [5.024 4.410 0.000 122.360])
 #agent( pose [5.50 5.50 0.00 225.00])
 #agent( pose [6.50 6.00 0.00 225.00])
 #agent( pose [6.00 5.50 0.00 225.00])
 #agent( pose [6.00 6.00 0.00 225.00])
 
-agent( pose [-6.00 6.00 0.00 315.00])
+agent( pose [6.052 -5.134 0.000 -93.443])
 #agent( pose [-5.50 5.50 0.00 315.00])
 #agent( pose [-5.50 6.00 0.00 315.00])
 #agent( pose [-6.00 5.50 0.00 315.00])

@@ -61,7 +61,7 @@ def transform_buffer_r(buff_r):    # 211101, for robot
     # buff=3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
     # buff = state, a_r, r, terminal, logprob_r, v_r
     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
-    v_batch = [], [], [], [], [], [], [], []
+    v_batch, occupancy_maps_batch = [], [], [], [], [], [], [], [], []
     s_temp, goal_temp, speed_temp = [], [], []
 
     for e in buff_r:
@@ -79,6 +79,7 @@ def transform_buffer_r(buff_r):    # 211101, for robot
         s_batch.append(s_temp)
         goal_batch.append(goal_temp)
         speed_batch.append(speed_temp)
+
         s_temp = []
         goal_temp = []
         speed_temp = []
@@ -88,6 +89,7 @@ def transform_buffer_r(buff_r):    # 211101, for robot
         d_batch.append(e[3])   # terminal(T or F)
         l_batch.append(e[4])   # logprob
         v_batch.append(e[5])   # V
+        occupancy_maps_batch.append(e[6])   # Occupancy map
 
     s_batch = np.asarray(s_batch)
     goal_batch = np.asarray(goal_batch)
@@ -97,8 +99,9 @@ def transform_buffer_r(buff_r):    # 211101, for robot
     d_batch = np.asarray(d_batch)
     l_batch = np.asarray(l_batch)
     v_batch = np.asarray(v_batch)
+    occupancy_maps_batch = np.asarray(occupancy_maps_batch)
 
-    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
+    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, occupancy_maps_batch
 
 
 def generate_action(env, state_list, policy, action_bound):
@@ -693,8 +696,9 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
     #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
-def generate_action_robot_localmap(env, state, pose, policy, action_bound, state_list, pose_list, evaluate):   # 211001 for local mapping
+def generate_action_robot_localmap(env, state, pose, policy, action_bound, state_list, pose_list, velocity_poly_list, evaluate):   # 211001 for local mapping
     if env.index == 0:
+        #print(velocity_poly_list)
         s_list, goal_list, speed_list, p_list = [], [], [], []
         
         s_list = state[0]
@@ -709,16 +713,16 @@ def generate_action_robot_localmap(env, state, pose, policy, action_bound, state
         p_list = np.asarray(p_list)
 
         s_list = Variable(torch.from_numpy(s_list).unsqueeze(dim=0)).float().cuda()   # (3, 512)   -> make (1, 3, 512)   # 1: num of agent(gather)
-        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # erase cuda()
+        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()   # (1, 2)
+        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # (1, 2))
 
-
+        #print(speed_list)
         # TODO build occupancy map
         # get humans state
         speed_list_human, pose_list_human = [], []  # n-1
         
-        for i in state_list:  # total # number of human's state
-            speed_list_human.append(i[2])    # veloclity
+        for i in velocity_poly_list:  # total # number of human's state
+            speed_list_human.append(i)    # veloclity
         for i in pose_list:  # total # number of human's state
             pose_list_human.append(i)    # veloclity
         speed_list_human = np.asarray(speed_list_human)
@@ -728,12 +732,17 @@ def generate_action_robot_localmap(env, state, pose, policy, action_bound, state
         print('ve:', speed_list)
         print('speed:',speed_list_human)
         print('pose:', pose_list_human)
-        '''
+        '''    
 
-        occupancy_map = build_occupancy_maps(state=p_list, velocity=speed_ori, human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
-        #print(occupancy_map)
+        occupancy_maps = build_occupancy_maps(state=p_list, velocity=speed_ori, human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
+        #print(occupancy_maps)
+        occupancy_maps_list = np.asarray(occupancy_maps)
+        occupancy_maps_list = Variable(torch.from_numpy(occupancy_maps_list).squeeze(0)).float().cuda()   # (1,1,48) -> (1,48)
+        
+        #print(occupancy_maps_list, occupancy_maps_list.shape, s_list.shape, goal_list.shape, speed_list.shape)
 
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        #v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, occupancy_maps_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # [0,-1], [1, 1]    # a = a[0], only 1 item
 
@@ -742,15 +751,19 @@ def generate_action_robot_localmap(env, state, pose, policy, action_bound, state
             scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
             
         scaled_action = raw_scaled_action
+
+#        scaled_action = [1,0]
         
         
     else:  # env.index =! 0
+        #print(state[2])   # linear vel, ang
         v = None
         a = None
         scaled_action = None
         logprob = None
+        occupancy_maps = None
 
-    return v, a, logprob, scaled_action
+    return v, a, logprob, scaled_action, occupancy_maps
 
 
 
@@ -1061,15 +1074,17 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
                coeff_entropy=0.02, clip_value=0.2,    #  coeff_entropy= 5e-4, clip_val = 0.1
                num_step=2048, num_env=1, frames=1, obs_size=24, act_size=4):  # num_step= 128, num_env=5, frames(laser_hist)=3, obs_size=512, act_size=2
     # num_env=12 is default, ppo_stage2.py line 33 is real
-    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+    #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, occupancy_maps = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
 
     advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
 
     # 128= batch training data, num_env = agent num
-    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*5, 3, 512
-    goals = goals.reshape((num_step*num_env, 2))   # 128*5, 2(x,y)
-    speeds = speeds.reshape((num_step*num_env, 2))  # 128*5, 2(vx,vy)
-    actions = actions.reshape(num_step*num_env, act_size)  # 128*5, 2
+    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*1, 3, 512
+    goals = goals.reshape((num_step*num_env, 2))   # 128*1, 2(x,y)
+    speeds = speeds.reshape((num_step*num_env, 2))  # 128*1, 2(vx,vy)
+    actions = actions.reshape(num_step*num_env, act_size)  # 128*1, 2
+    occupancy_maps = occupancy_maps.reshape((num_step*num_env, 48))
     logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
     advs = advs.reshape(num_step*num_env, 1)  # 128*5, 1
     targets = targets.reshape(num_step*num_env, 1)  # targets?
@@ -1081,14 +1096,16 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
             sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
             sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
-
             sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_occupancy_maps = Variable(torch.from_numpy(occupancy_maps[index])).float().cuda()
+
             sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
             sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
             sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
 
 
-            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+            #new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_occupancy_maps)
 
             sampled_logprobs = sampled_logprobs.view(-1, 1)
             ratio = torch.exp(new_logprob - sampled_logprobs)
@@ -1134,7 +1151,7 @@ def get_parameters():   # 211027 for logging
     #return info_p_losss, info_v_losss, info_entropys, total_losss
     return info_p_losss, info_v_losss, info_entropys
 
-def build_occupancy_maps(state, velocity, human_states, human_velocities):
+def build_occupancy_maps(state, velocity, human_states, human_velocities):  # velocity: nonholonomic_robot, human_velocities=holonomic robot
     '''
     param human_states:
     return: tensor of shape
@@ -1153,7 +1170,7 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):
     robot_velocity_angle = np.arctan2(human_velocities[0][1], human_velocities[0][0])
     other_human_orientation = np.arctan2(other_py, other_px)
     rotation = other_human_orientation - robot_velocity_angle
-    distance = np.linalg.norm([other_px, other_py], axis=0)
+    distance = np.linalg.norm([other_px, other_py], axis=0)  # [1,2,5,6]
         #print('other_human_orien:',other_human_orientation)
         #print('robot_velocity_angle:',robot_velocity_angle)
         #print('rotation:',rotation)
@@ -1165,7 +1182,7 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):
     # compute indicies of humans in the grid
     cell_size = 1
     cell_num = 4
-    om_channel_size = 1
+    om_channel_size = 3
     other_x_index = np.floor(other_px / cell_size + cell_num / 2)   # other_px / 1 + 2
     other_y_index = np.floor(other_py / cell_size + cell_num / 2)
         #print('other_x_index=',other_x_index,other_y_index)
@@ -1175,30 +1192,33 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):
     other_y_index[other_y_index >= cell_num] = float('-inf')   # -inf [0,1,2,3] -inf
         #print('refined index=',other_x_index, other_y_index)
     grid_indices = cell_num * other_y_index + other_x_index    # y_index is y-axis, x_index is x-axis
-        #print('grid_indicies:',grid_indices)    # each human's indiv. call num. 0(SW) ~ 15(NE), if |x|>2 or |y|>2, then -inf
+    #print('grid_indicies:',grid_indices)    # each human's indiv. call num. 0(SW) ~ 15(NE), if |x|>2 or |y|>2, then -inf
     occupancy_map = np.isin(range(cell_num ** 2), grid_indices)   # [0,1,2,...,15] range, is there grid_indicies?  T or F
-        #print('occupancy_map:',occupancy_map)
+    #print('occupancy_map:',occupancy_map)
 
     #OM shape: center is robot
     '''
-    # Grid Indicies
-    [11 12 13 14
-      8  9 10 11
-      4  5  6  7
-      0  1  2  3]
+    # Grid Indicies. N: robot's velocity direction
+    [15 11  7  3
+     14 10  6  2
+     13  9  5  1
+     12  8  4  0]
     '''
 
     if om_channel_size == 1:   # just only consider position data
         occupancy_maps.append([occupancy_map.astype(int)])
     else:
         # calculate relative velocity for other agents
-        #other_human_velocity_angles = np.arctan2(other_humans_vel[:, 3], other_humans_vel[:, 2])   # vy, vx
-        #rotation = other_human_velocity_angles - robot_velocity_angle
-        #speed = np.linalg.norm(other_humans_vel, axis=0)
-        #other_vx = np.cos(rotation) * speed
-        #other_vy = np.sin(rotation) * speed
+        other_human_velocity_angles = np.arctan2(other_humans_vel[:, 1], other_humans_vel[:, 0])   # vy, vx
+        rotation = other_human_velocity_angles - robot_velocity_angle
         other_vx = other_humans_vel[:,0] - human_velocities[0][0]
         other_vy = other_humans_vel[:,1] - human_velocities[0][1]
+        speed = np.linalg.norm([other_vx, other_vy], axis=0)
+        #print('rotation:',rotation)
+        #print('speed:',speed)
+        other_vx = np.cos(rotation) * speed
+        other_vy = np.sin(rotation) * speed
+        
         #print(other_vx, other_vy)
         dm = [list() for _ in range(cell_num ** 2 * om_channel_size)]    # 4**2 * 3 = 16*3 = 48 (each channel has 16 cells)
         for i, index in np.ndenumerate(grid_indices):
@@ -1221,5 +1241,5 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):
 
 
     #print('occupancy map:', occupancy_maps)
-    return occupancy_map
+    return occupancy_maps
     # return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()
