@@ -4,7 +4,6 @@ import copy
 import tf
 import numpy as np
 
-
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
@@ -12,7 +11,6 @@ from rosgraph_msgs.msg import Clock
 from std_srvs.srv import Empty
 from std_msgs.msg import Int8
 from model.utils import test_init_pose_new, test_goal_point_new    # arbitrary start and goal position sets
-
 
 
 class StageWorld():
@@ -174,15 +172,6 @@ class StageWorld():
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
         return [local_x, local_y]
-        #return [goal_x, goal_y]
-
-    def get_local_goal_new(self):   # 211102, do not consider robot's rotation(Theta). perspective to global view
-        [x, y, theta] = self.get_self_stateGT()   # robot state
-        [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
-        local_x = goal_x - x
-        local_y = goal_y - y
-        return [local_x, local_y]
-        #return [goal_x, goal_y]
 
     def reset_world(self):
         self.reset_stage()
@@ -202,10 +191,8 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
         '''
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
-        #[x_g, y_g] = [0, 0]
         self.goal_point = [x_g, y_g]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
-        #[x, y] = self.get_local_goal_new()               # calculate local(robot's coord) goal
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)

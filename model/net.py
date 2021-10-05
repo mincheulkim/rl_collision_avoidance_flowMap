@@ -400,8 +400,8 @@ class RobotPolicy_LM(nn.Module):
         
         a = torch.cat((a, goal, speed, lm_a), dim=-1)   # concat feature lidar, local goal, speed and local map # 211104
         a = F.relu(self.act_fc2(a))
-        mean1 = F.sigmoid(self.actor1(a))
-        mean2 = F.tanh(self.actor2(a))
+        mean1 = F.sigmoid(self.actor1(a))   # 0~1    # linear vel
+        mean2 = F.tanh(self.actor2(a))      # -1~1   # angular vel
         mean = torch.cat((mean1, mean2), dim=-1)
 
         logstd = self.logstd.expand_as(mean)

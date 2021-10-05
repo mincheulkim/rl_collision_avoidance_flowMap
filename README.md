@@ -80,6 +80,19 @@ tensorboard --logdir runs/
 - [ ] check whether get_laser_observation need -0.5
 - [ ] enlarge local map(current 4*4)
 ```
+- From IJCAI20 work, crowd-steer
+- [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location
+- [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions
+
+'''
+- 211105, after meeting
+- [ ] visualize local occupancy map(OpenCV)
+- [ ] prevent human-human collision: modify RVO
+- [ ] check all states(lidar, rel.goal,vel) is right
+- [ ] as toward goal, reward is increase well?
+- [ ] incremental testing: basic scene(0, 1, 2, ... 5)
+- [ ] use conv2D, rather than FC for occupancy map
+```
 # checklist
 ```
 -1. [ppo_city_dense.py]policy_r=RobotPolicy or RobotPolicy_LM

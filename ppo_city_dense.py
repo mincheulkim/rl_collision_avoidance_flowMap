@@ -56,11 +56,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
     global_update = 0  # for memory update(128)
     global_step = 0   # just for counting total step
 
-
     if env.index == 0:
-        # 211026. env.index=0 (robot), else: humans
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
-
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         env.reset_pose()   # reset initial pose(x,y,theta)
@@ -71,96 +68,44 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
         ep_reward = 0
         step = 1  # is used for Time Out(limit 150)
 
-        #print('generate_goal_pose!')
         obs = env.get_laser_observation()   # e.g. array([0.5, 0.5, ...., 0.24598769, 24534221]), total list length 512
-        #print('laser scan: ',len(obs))
         obs_stack = deque([obs, obs, obs])
         goal = np.asarray(env.get_local_goal())   # local goal: perspective of robot coordinate
-        #if env.index ==0:
-            #print('init goal:',goal)
         speed = np.asarray(env.get_self_speed())
+        
         speed_poly = np.asarray(env.get_self_speed_poly())  # 211103
-    
         pose_ori = env.get_self_stateGT()   # 211019
         pose = np.asarray(pose_ori[:2])   # 211019
 
-        #print('pose:',pose)
         state = [obs_stack, goal, speed]  # state: [deque([array([]),array([]),array([])]), array([-0.2323, 8.23232]), array[0, 0]]    # 3 stacted 512 lidar, local goal, init speed
-        #print('state:',state)
-
-        # for static goal test   211021
-        '''
-        print(env,'s goal point:',env.goal_point)
-        print(env,'s local goal:',goal)
-        print(env,'s pos:',pose_ori)
-        '''
-        #print(env.index, 'goal:',goal)
-
-        # local map(adjacency position)
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
             state_list = comm.gather(state, root=0)   # incorporate observation state
+
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             velocity_poly_list = comm.gather(speed_poly, root=0)  # 211104, for [vx,vy]
-            #if env.index == 0:
-                #print(velocity_poly_list)
-            #    print(state)
-            #goals_list = comm.gather(goal, root=0)     # 211019
-            #print('pose_list:',pose_list)
-            #print('goals_list:',goals_list)
-            # [array([-6.50951869, -8.42569113]), array([-7.39730693, -8.33040246]), array([-8.64532387, -7.73384512]), array([-8.9156547 , -8.98302644]), array([-8.77155013, -8.20209891])])
-            # to rvo2
-            # then get action tuples
-
-            # TODO. Create/Update flowMap by robot(agent 0, env.index=0)
-            '''
-            if env.index == 0:
-                if flow_map is None:  # create flowmap
-                    #flow_map = [[0,1,1,0,0,0,1,1,0,0],[1,0,1,0,0,1,0,0],[2,3,2,0,0,2,0],...,[2,4,2,0,0,2,0,2,0]]   # like list. # = count of how many human detected?
-                    flow_map = get_flowmap(robot_curr_pose,humans_pose,update=false)
-                    flow_map = np.array(flow_map)
-                else:                 # update flowmap
-                    flow_map = get_flowmap(robot_curr_pose,humans_pose,update=true)
-                    # flow_map : 12*12 dig0 matrix. axis=1 means the weights? or direction
-            '''
 
             # 1. generate actions at rank==0
             # human part
-            # env: <stage_world1.StageWorld instace at 0x7ff758640050> as manything, state_list=[3 stacked 512 lidar, local_goal, self_speed], policy: 'CNNPolicy(~~, action_boud:[[0,-1],[1,1]]
-            #print('policy:',policy)
-            #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)   # from ppo
-            #print('scaled action:',scaled_action)
+            # env: <stage_world1.StageWorld instace at 0x7ff758640050> as manything, state_list=[3 stacked 512 lidar, local_goal, self_speed], policy: 'CNNPolicy(~~, action_boud:[[0,-1],[1,1]]           
             # v: array[[-0.112323],[0.2323],[0.123123],[-1.2323],[-0.023232]] like dummy_vec, a: array({[[0.123,0.23],[0.23,0.23],..,[0.232,0.2323]]})  total 5 like dummy_vec, log_prob:[[-2],...,[-2]] as dummy_vec 5, scaled_action: array([[0.232, 0.2323], [0.2323, 0.2323], ..., [0.2323, 0.2323]]) as 5 agent's action
-            #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
-            
-            
-            #if env.index ==0:
-                #print('================')
-                #print(state_list, pose_list)
-                #print('state:', state, 'pose:', pose)
-            
+                
             # for human 211002
-            v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
-            
+            v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 21102        
 
             # for robot  211101
             #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
             #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for test
 
-
-            #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
-            # TODO 1. generate_action_human with local_flowmap
+            # generate_action_human with local_flowmap
             v_r, a_r, logprob_r, scaled_action_r, occupancy_maps_r=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
 
             # TODO 2. generate_action_human with global_flowmap
 
-
-            # only robot whose rank(index)==0 has the state_list which contains other's state.
-
             # 2. execute actions
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
-            #print('real action:',real_action)
+            
             if env.index ==0:
                 env.control_vel(scaled_action_r)
             else:  # TODO check rvo vel
@@ -168,45 +113,19 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 env.control_vel(real_action)
             # rate.sleep()
             rospy.sleep(0.001)
-            
-            vel1 = env.get_self_speed()          # odometry.twist.twist.linear.x, odometry.twist.twist.angular.z
-            vel2 = env.get_self_speed_poly()     # GT_odometry.twist.twist.linear.x, GT_odometry.twist.twist.linear.y
-            vel3 = env.get_self_speedGT()        # v, GT_odometry.twist.twist.angular.z
-            #if env.index == 0:
-            #    print('1:',vel1)
-            #    print('2:',vel2)
-            #    print('3:',vel3)
-            
-            
 
             # 3. get informtion after action(reward, info)
             r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
-            #print('step reward:',r)
             ep_reward += r   # for one episode culm reward
             global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
-            #print('step:',step, 'r:',r, 'terminal:',terminal, 'result:',result, 'ep_reward:',ep_reward,'global_step:',global_step)
-            #e.g.
-            #Env 00 ('step:', 1, 'r:', -0.062560365832449172, 'terminal:', False, 'result:', 0, 'ep_reward:', -0.062560365832449172, 'global_step:', 1)
-            #Env 01 ('step:', 1, 'r:',    13.337030629721486, 'terminal:', False, 'result:', 0, 'ep_reward:', 13.337030629721486, 'global_step:', 1)       
-            #Env 02 ('step:', 1, 'r:',  -0.20109885838264674, 'terminal:', False, 'result:', 0, 'ep_reward:', -0.20109885838264674, 'global_step:', 1)
-            #Env 03 ('step:', 1, 'r:',   -13.016827513449938, 'terminal:', False, 'result:', 0, 'ep_reward:', -13.016827513449938, 'global_step:', 1)
-            #Env 04 ('step:', 1, 'r:',   -8.7319593604756527, 'terminal:', False, 'result:', 0, 'ep_reward:', -8.7319593604756527, 'global_step:', 1)
-
 
             # 4. get next state
             s_next = env.get_laser_observation()   # get new lidar obs
-            #if env.index ==0:
-            #    print('s_next:',s_next)
-            #print('s_next:',s_next)
             left = obs_stack.popleft()   # remove left stack(3 consequence data use)  # obs_stack:deque[obs, obs, obs], left = trash(don't use)
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
-            #if env.index ==0:
-            #    print('GT global goal:',env.get_goal_point())
-            #    print('local_goal:',goal_next)
             speed_next = np.asarray(env.get_self_speed())  # ???
             
-            #print('env.index:',env.index, goal_next, speed_next)
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'
                                                                # get (updated l-r+) obs_stack, new local goal and updated speed_next
             # 4.1 get next state(pose, vel)
@@ -216,28 +135,13 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
 
             if global_step % HORIZON == 0:   # every 128, estimate future V???
                 
-                # TODO 1. generate_action_human with local_flowmap
-        
                 # For Robot 211001
-                
                 #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
                 #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
-                
-                
-                # TODO 2. generate_action_human with global_flowmap
                 last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
 
-
-                '''
-                generate_action_rvo_dense(...,+flow_map)
-                '''
                 
             # 5. add transitons in buff and update policy
-            #r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
-            #terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F] in case agent = 5
-            #print('terminal list:',terminal_list)
-            #print('r_list:',r_list)
-
             if env.index == 0:  # maybe env.index=0 means robot? or just one(VIP) act as?
                 # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
                 '''
@@ -268,12 +172,11 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 '''
 
                 if len(buff_r) > HORIZON - 1:   # FOR ROBOT
-                    #print(buff_r)
                     s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, r_batch_r, d_batch_r, l_batch_r, v_batch_r, occupancy_maps_r = \
                         transform_buffer_r(buff_r=buff_r)   # from model.ppo, batched buffer
                     t_batch_r, advs_batch_r = generate_train_data_r(rewards=r_batch_r, gamma=GAMMA, values=v_batch_r,  # r_batch, 0.99, v_batch
                                                               last_value=last_v_r, dones=d_batch_r, lam=LAMDA)   # last_v(every 128, future v), terminal list, 0.95
-                    #memory_r = (s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, l_batch_r, t_batch_r, v_batch_r, r_batch_r, advs_batch_r)
+                    #memory_r = (s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, l_batch_r, t_batch_r, v_batch_r, r_batch_r, advs_batch_r)   # before occupancy maps
                     memory_r = (s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, l_batch_r, t_batch_r, v_batch_r, r_batch_r, advs_batch_r, occupancy_maps_r)
                     # TODO Real training part
                     ppo_update_city_r(policy=policy_r, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory_r,  # CNNPolicy, Adam, 1024, above lie about memory
@@ -282,45 +185,41 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
                     #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
 
-                    buff_r = []    # clean buffer
+                    buff_r = []          # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
 
             step += 1   # time goes on +1
             state = state_next
             
             pose = pose_next   # 2l.,j,j,11020
-            #print(env.goal_point[0], env.init_pose[0], env.goal_point[1], env.init_pose[1])
-            '''
-            if env.index==0:
-                print('state:',state)
-                print('pose:',pose)
-                print('sampled_action:',scaled_action_r)
-                print('reward:',r)
-                print('culm.reward:',ep_reward)
-            '''
             speed_poly = speed_next_poly  # 211104
 
         # after terminate = True(end step)
+        
+        '''
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
                 #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_global:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps#########'
                             '################'.format(global_update, step))
-        
-        distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
-        #distance=2   # 211027 revive
+        '''
 
-        #print('envgoal:',env.goal_point)
+        distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         
-        # 211027 only show and save env.index=0(robot) log
-        if env.index ==0:
+        if env.index ==0:   # log save
             logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
             logger_cal.info(ep_reward)
 
-        # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
+            if id != 0 and id % 20 == 0:
+                #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
+                torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
+                logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
+                            '################'.format(global_update, step, id))
+            
 
+        # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
 
 
 
@@ -356,7 +255,6 @@ if __name__ == '__main__':
     size = comm.Get_size()
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)   # 512(obs_size as lidar size), index, 5
-    #print('env:',env.index)    # create rank'th different env
     reward = None
     action_bound = [[0, -1], [1, 1]]
 
@@ -364,7 +262,6 @@ if __name__ == '__main__':
     # np.random.seed(1)
     if rank == 0:   # (env.index=0))
         policy_path = 'policy'
-        # policy = MLPPolicy(obs_size, act_size)    # 512, 2   # from model/net.py
         #policy = CNNPolicy(frames=LASER_HIST, action_space=2)   # 3, 2   # TODO: callback to this funct
         policy = RVOPolicy(frames=LASER_HIST, action_space=2)   # 3, 2
         #policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211001 for robot
@@ -379,12 +276,8 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
-        #file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
         file_r = policy_path + '/final.pth'
-        #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
-        #print('file nave:',file)
-        #if os.path.exists(file):
+
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):
             logger.info('####################################')
@@ -399,7 +292,7 @@ if __name__ == '__main__':
             logger.info('#####################################')
     else:
         policy = None
-        policy_r = None  # 211001
+        policy_r = None  # 211101. robot's policy
         policy_path = None
         opt = None
 

@@ -7,3 +7,12 @@ model/*.pyc
 build/
 devel/
 src/
+Result/
+all_archive backup_211101/
+backup/
+backup_1/
+backup_211102_20Humans/
+backup_erase/
+catkin_ws/
+log/
+

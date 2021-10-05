@@ -9,7 +9,6 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import rvo2
 
 
-
 hostname = socket.gethostname()
 if not os.path.exists('./log/' + hostname):
     os.makedirs('./log/' + hostname)
@@ -65,7 +64,6 @@ def transform_buffer_r(buff_r):    # 211101, for robot
     s_temp, goal_temp, speed_temp = [], [], []
 
     for e in buff_r:
-        #print(e[0][0],e[0][1],e[0][2])
         '''
         for state in e[0]:   # states data
             s_temp.append(state[0])   # 1. lidar
@@ -404,8 +402,6 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
 
         sim.doStep()
 
-
-
         #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
         #scaled_action = np.array([[0.123,0.00],[0.23,0.00],[0.33,0.00],[0.43,0.00],[0.232,0.003]])
         scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
@@ -625,32 +621,22 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
 def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   # policy = RobotPolicy
     if env.index == 0:
         s_list, goal_list, speed_list, p_list = [], [], [], []
-        #print('state_list:',state, pose)
-        #print('PPPPPOOOLICIY:',policy)
         '''
         for i in state:
             s_list.append(i[0])      # lidar state
             goal_list.append(i[1])   # local goal
             speed_list.append(i[2])  # veloclity
         '''
-        #print('state:',state)
         
         s_list = state[0]
         goal_list = state[1]
         speed_list = state[2]
         p_list = pose
-
-        #print('input:',s_list, goal_list, speed_list, p_list)
-        #print('input:',goal_list)
-
              
         s_list = np.asarray(s_list)
         goal_list = np.asarray(goal_list)
         speed_list = np.asarray(speed_list)
         p_list = np.asarray(p_list)
-
-        #print(s_list, goal_list, speed_list, p_list)
-        
 
         #s_list = Variable(torch.from_numpy(s_list)).float().cuda()
         #goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
@@ -664,27 +650,16 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
 
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # [0,-1], [1, 1]
-                            # TODO. a[0]? or a?
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # a[0] = (linear, angular), [0,-1], [1, 1]
+                            # TODO. see is action_bound really work
 
         # for evaluate(best action)
         if evaluate:
             mean = mean.data.cpu().numpy()
-            scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-            
-        #print(v, a, logprob, mean)
+            scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])   
 
-        '''
-        # 211028 For NO-SAMPLING(TEST)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-        '''
-        
-        # Get action for humans(RVO)
-        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
-        #print(v, a, logprob, raw_scaled_action)
         scaled_action = raw_scaled_action
-        #print('v':,v, 'a:',a,'logprob:',logprob,'seacled_Action:',s)
+
         
         
     else:  # env.index =! 0
@@ -693,7 +668,6 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
         scaled_action = None
         logprob = None
     
-    #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
 def generate_action_robot_localmap(env, state, pose, policy, action_bound, state_list, pose_list, velocity_poly_list, evaluate):   # 211001 for local mapping
@@ -716,7 +690,6 @@ def generate_action_robot_localmap(env, state, pose, policy, action_bound, state
         goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()   # (1, 2)
         speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # (1, 2))
 
-        #print(speed_list)
         # TODO build occupancy map
         # get humans state
         speed_list_human, pose_list_human = [], []  # n-1
@@ -751,7 +724,6 @@ def generate_action_robot_localmap(env, state, pose, policy, action_bound, state
             scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
             
         scaled_action = raw_scaled_action
-
 #        scaled_action = [1,0]
         
         
@@ -798,7 +770,6 @@ def generate_train_data(rewards, gamma, values, last_value, dones, lam):
     return targets, advs
 
 def generate_train_data_r(rewards, gamma, values, last_value, dones, lam):   # rewards=r_batch_r, gamma=0.99, values=v_batch_r, last_value=last_v_r, dones=d_batch_r, lam=LAMDA
-    #print('rewards:',rewards.shape)
     num_step = rewards.shape[0]
     #num_env = rewards.shape[1]
     num_env = 1
@@ -1055,10 +1026,6 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             # logger_ppo.info('p_loss: {}, v_loss: {}, entropy: {}'.format(info_p_loss, info_v_loss, info_entropy))
             
             # 211027 for logging     # https://www.infoking.site/64
-            #global info_p_losss   
-            #global info_v_losss
-            #global info_entropys
-            #global total_loss
             global info_p_losss
             info_p_losss = info_p_loss
             global info_v_losss
@@ -1103,7 +1070,6 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
             sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
 
-
             #new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
             new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_occupancy_maps)
 
@@ -1128,13 +1094,9 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             # 211103 add total loss
             info_p_loss, info_v_loss, info_entropy, info_total_loss = float(policy_loss.detach().cpu().numpy()), \
                                                      float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy()), float(loss.detach().cpu().numpy())
-            logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}, total_loss_R: {}'.format(info_p_loss, info_v_loss, info_entropy, info_entropy))
+            logger_ppo.info('p_loss_R: {}, v_loss_R: {}, entropy_R: {}, total_loss_R: {}'.format(info_p_loss, info_v_loss, info_entropy, info_total_loss))
             
             # 211027 for logging     # https://www.infoking.site/64
-            #global info_p_losss   
-            #global info_v_losss
-            #global info_entropys
-            #global total_loss
             global info_p_losss
             info_p_losss = info_p_loss
             global info_v_losss
@@ -1157,7 +1119,6 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):  # ve
     return: tensor of shape
     '''
     occupancy_maps = []
-    #print(state, velocity, human_states, human_velocities)
 
     #other_humans_pose = np.concatenate([np.array([(other_human.px, other_human.py)]) for other_human in human_states[1:]], axis=0)   # except robot self
     #other_humans_vel = np.concatenate([np.array([(other_human.vx, other_human.vy)]) for other_human in human_velocities[1:]], axis=0)   # except robot self
@@ -1214,8 +1175,7 @@ def build_occupancy_maps(state, velocity, human_states, human_velocities):  # ve
         other_vx = other_humans_vel[:,0] - human_velocities[0][0]
         other_vy = other_humans_vel[:,1] - human_velocities[0][1]
         speed = np.linalg.norm([other_vx, other_vy], axis=0)
-        #print('rotation:',rotation)
-        #print('speed:',speed)
+
         other_vx = np.cos(rotation) * speed
         other_vy = np.sin(rotation) * speed
         
