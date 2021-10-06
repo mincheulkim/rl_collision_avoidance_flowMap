@@ -68,8 +68,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     if env.index == 0:
         env.reset_world()
-    plt.ion()
-    fig = plt.figure()
+    
 
     for id in range(MAX_EPISODES):
         # senario reset option
