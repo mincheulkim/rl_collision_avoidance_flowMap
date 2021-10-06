@@ -108,7 +108,6 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         cell_size=1*0.1
         map_size=6
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
-        print('=============')
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]
             #print(i, diff,': ', pose-pose_list[0])   # calculate diff position vs robot[0]

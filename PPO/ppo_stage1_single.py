@@ -63,6 +63,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     local_map = True                 # select LM policy
     LM_visualize = True             # visualize local map(but very slow!!)
+    LIDAR_visualize = False
 
 
     if env.index == 0:
