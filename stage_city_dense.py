@@ -127,6 +127,9 @@ class StageWorld():
     def get_self_speed_poly(self):
         return self.speed_poly
 
+    def get_self_state_rot(self):
+        return self.state_GT[2]
+
     def get_laser_observation(self):
         scan = copy.deepcopy(self.scan)  # from laser_scan_callback   # self.scan = np.array(scan.ranges)
         scan[np.isnan(scan)] = 6.0       # NaN or INF set 6
@@ -315,14 +318,14 @@ class StageWorld():
             y = np.random.uniform(-7, -5)
         '''
         if self.index == 1:
-            x= -5.5
-            y=-5.5
+            x=-6
+            y=-6
         elif self.index == 2:
             x= 6
             y=-6
         elif self.index == 3:
-            x= 5
-            y= 5
+            x= 6
+            y= 6
         if self.index == 4:
             x= -6
             y= 6
@@ -358,14 +361,14 @@ class StageWorld():
             y = np.random.uniform(5, 7)
         '''
         if self.index == 1:
-            x= 5.5
-            y=5.5
+            x= 6
+            y= 6
         elif self.index == 2:
             x= -6
             y=6
         elif self.index == 3:
-            x= -5
-            y= -5
+            x= -6
+            y= -6
         if self.index == 4:
             x= 6
             y= -6

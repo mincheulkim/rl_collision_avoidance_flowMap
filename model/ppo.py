@@ -56,7 +56,7 @@ def transform_buffer(buff):    # from 5 step at ppo_stage3.py
 
     return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
 
-def transform_buffer_r(buff_r):    # 211101, for robot
+def transform_buffer_r(buff_r, LM):    # 211101, for robot
     # buff=3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
     # buff = state, a_r, r, terminal, logprob_r, v_r
     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
@@ -87,7 +87,8 @@ def transform_buffer_r(buff_r):    # 211101, for robot
         d_batch.append(e[3])   # terminal(T or F)
         l_batch.append(e[4])   # logprob
         v_batch.append(e[5])   # V
-        occupancy_maps_batch.append(e[6])   # Occupancy map
+        if LM:
+            occupancy_maps_batch.append(e[6])   # Occupancy map
 
     s_batch = np.asarray(s_batch)
     goal_batch = np.asarray(goal_batch)
@@ -97,9 +98,13 @@ def transform_buffer_r(buff_r):    # 211101, for robot
     d_batch = np.asarray(d_batch)
     l_batch = np.asarray(l_batch)
     v_batch = np.asarray(v_batch)
-    occupancy_maps_batch = np.asarray(occupancy_maps_batch)
+    if LM:
+        occupancy_maps_batch = np.asarray(occupancy_maps_batch)
 
-    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, occupancy_maps_batch
+    if LM:
+        return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, occupancy_maps_batch
+    else:
+        return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
 
 
 def generate_action(env, state_list, policy, action_bound):
@@ -414,7 +419,7 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
 
     return v, a, logprob, scaled_action
 
-def generate_action_human(env, state_list, pose_list, policy, action_bound):   # pose_list added
+def generate_action_human(env, state_list, pose_list, policy, action_bound, velocity_poly_list, goal_global_list, rot_list, num_env):   # pose_list added
     if env.index == 0:
         
         s_list, goal_list, speed_list = [], [], []
@@ -438,32 +443,25 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         for i in pose_list:
             p_list.append(i)
         p_list = np.asarray(p_list)
-        #print('p_list:',p_list)
-        #print('goal_list:',goal_list_new)
-        
-        '''
-        # Get action for robot(RVOPolicy)   # s_list.shape: (20, 3, 512)
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
-        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
-        #print(v, a, logprob, mean)
-        '''
 
-        '''
-        # 211028 For NO-SAMPLING(TEST)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-        '''
         
         # Get action for humans(RVO)
         #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
-        sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.4, 1)
+        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
+        #sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.4, 1)
+        sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
+        #callback
+        #for i in num_env-1:  # if num_env=5 then human 1,2,3,4
+        #    sim.addAgent(tuple(p_list[i+1]))
+        for i in range(num_env):  # i=0, 1,2,3,4
+            if i >= 1:
+                print(i)
 
-        a0=sim.addAgent(tuple(p_list[0]))  # like robot exists
-        a1=sim.addAgent(tuple(p_list[1]))
-        a2=sim.addAgent(tuple(p_list[2]))
-        a3=sim.addAgent(tuple(p_list[3]))
-        a4=sim.addAgent(tuple(p_list[4]))
+        a0=sim.addAgent(tuple(p_list[1]))  # like robot exists
+        a1=sim.addAgent(tuple(p_list[2]))
+        a2=sim.addAgent(tuple(p_list[3]))
+        a3=sim.addAgent(tuple(p_list[4]))
+        #a4=sim.addAgent(tuple(p_list[4]))
         '''
         a5=sim.addAgent(tuple(p_list[5]))
         a6=sim.addAgent(tuple(p_list[6]))
@@ -487,12 +485,18 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         #sim.processObstacles()
         # TODO concern about local obstacle
 
-        h0v = goal_list_new[0]# - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
-        h1v = goal_list_new[1]# - p_list[1]
-        h2v = goal_list_new[2]# - p_list[2]
-        h3v = goal_list_new[3]# - p_list[3]
-        h4v = goal_list_new[4]# - p_list[4]
-        #print(h0v,h1v,h2v,h3v,h4v)
+        h0v = goal_global_list[1] - p_list[1]  # TODO because goal's here is local goal, there is no need to minus current position
+        h1v = goal_global_list[2] - p_list[2]
+        h2v = goal_global_list[3] - p_list[3]
+        h3v = goal_global_list[4] - p_list[4]
+        #h4v = goal_global_list[4] - p_list[4]
+        
+        #h0v = goal_list_new[0]# - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
+        #h1v = goal_list_new[1]# - p_list[1]
+        #h2v = goal_list_new[2]# - p_list[2]
+        #h3v = goal_list_new[3]# - p_list[3]
+        #h4v = goal_list_new[4]# - p_list[4]
+        
         '''
         h5v = goal_list_new[5]  
         h6v = goal_list_new[6]
@@ -517,7 +521,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h1s = np.linalg.norm(h1v)
         h2s = np.linalg.norm(h2v)
         h3s = np.linalg.norm(h3v)
-        h4s = np.linalg.norm(h4v)
+        #h4s = np.linalg.norm(h4v)
         '''
         h5s = np.linalg.norm(h5v)     
         h6s = np.linalg.norm(h6v)
@@ -540,7 +544,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         prefv1=h1v/h1s if h1s >1 else h1v
         prefv2=h2v/h2s if h2s >1 else h2v
         prefv3=h3v/h3s if h3s >1 else h3v
-        prefv4=h4v/h4s if h4s >1 else h4v
+        #prefv4=h4v/h4s if h4s >1 else h4v
         #print(prefv0,prefv1,prefv2,prefv3,prefv4)
 
         '''
@@ -565,7 +569,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         sim.setAgentPrefVelocity(a1, tuple(prefv1))
         sim.setAgentPrefVelocity(a2, tuple(prefv2))
         sim.setAgentPrefVelocity(a3, tuple(prefv3))
-        sim.setAgentPrefVelocity(a4, tuple(prefv4))
+        #sim.setAgentPrefVelocity(a4, tuple(prefv4))
         '''
         sim.setAgentPrefVelocity(a5, tuple(prefv5))
         sim.setAgentPrefVelocity(a6, tuple(prefv6))
@@ -583,18 +587,17 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         sim.setAgentPrefVelocity(a18, tuple(prefv18))
         sim.setAgentPrefVelocity(a19, tuple(prefv19))
         '''
-
-
         sim.doStep()
 
         #scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
         '''
         scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
         '''
-        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)
+        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3)
         v = None
         a = None
         logprob = None
+        #print(scaled_action)
         
     else:  # env.index =! 0
         v = None
@@ -1039,10 +1042,13 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
 
 def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPolicy, Adam, 1024, above lie about memory, epoch=2
                coeff_entropy=0.02, clip_value=0.2,    #  coeff_entropy= 5e-4, clip_val = 0.1
-               num_step=2048, num_env=1, frames=1, obs_size=24, act_size=4):  # num_step= 128, num_env=5, frames(laser_hist)=3, obs_size=512, act_size=2
+               num_step=2048, num_env=1, frames=1, obs_size=24, act_size=4, LM=False):  # num_step= 128, num_env=5, frames(laser_hist)=3, obs_size=512, act_size=2
     # num_env=12 is default, ppo_stage2.py line 33 is real
     #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
-    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, occupancy_maps = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+    if LM:
+        obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, occupancy_maps = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+    else:
+        obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
 
     advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
 
@@ -1051,7 +1057,8 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
     goals = goals.reshape((num_step*num_env, 2))   # 128*1, 2(x,y)
     speeds = speeds.reshape((num_step*num_env, 2))  # 128*1, 2(vx,vy)
     actions = actions.reshape(num_step*num_env, act_size)  # 128*1, 2
-    occupancy_maps = occupancy_maps.reshape((num_step*num_env, 48))
+    if LM:
+        occupancy_maps = occupancy_maps.reshape((num_step*num_env, 48))
     logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
     advs = advs.reshape(num_step*num_env, 1)  # 128*5, 1
     targets = targets.reshape(num_step*num_env, 1)  # targets?
@@ -1064,14 +1071,18 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
             sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
             sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
-            sampled_occupancy_maps = Variable(torch.from_numpy(occupancy_maps[index])).float().cuda()
+            if LM:
+                sampled_occupancy_maps = Variable(torch.from_numpy(occupancy_maps[index])).float().cuda()
 
             sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
             sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
             sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
 
             #new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
-            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_occupancy_maps)
+            if LM:
+                new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_occupancy_maps)
+            else:
+                new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
 
             sampled_logprobs = sampled_logprobs.view(-1, 1)
             ratio = torch.exp(new_logprob - sampled_logprobs)

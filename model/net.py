@@ -365,7 +365,7 @@ class RobotPolicy_LM(nn.Module):
         self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
-        self.crt_LM = nn.Linear(48, 16)    # localmap
+        self.crt_LM = nn.Linear(48, 16)    # localmap 
         #self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.crt_fc2 = nn.Linear(256+2+2+16, 128)
         self.critic = nn.Linear(128, 1)
