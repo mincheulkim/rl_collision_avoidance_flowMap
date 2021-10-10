@@ -50,7 +50,7 @@ LEARNING_RATE = 5e-5
 
 local_map = False
 
-def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
+def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
     # rate = rospy.Rate(5)
     buff = []
     buff_r = [] # 211101
@@ -95,7 +95,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             # 1. generate actions            
             # for human 211002
             #v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 21102        
-            v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound, velocity_poly_list=velocity_poly_list, goal_global_list=goal_global_list, rot_list=rot_list, num_env=NUM_ENV)   # from orca, 21102        
+            #print('original numbenb:',NUM_ENV)
+            scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, action_bound=action_bound, velocity_poly_list=velocity_poly_list, goal_global_list=goal_global_list, rot_list=rot_list, num_env=NUM_ENV)   # from orca, 21102        
 
             # for robot  211101
             if local_map:   # generate_action_human with local_flowmap
@@ -283,15 +284,11 @@ if __name__ == '__main__':
     # np.random.seed(1)
     if rank == 0:   # (env.index=0))
         policy_path = 'policy'
-        #policy = CNNPolicy(frames=LASER_HIST, action_space=2)   # 3, 2   # TODO: callback to this funct
-        policy = RVOPolicy(frames=LASER_HIST, action_space=2)   # 3, 2
-        #policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211001 for robot
         if local_map:
             policy_r = RobotPolicy_LM(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
         else:
             policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
         
-        policy.cuda()
         policy_r.cuda()
         #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
@@ -316,13 +313,12 @@ if __name__ == '__main__':
             logger.info('############Start Training###########')
             logger.info('#####################################')
     else:
-        policy = None
         policy_r = None  # 211101. robot's policy
         policy_path = None
         opt = None
 
     try:
-        run(comm=comm, env=env, policy=policy, policy_r=policy_r, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
+        run(comm=comm, env=env, policy_r=policy_r, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
     except KeyboardInterrupt:
         pass
 

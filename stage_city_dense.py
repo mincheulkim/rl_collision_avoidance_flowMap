@@ -302,22 +302,8 @@ class StageWorld():
         if self.index == 0:
             x = 0
             y = -8
-        # for humans
-        '''
-        elif self.index > 14:
-            x = np.random.uniform(-5, -7)
-            y = np.random.uniform(5, 7)
-        elif self.index > 9:
-            x = np.random.uniform(5, 7)
-            y = np.random.uniform(5, 7)
-        elif self.index > 4:
-            x = np.random.uniform(5, 7)
-            y = np.random.uniform(-5, -7)
-        else:
-            x = np.random.uniform(-7, -5)
-            y = np.random.uniform(-7, -5)
-        '''
-        if self.index == 1:
+        # For human
+        elif self.index == 1:
             x=-6
             y=-6
         elif self.index == 2:
@@ -326,9 +312,12 @@ class StageWorld():
         elif self.index == 3:
             x= 6
             y= 6
-        if self.index == 4:
+        elif self.index == 4:
             x= -6
             y= 6
+        else:
+            x = np.random.uniform(-7, 7)
+            y = np.random.uniform(-7, 7)
         #dis = np.sqrt(x ** 2 + y ** 2)
         #while (dis > 9) and not rospy.is_shutdown():
         #    x = np.random.uniform(-9, 9)
@@ -345,22 +334,8 @@ class StageWorld():
         if self.index == 0:
             x = 0
             y = 8
-        # For humans
-        '''
-        elif self.index > 14:
-            x = np.random.uniform(5, 7)
-            y = np.random.uniform(-5, -7)
-        elif self.index > 9:
-            x = np.random.uniform(-5, -7)
-            y = np.random.uniform(-5, -7)
-        elif self.index > 4:
-            x = np.random.uniform(-5, -7)
-            y = np.random.uniform(5, 7)
-        else:
-            x = np.random.uniform(5, 7)
-            y = np.random.uniform(5, 7)
-        '''
-        if self.index == 1:
+        # For human
+        elif self.index == 1:
             x= 6
             y= 6
         elif self.index == 2:
@@ -369,9 +344,12 @@ class StageWorld():
         elif self.index == 3:
             x= -6
             y= -6
-        if self.index == 4:
+        elif self.index == 4:
             x= 6
             y= -6
+        else:
+            x = np.random.uniform(-7, 7)
+            y = np.random.uniform(-7, 7)
         #x = np.random.uniform(6, 9)
         #y = np.random.uniform(6, 9)
         dis_origin = np.sqrt(x ** 2 + y ** 2)

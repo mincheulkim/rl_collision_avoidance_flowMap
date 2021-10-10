@@ -419,7 +419,7 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
 
     return v, a, logprob, scaled_action
 
-def generate_action_human(env, state_list, pose_list, policy, action_bound, velocity_poly_list, goal_global_list, rot_list, num_env):   # pose_list added
+def generate_action_human(env, state_list, pose_list, action_bound, velocity_poly_list, goal_global_list, rot_list, num_env):   # pose_list added
     if env.index == 0:
         
         s_list, goal_list, speed_list = [], [], []
@@ -443,7 +443,6 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound, velo
         for i in pose_list:
             p_list.append(i)
         p_list = np.asarray(p_list)
-
         
         # Get action for humans(RVO)
         #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
@@ -451,175 +450,33 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound, velo
         #sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.4, 1)
         sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
         #callback
-        #for i in num_env-1:  # if num_env=5 then human 1,2,3,4
-        #    sim.addAgent(tuple(p_list[i+1]))
+
         for i in range(num_env):  # i=0, 1,2,3,4
             if i >= 1:
-                print(i)
-
-        a0=sim.addAgent(tuple(p_list[1]))  # like robot exists
-        a1=sim.addAgent(tuple(p_list[2]))
-        a2=sim.addAgent(tuple(p_list[3]))
-        a3=sim.addAgent(tuple(p_list[4]))
-        #a4=sim.addAgent(tuple(p_list[4]))
-        '''
-        a5=sim.addAgent(tuple(p_list[5]))
-        a6=sim.addAgent(tuple(p_list[6]))
-        a7=sim.addAgent(tuple(p_list[7]))
-        a8=sim.addAgent(tuple(p_list[8]))
-        a9=sim.addAgent(tuple(p_list[9]))
-        a10=sim.addAgent(tuple(p_list[10]))
-        a11=sim.addAgent(tuple(p_list[11]))
-        a12=sim.addAgent(tuple(p_list[12]))
-        a13=sim.addAgent(tuple(p_list[13]))
-        a14=sim.addAgent(tuple(p_list[14]))
-        a15=sim.addAgent(tuple(p_list[15]))
-        a16=sim.addAgent(tuple(p_list[16]))
-        a17=sim.addAgent(tuple(p_list[17]))
-        a18=sim.addAgent(tuple(p_list[18]))
-        a19=sim.addAgent(tuple(p_list[19]))
-        '''
-
+                sim.addAgent(tuple(p_list[i]))
+                hv = goal_global_list[i] - p_list[i]  # TODO because goal's here is local goal, there is no need to minus current position
+                hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+                prefv=hv/hs if hs >1 else hv
+                sim.setAgentPrefVelocity(i-1, tuple(prefv))
+                
         # Obstacles are also supported # 211022   https://gamma.cs.unc.edu/RVO2/documentation/2.0/class_r_v_o_1_1_r_v_o_simulator.html#a0f4a896c78fc09240083faf2962a69f2
         #o1 = sim.addObstacle([(2.0, 2.0), (-2.0, 2.0), (-2.0, -2.0), (2.0, -2.0)])
         #sim.processObstacles()
         # TODO concern about local obstacle
 
-        h0v = goal_global_list[1] - p_list[1]  # TODO because goal's here is local goal, there is no need to minus current position
-        h1v = goal_global_list[2] - p_list[2]
-        h2v = goal_global_list[3] - p_list[3]
-        h3v = goal_global_list[4] - p_list[4]
-        #h4v = goal_global_list[4] - p_list[4]
-        
-        #h0v = goal_list_new[0]# - p_list[0]  # TODO because goal's here is local goal, there is no need to minus current position
-        #h1v = goal_list_new[1]# - p_list[1]
-        #h2v = goal_list_new[2]# - p_list[2]
-        #h3v = goal_list_new[3]# - p_list[3]
-        #h4v = goal_list_new[4]# - p_list[4]
-        
-        '''
-        h5v = goal_list_new[5]  
-        h6v = goal_list_new[6]
-        h7v = goal_list_new[7]
-        h8v = goal_list_new[8]
-        h9v = goal_list_new[9]
-        h10v = goal_list_new[10] 
-        h11v = goal_list_new[11]
-        h12v = goal_list_new[12]
-        h13v = goal_list_new[13]
-        h14v = goal_list_new[14]
-        h15v = goal_list_new[15]  
-        h16v = goal_list_new[16]
-        h17v = goal_list_new[17]
-        h18v = goal_list_new[18]
-        h19v = goal_list_new[19]
-        '''
-
-        #h0s = np.linalg.norm(h0v)   
-        #h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
-        h0s = np.linalg.norm(h0v)     # 211027   get raw_scaled action from learned policy
-        h1s = np.linalg.norm(h1v)
-        h2s = np.linalg.norm(h2v)
-        h3s = np.linalg.norm(h3v)
-        #h4s = np.linalg.norm(h4v)
-        '''
-        h5s = np.linalg.norm(h5v)     
-        h6s = np.linalg.norm(h6v)
-        h7s = np.linalg.norm(h7v)
-        h8s = np.linalg.norm(h8v)
-        h9s = np.linalg.norm(h9v)
-        h10s = np.linalg.norm(h10v)         
-        h11s = np.linalg.norm(h11v)
-        h12s = np.linalg.norm(h12v)
-        h13s = np.linalg.norm(h13v)
-        h14s = np.linalg.norm(h14v)
-        h15s = np.linalg.norm(h15v)       
-        h16s = np.linalg.norm(h16v)
-        h17s = np.linalg.norm(h17v)
-        h18s = np.linalg.norm(h18v)
-        h19s = np.linalg.norm(h19v)
-        '''
-
-        prefv0=h0v/h0s if h0s >1 else h0v
-        prefv1=h1v/h1s if h1s >1 else h1v
-        prefv2=h2v/h2s if h2s >1 else h2v
-        prefv3=h3v/h3s if h3s >1 else h3v
-        #prefv4=h4v/h4s if h4s >1 else h4v
-        #print(prefv0,prefv1,prefv2,prefv3,prefv4)
-
-        '''
-        prefv5=h5v/h5s if h5s >1 else h5v
-        prefv6=h6v/h6s if h6s >1 else h6v
-        prefv7=h7v/h7s if h7s >1 else h7v
-        prefv8=h8v/h8s if h8s >1 else h8v
-        prefv9=h9v/h9s if h9s >1 else h9v
-        prefv10=h10v/h10s if h10s >1 else h10v
-        prefv11=h11v/h11s if h11s >1 else h11v
-        prefv12=h12v/h12s if h12s >1 else h12v
-        prefv13=h13v/h13s if h13s >1 else h13v
-        prefv14=h14v/h14s if h14s >1 else h14v
-        prefv15=h15v/h15s if h15s >1 else h15v
-        prefv16=h16v/h16s if h16s >1 else h16v
-        prefv17=h17v/h17s if h17s >1 else h17v
-        prefv18=h18v/h18s if h18s >1 else h18v
-        prefv19=h19v/h19s if h19s >1 else h19v
-        '''
-
-        sim.setAgentPrefVelocity(a0, tuple(prefv0))
-        sim.setAgentPrefVelocity(a1, tuple(prefv1))
-        sim.setAgentPrefVelocity(a2, tuple(prefv2))
-        sim.setAgentPrefVelocity(a3, tuple(prefv3))
-        #sim.setAgentPrefVelocity(a4, tuple(prefv4))
-        '''
-        sim.setAgentPrefVelocity(a5, tuple(prefv5))
-        sim.setAgentPrefVelocity(a6, tuple(prefv6))
-        sim.setAgentPrefVelocity(a7, tuple(prefv7))
-        sim.setAgentPrefVelocity(a8, tuple(prefv8))
-        sim.setAgentPrefVelocity(a9, tuple(prefv9))
-        sim.setAgentPrefVelocity(a10, tuple(prefv10))
-        sim.setAgentPrefVelocity(a11, tuple(prefv11))
-        sim.setAgentPrefVelocity(a12, tuple(prefv12))
-        sim.setAgentPrefVelocity(a13, tuple(prefv13))
-        sim.setAgentPrefVelocity(a14, tuple(prefv14))
-        sim.setAgentPrefVelocity(a15, tuple(prefv15))
-        sim.setAgentPrefVelocity(a16, tuple(prefv16))
-        sim.setAgentPrefVelocity(a17, tuple(prefv17))
-        sim.setAgentPrefVelocity(a18, tuple(prefv18))
-        sim.setAgentPrefVelocity(a19, tuple(prefv19))
-        '''
         sim.doStep()
 
-        #scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
-        '''
-        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
-        '''
-        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3)
-        v = None
-        a = None
-        logprob = None
-        #print(scaled_action)
+        scaled_action = []       
+        for i in range(num_env):  # num_env=3,  i=0, 1,2
+            if i==0:
+                scaled_action.append((0,0))
+            if i >= 1:
+                scaled_action.append(sim.getAgentVelocity(i-1))
         
     else:  # env.index =! 0
-        v = None
-        a = None
         scaled_action = None
-        logprob = None
 
-
-    # FOR NO-SAMPLING(TEST)
-    '''
-        _, _, _, mean = policy(s_list, goal_list, speed_list)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-    else:
-        mean = None
-        scaled_action = None
-    
-    return mean, scaled_action
-    '''
-    
-    #print(v, a, logprob, scaled_action)
-    return v, a, logprob, scaled_action
+    return scaled_action
 
 def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   # policy = RobotPolicy
     if env.index == 0:
