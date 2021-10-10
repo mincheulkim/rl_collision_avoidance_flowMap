@@ -330,7 +330,9 @@ class StageWorld():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
-        theta = np.random.uniform(0, 0.5 * np.pi)
+        #theta = np.random.uniform(0, 0.5 * np.pi)
+        #theta = np
+        theta = np.arctan2(y, x) + np.pi
         #if self.index ==0:
         #    theta = np.pi*0.5
         return [x, y, theta]

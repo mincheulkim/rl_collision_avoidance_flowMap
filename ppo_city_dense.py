@@ -41,7 +41,7 @@ EPOCH = 2
 #COEFF_ENTROPY = 5e-4
 COEFF_ENTROPY = 1e-3   # 211102
 CLIP_VALUE = 0.1
-NUM_ENV = 5  # 211018   # human num
+NUM_ENV = 6  # 211018   # human num
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -236,7 +236,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         
         if env.index ==0:   # log save
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Result %s' % \
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Result: %s' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
             logger_cal.info(ep_reward)
 
