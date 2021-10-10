@@ -41,14 +41,15 @@ EPOCH = 2
 #COEFF_ENTROPY = 5e-4
 COEFF_ENTROPY = 1e-3   # 211102
 CLIP_VALUE = 0.1
-#NUM_ENV = 24
-#NUM_ENV = 20  # 211018   # human num
 NUM_ENV = 5  # 211018   # human num
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 local_map = False
+
+
+# check 1.[city_dense.world] # of human position 2.[ppo_city_dense.py] NUM_ENV, local_map 3. mpiexec -np NUM_ENV
 
 def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
     # rate = rospy.Rate(5)
@@ -67,6 +68,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
         terminal = False
         ep_reward = 0
+        live_flag = True
         step = 1  # is used for Time Out(limit 150)
 
         obs = env.get_laser_observation()   # e.g. array([0.5, 0.5, ...., 0.24598769, 24534221]), total list length 512
@@ -109,24 +111,26 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             # 2. execute actions
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
-            
-            if env.index ==0:
-                env.control_vel(scaled_action_r)
-            else:  # TODO check rvo vel
-                #print('actions:',real_action[0], real_action[1])
-                angles = np.arctan2(real_action[1], real_action[0])
-                diff = angles - rot
-                length = np.sqrt([real_action[0]**2+real_action[1]**2])
-                mod_vel = (length, diff)
-                #env.control_vel_rvo(real_action)
-                #env.control_vel(real_action)
-                env.control_vel(mod_vel)   # 211108
+            if live_flag:
+                if env.index ==0:
+                    env.control_vel(scaled_action_r)
+                else:  # TODO check rvo vel
+                    angles = np.arctan2(real_action[1], real_action[0])
+                    diff = angles - rot
+                    length = np.sqrt([real_action[0]**2+real_action[1]**2])
+                    mod_vel = (length, diff)
+
+                    env.control_vel(mod_vel)   # 211108
             # rate.sleep()
-            rospy.sleep(0.001)
+                rospy.sleep(0.001)
 
             # 3. get informtion after action(reward, info)
-            r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
-            ep_reward += r   # for one episode culm reward
+                r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
+                ep_reward += r   # for one episode culm reward
+
+            if terminal==True:
+                live_flag=False
+
             global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
 
             # 4. get next state
@@ -271,15 +275,17 @@ if __name__ == '__main__':
     cal_f_handler = logging.FileHandler(cal_file, mode='a')
     file_handler.setLevel(logging.INFO)
     logger_cal.addHandler(cal_f_handler)
+    
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)   # 512(obs_size as lidar size), index, 5
+    
     reward = None
     action_bound = [[0, -1], [1, 1]]
-
+    
     # torch.manual_seed(1)
     # np.random.seed(1)
     if rank == 0:   # (env.index=0))

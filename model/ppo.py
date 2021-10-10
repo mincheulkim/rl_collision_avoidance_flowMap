@@ -319,8 +319,6 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
         #sim.processObstacles()
         # TODO concern about local obstacle
 
-
-
         h0v = goal_list_new[0]   # TODO because goal's here is local goal, there is no need to minus current position
         h1v = goal_list_new[1]
         h2v = goal_list_new[2]
@@ -445,9 +443,8 @@ def generate_action_human(env, state_list, pose_list, action_bound, velocity_pol
         p_list = np.asarray(p_list)
         
         # Get action for humans(RVO)
-        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
-        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
-        #sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.4, 1)
+        #sim = rvo2.PyRVOSimulator(1/60., num_env, 5, 3, 3, 0.4, 1)
+        
         sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
         #callback
 

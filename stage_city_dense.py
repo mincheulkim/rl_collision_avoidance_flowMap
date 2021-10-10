@@ -42,7 +42,6 @@ class StageWorld():
         self.flow_map = None  # 211026
 
 
-
         # for get reward and terminate(Didn't use)
         self.stop_counter = 0
 
@@ -72,7 +71,7 @@ class StageWorld():
         # -----------Service-------------------
         self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
 
-
+        
         # # Wait until the first callback
         self.speed = None
         self.state = None
@@ -82,7 +81,6 @@ class StageWorld():
         while self.scan is None or self.speed is None or self.state is None\
                 or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
             pass
-
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
         # rospy.on_shutdown(self.shutdown)
