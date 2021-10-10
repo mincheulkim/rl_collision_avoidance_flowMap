@@ -62,9 +62,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
-        env.reset_pose()   # reset initial pose(x,y,theta)
+        
+        #env.reset_pose()   # reset initial pose(x,y,theta)
+        #env.generate_goal_point()   # generate global goal & local goal
 
-        env.generate_goal_point()   # generate global goal & local goal
+        env.generate_pose_goal_circle()  # shafeshift above two line
 
         terminal = False
         ep_reward = 0
@@ -231,11 +233,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                             '################'.format(global_update, step))
         '''
 
-        distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+        #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         
         if env.index ==0:   # log save
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
-                        (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Result %s' % \
+                        (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
             logger_cal.info(ep_reward)
 
             if id != 0 and id % 20 == 0:

@@ -184,13 +184,7 @@ class StageWorld():
 
 
     def generate_goal_point(self):
-        '''
-        [x_g, y_g] = test_goal_point_new(self.index)   # get index's goal_point
-        self.goal_point = [x_g, y_g]
-        [x, y] = self.get_local_goal()
-        self.pre_distance = np.sqrt(x ** 2 + y ** 2)
-        self.distance = copy.deepcopy(self.pre_distance)
-        '''
+
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         self.goal_point = [x_g, y_g]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
@@ -240,12 +234,8 @@ class StageWorld():
         return reward, terminate, result   # float, T or F(base), description
 
     def reset_pose(self):
-        
-        '''
-        reset_pose = test_init_pose_new(self.index)   # from model.utils
-        self.control_pose(reset_pose)                 # if want static start pose, use above two lines 211021
-        '''
         random_pose = self.generate_random_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         rospy.sleep(0.01)
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
@@ -307,6 +297,7 @@ class StageWorld():
         elif self.index == 2:
             x= 6
             y=-6
+            #x,y=-17,-17
         elif self.index == 3:
             x= 6
             y= 6
@@ -326,6 +317,24 @@ class StageWorld():
         #    theta = np.pi*0.5
         return [x, y, theta]
 
+    # 211110
+    def generate_random_circle_pose(self):
+        if self.index == 0:   # for robot
+            x = 0
+            y = -8
+        else:           # For human
+            x = np.random.uniform(-8, 8)
+            y = np.random.uniform(-8, 8)
+            dis = np.sqrt(x ** 2 + y ** 2)
+            while (dis < 7.5 or dis > 8.5) and not rospy.is_shutdown():
+                x = np.random.uniform(-8, 8)
+                y = np.random.uniform(-8, 8)
+                dis = np.sqrt(x ** 2 + y ** 2)
+        theta = np.random.uniform(0, 0.5 * np.pi)
+        #if self.index ==0:
+        #    theta = np.pi*0.5
+        return [x, y, theta]
+
     def generate_random_goal(self):
         self.init_pose = self.get_self_stateGT()
         # For robot
@@ -336,6 +345,7 @@ class StageWorld():
         elif self.index == 1:
             x= 6
             y= 6
+            #x,y=-18,-18
         elif self.index == 2:
             x= -6
             y=6
@@ -359,3 +369,28 @@ class StageWorld():
         #    dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
 
         return [x, y]
+
+    def generate_pose_goal_circle(self):
+        # reset pose
+        random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        rospy.sleep(0.01)
+        self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
+        [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
+
+        # start_time = time.time()
+        while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
+            [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
+            self.control_pose(random_pose)
+        
+        rospy.sleep(0.01)
+
+        # reset goal
+        #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
+        if self.index == 0:
+            self.goal_point = [0, 8]
+        else:
+            self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
+        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
+
+        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
+        self.distance = copy.deepcopy(self.pre_distance)
