@@ -32,7 +32,9 @@ define sicklaser ranger
 define floorplan model
 (
   color "gray30"
-  boundary 1
+  #boundary 1
+  # 211110
+  boundary 1   
 
   gui_nose 0
   gui_grid 0
@@ -47,8 +49,8 @@ define floorplan model
 floorplan
 (
   name "blank"
-  size [20.000 20.000 0.800]            # floor size
-  #size [40.000 40.000 0.800]            # floor size
+  #size [20.000 20.000 0.800]            # floor size
+  size [40.000 40.000 0.800]            # floor size
   pose [0.000 0.000 0.000 0.000]
   #bitmap "city.png"
   bitmap "blank.png"
