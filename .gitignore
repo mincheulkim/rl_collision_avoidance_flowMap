@@ -18,3 +18,4 @@ log/
 all archive backup_211101
 policy/
 worlds/circle - (copy).world
+.vscode/launch.json

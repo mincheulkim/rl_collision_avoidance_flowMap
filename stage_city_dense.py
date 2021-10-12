@@ -210,12 +210,14 @@ class StageWorld():
 
         if self.distance < self.goal_size:  # success reward
             terminate = True
-            reward_g = 15
+            #reward_g = 15
+            reward_g = 35
             result = 'Reach Goal'
 
         if is_crash == 1:                   # collision penalty
             terminate = True
-            reward_c = -15.
+            #reward_c = -15.
+            reward_c = -35
             result = 'Crashed'
 
         if np.abs(w) >  1.05:               # rotation penalty
@@ -360,7 +362,7 @@ class StageWorld():
         else:
             x = np.random.uniform(-7, 7)
             y = np.random.uniform(-7, 7)
-        #x = np.random.uniform(6, 9)
+        #x = np.random.uniform(6, 9)   314    182  5
         #y = np.random.uniform(6, 9)
         dis_origin = np.sqrt(x ** 2 + y ** 2)
         dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
