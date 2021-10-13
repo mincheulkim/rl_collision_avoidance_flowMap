@@ -132,7 +132,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate robot action (at rank==0)
             # ERASE ME!
             if env.index==0:
-                if local_map:
+                if local_map:  # LM: 60x60
                     v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                                                                         # env, state_list, pose_list, velocity_poly_list, policy, action_bound
                 else:
@@ -158,8 +158,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             rospy.sleep(0.001)
 
             if env.index ==0 and LM_visualize:
-                dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                dist = cv2.resize(LM[0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                dist2 = cv2.resize(LM[1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                dist3 = cv2.resize(LM[2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+
                 cv2.imshow("Local flow map", dist)
+                cv2.imshow("Local flow map2", dist2)
+                cv2.imshow("Local flow map3", dist3)
                 cv2.waitKey(1)
                 
 
