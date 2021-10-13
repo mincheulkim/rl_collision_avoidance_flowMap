@@ -18,10 +18,10 @@ from mpi4py import MPI #test
 from torch.optim import Adam #test
 from collections import deque #test
 
-from model.net import MLPPolicy, CNNPolicy #test
+from model.net import MLPPolicy, CNNPolicy, stacked_LM_Policy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer #test
 from drawnow import drawnow
 
@@ -47,7 +47,9 @@ OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
-
+LM_visualize = True             # visualize local map(but very slow!!)
+LIDAR_visualize = False
+policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 
 
 #policy_path, optimizer 
@@ -61,9 +63,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     memory_size = 0
 
-    local_map = True                 # select LM policy
-    LM_visualize = True             # visualize local map(but very slow!!)
-    LIDAR_visualize = False
+
 
 
     if env.index == 0:
@@ -132,9 +132,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate robot action (at rank==0)
             # ERASE ME!
             if env.index==0:
-                if local_map:  # LM: 60x60
+                if policy_list=='LM':  # LM: 60x60
                     v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                                                                         # env, state_list, pose_list, velocity_poly_list, policy, action_bound
+                elif policy_list=='stacked_LM':
+                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
             
@@ -151,20 +153,23 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 #mod_vel = (length, diff)
                 difficulty = 1
                 mod_vel = (length/difficulty, diff/difficulty)   # make more ease, erase me!
-                # Erase me!!
                 env.control_vel(mod_vel)   # 211108
                 #env.control_vel([0,0])   # 211108
             # rate.sleep()
             rospy.sleep(0.001)
 
             if env.index ==0 and LM_visualize:
-                dist = cv2.resize(LM[0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                dist2 = cv2.resize(LM[1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                dist3 = cv2.resize(LM[2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-
-                cv2.imshow("Local flow map", dist)
-                cv2.imshow("Local flow map2", dist2)
-                cv2.imshow("Local flow map3", dist3)
+                # if using _LM, delete [0]
+                if policy_list == 'LM':
+                    dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    cv2.imshow("Local flow map", dist)
+                elif policy_list == 'stacked_LM':
+                    dist = cv2.resize(LM[0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist2 = cv2.resize(LM[1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist3 = cv2.resize(LM[2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    cv2.imshow("Local flow map", dist)    
+                    cv2.imshow("Local flow map2", dist2)
+                    cv2.imshow("Local flow map3", dist3)
                 cv2.waitKey(1)
                 
 
@@ -324,9 +329,15 @@ if __name__ == '__main__':
     # torch.manual_seed(1)
     # np.random.seed(1)
     if rank == 0:
-        policy_path = 'policy'
-        # policy = MLPPolicy(obs_size, act_size)
-        policy = CNNPolicy(frames=LASER_HIST, action_space=2)
+        if policy_list == 'stacked_LM':
+            policy_path = 'policy'
+            # policy = MLPPolicy(obs_size, act_size)
+            policy = stacked_LM_Policy(frames=LASER_HIST, action_space=2)
+        else:
+            policy_path = 'policy'
+            # policy = MLPPolicy(obs_size, act_size)
+            policy = CNNPolicy(frames=LASER_HIST, action_space=2)
+        print(policy)
         policy.cuda()
         
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
