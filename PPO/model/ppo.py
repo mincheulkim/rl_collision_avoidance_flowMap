@@ -55,6 +55,45 @@ def transform_buffer(buff):
 
     return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
 
+def transform_buffer_stacked_LM(buff):   # 211214
+    s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
+    v_batch, local_maps_batch = [], [], [], [], [], [], [], [], []
+    #v_batch = [], [], [], [], [], [], [], []
+    s_temp, goal_temp, speed_temp = [], [], []
+
+    for e in buff:
+        for state in e[0]:
+            s_temp.append(state[0])
+            goal_temp.append(state[1])
+            speed_temp.append(state[2])
+        s_batch.append(s_temp)
+        goal_batch.append(goal_temp)
+        speed_batch.append(speed_temp)
+        s_temp = []
+        goal_temp = []
+        speed_temp = []
+
+        a_batch.append(e[1])
+        r_batch.append(e[2])
+        d_batch.append(e[3])
+        l_batch.append(e[4])
+        v_batch.append(e[5])
+
+        local_maps_batch.append(e[6])  # 211214
+
+    s_batch = np.asarray(s_batch)
+    goal_batch = np.asarray(goal_batch)
+    speed_batch = np.asarray(speed_batch)
+    a_batch = np.asarray(a_batch)
+    r_batch = np.asarray(r_batch)
+    d_batch = np.asarray(d_batch)
+    l_batch = np.asarray(l_batch)
+    v_batch = np.asarray(v_batch)
+
+    local_maps_batch = np.asarray(local_maps_batch)
+    #return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
+    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch
+
 
 def generate_action(env, state_list, policy, action_bound):
     #print(state_list)
@@ -194,6 +233,8 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
             local_maps.append(local_map.tolist())
             local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
         #print(local_map.tolist())   # 211213. [[60],[60],...,[60]]  # https://appia.tistory.com/175
+        
+        local_maps = [local_maps]   # 211214 to match shape of robot_state (3072, 1, 3, 512) and local_map(30712, 1, 3, 60, 60)
         local_maps = np.array(local_maps)
 
         speed_list_human, pose_list_human = [], []  # n-1
@@ -218,10 +259,10 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
 
         local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()
         local_maps_torch = local_maps_torch.unsqueeze(0)
-        # print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
+        #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
 
         #v, a, logprob, mean = policy(s_list, goal_list, speed_list)
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list)
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps)    # from Stacked_LM_Policy
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
     else:
@@ -496,6 +537,67 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
 
 
             new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+
+            sampled_logprobs = sampled_logprobs.view(-1, 1)
+            ratio = torch.exp(new_logprob - sampled_logprobs)
+
+            sampled_advs = sampled_advs.view(-1, 1)
+            surrogate1 = ratio * sampled_advs
+            surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()
+
+            sampled_targets = sampled_targets.view(-1, 1)
+            value_loss = F.mse_loss(new_value, sampled_targets)
+
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            #loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(
+                                                    dist_entropy.detach().cpu().numpy())
+            logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
+
+    #print('update')
+
+def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,    # 211214
+               coeff_entropy=0.02, clip_value=0.2,
+               num_step=2048, num_env=12, frames=1, obs_size=24, act_size=4):     # num_step = 1000, batch_size=1024
+    #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, local_mapss = memory
+
+    advs = (advs - advs.mean()) / advs.std()
+    print('ppo_update_stage1_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'local mapss.shape:',local_mapss.shape)
+
+    obss = obss.reshape((num_step*num_env, frames, obs_size))    # (3072, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
+    goals = goals.reshape((num_step*num_env, 2))
+    speeds = speeds.reshape((num_step*num_env, 2))
+    actions = actions.reshape(num_step*num_env, act_size)
+    logprobs = logprobs.reshape(num_step*num_env, 1)
+    advs = advs.reshape(num_step*num_env, 1)
+    targets = targets.reshape(num_step*num_env, 1)
+
+    local_map_width = 60   # 211214
+    local_mapss = local_mapss.reshape((num_step*num_env, 3, local_map_width, local_map_width))
+
+    for update in range(epoch):
+        sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,   # from 0~999, pick 1024 nums
+                               drop_last=False)
+        for i, index in enumerate(sampler):
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
+
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()  
+
+            sampled_local_maps = Variable(torch.from_numpy(local_mapss[index])).float().cuda()  # 211214
+
+                                                                        # (1024, 3, 512)  (1024, 2)      (1024, 2)        (1024, 2)    be (1024, 3, 60, 60)
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_local_maps)   # FIXME
 
             sampled_logprobs = sampled_logprobs.view(-1, 1)
             ratio = torch.exp(new_logprob - sampled_logprobs)

@@ -20,9 +20,9 @@ from collections import deque #test
 
 from model.net import MLPPolicy, CNNPolicy, stacked_LM_Policy #test
 from stage_world1 import StageWorld #test
-from model.ppo import ppo_update_stage1, generate_train_data
+from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM, generate_action_stacked_LM
-from model.ppo import transform_buffer #test
+from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from drawnow import drawnow
 
 
@@ -47,7 +47,7 @@ OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
-LM_visualize = True             # visualize local map(but very slow!!)
+LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False
 policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 
@@ -57,18 +57,13 @@ policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
-    buff_c = []
     global_update = 0
     global_step = 0
 
     memory_size = 0
 
-
-
-
     if env.index == 0:
-        env.reset_world()
-    
+        env.reset_world()  
 
     for id in range(MAX_EPISODES):
         # senario reset option
@@ -83,7 +78,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         if env.is_crashed:   # 211201
             env.generate_pose_goal_circle()
             env.is_crashed = False
-
 
         terminal = False
         ep_reward = 0
@@ -103,8 +97,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         goal_global = np.asarray(env.get_goal_point())
 
         # for visualize
-        
-
 
         while not terminal and not rospy.is_shutdown():
             
@@ -119,18 +111,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if env.index==0:
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
             
-            #print('envindex=',env_index_list)
-            
             # generate humans action_space
-            
             #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             human_actions=generate_action_human_groups(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            # erase me!
-            #human_actions=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
-            #print('human actions:',human_actions)
 
             # generate robot action (at rank==0)
-            # ERASE ME!
             if env.index==0:
                 if policy_list=='LM':  # LM: 60x60
                     v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
@@ -164,9 +149,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
                     cv2.imshow("Local flow map", dist)
                 elif policy_list == 'stacked_LM':
-                    dist = cv2.resize(LM[0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                    dist2 = cv2.resize(LM[1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                    dist3 = cv2.resize(LM[2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
                     cv2.imshow("Local flow map", dist)    
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
@@ -194,26 +179,24 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
-            #print("len(state_next)")
-            #print(len(state_next))
-            ############training#######################################################################################
 
+            ############training#######################################################################################
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
-                if env.index == 0:
-                    state_next_list_new = state_next_list[0:1]
-                if env.index ==0:
+                pose_next_list = comm.gather(pose_next, root=0)     # 211019. 5 states for each human
+                speed_poly_next_list = comm.gather(speed_next_poly, root=0)
 
-                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
-                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
-                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
-                    
-                    #last_v_c, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
-                    #print('####round 2#####')
-                    #print('original last_v:',last_v)
-                    #print('modified last_v:',last_v_c)
+                if env.index == 0:   # get last_v_r
+                    state_next_list_new = state_next_list[0:1]   # for robot
+                    if policy_list=='LM':  # LM: 60x60    # 211214
+                        last_v_r, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
+                    elif policy_list=='stacked_LM':
+                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
+                    else:
+                        last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 else:
                     last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+            
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
@@ -221,55 +204,68 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 r_list_new = r_list[0:1]
                 terminal_list_new=terminal_list[0:1]
 
-            #if env.index == 0:
+            #if env.index == 0:  (original)
             if env.index == 0 and not (step == 1 and terminal):
+                ############## LM or stacekd LM ######################################################
+                if policy_list =='LM' or policy_list == 'stacked_LM':
+                    #TODO. if local_map: change buff.append
+                    #buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
+                    
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM))   # 211214
 
+                    # TODO check a, r_robot(real plus root), terminal_robot
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        #s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
+                            transform_buffer_stacked_LM(buff=buff)
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        #memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        ppo_update_stage1_stacked_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                                #num_env=NUM_ENV, frames=LASER_HIST,
+                                                num_env=1, frames=LASER_HIST,
+                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)  # FIXME
+
+                        buff = []
+                        global_update += 1
+
+                ############## original method ######################################################
+                else:
                 #TODO. if local_map: change buff.append
-                
-                
-                #buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                #print(len(robot_state), len(a), len(r_list_new), len(terminal_list_new), len(logprob), len(v))
-                buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
 
+                    # TODO check a, r_robot(real plus root), terminal_robot
+                    memory_size += 1
 
-                # TODO check a, r_robot(real plus root), terminal_robot
-                #print('original reward:',r_list,'original_terminal:',terminal_list,'mod reward:',r_robot,'mod terminal:',terminal_robot,'ep_reward:',ep_reward)
-                memory_size += 1
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
+                            transform_buffer(buff=buff)
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+                        ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                                #num_env=NUM_ENV, frames=LASER_HIST,
+                                                num_env=1, frames=LASER_HIST,
+                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)
 
-                #buff_c.append((state_robot, a_c, r_robot, terminal_robot, logprob_c, v_c))   # state_list, r_list, terminal_list: can we manage
-                #print('#####Round 3######')
-                #print('original buff:',buff)
-                #print('modified buff:',buff_c)
-                
-                if len(buff) > HORIZON - 1:
-                    s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
-                        transform_buffer(buff=buff)
-                    t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
-                                                              last_value=last_v_r, dones=d_batch, lam=LAMDA)
-                    memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
-                    ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
-                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
-                                            #num_env=NUM_ENV, frames=LASER_HIST,
-                                            num_env=1, frames=LASER_HIST,
-                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)
-
-                    buff = []
-                    global_update += 1
+                        buff = []
+                        global_update += 1
                     
 
             step += 1
-            #print('memory size:',memory_size,'len buffer:',len(buff))
             ###################################################################################################
             state = state_next
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
 
-
         
         #####save policy and logger##############################################################################################
-    
         if env.index == 0:
             if global_update != 0 and global_update % 5 == 0:
                 torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
@@ -288,7 +284,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     
 
 if __name__ == '__main__':
-
     # config log
     hostname = socket.gethostname()
     if not os.path.exists('./log/' + hostname):

@@ -105,15 +105,15 @@ class stacked_LM_Policy(nn.Module):
         self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.critic = nn.Linear(128, 1)
 
-    def forward(self, x, goal, speed):
+    def forward(self, x, goal, speed, local_maps):
         """
             returns value estimation, action, log_action_prob
         """
         # action
-
-        # print(x.shape)
-        # print(goal.shape)
-        # print(speed.shape)
+        print(x.shape)      # 1, 3, 512                 # 1024, 3, 512  (batch)
+        print(goal.shape)   # 1, 2                      # 1024, 2
+        print(speed.shape)  # 1, 2                      # 1024, 2
+        print(local_maps.shape)  # 1, 3, 60, 60         # 1024, 3, 60, 60
 
         a = F.relu(self.act_fea_cv1(x))
         a = F.relu(self.act_fea_cv2(a))
@@ -146,8 +146,8 @@ class stacked_LM_Policy(nn.Module):
 
         return v, action, logprob, mean
 
-    def evaluate_actions(self, x, goal, speed, action):
-        v, _, _, mean = self.forward(x, goal, speed)
+    def evaluate_actions(self, x, goal, speed, action, local_maps):
+        v, _, _, mean = self.forward(x, goal, speed, local_maps)
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
         # evaluate
@@ -155,6 +155,13 @@ class stacked_LM_Policy(nn.Module):
         dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
         dist_entropy = dist_entropy.sum(-1).mean()
         return v, logprob, dist_entropy
+
+
+
+
+
+
+
 
 
 class MLPPolicy(nn.Module):
