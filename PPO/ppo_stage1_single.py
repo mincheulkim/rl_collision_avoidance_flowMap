@@ -149,9 +149,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
                     cv2.imshow("Local flow map", dist)
                 elif policy_list == 'stacked_LM':
-                    dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                    dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                    dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                    dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   
+                    dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  
+                    dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  
                     cv2.imshow("Local flow map", dist)    
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
@@ -208,12 +208,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if env.index == 0 and not (step == 1 and terminal):
                 ############## LM or stacekd LM ######################################################
                 if policy_list =='LM' or policy_list == 'stacked_LM':
-                    #TODO. if local_map: change buff.append
-                    #buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
-                    
                     buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM))   # 211214
 
-                    # TODO check a, r_robot(real plus root), terminal_robot
                     memory_size += 1
 
                     if len(buff) > HORIZON - 1:
@@ -228,17 +224,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                 epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
                                                 #num_env=NUM_ENV, frames=LASER_HIST,
                                                 num_env=1, frames=LASER_HIST,
-                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)  # FIXME
+                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
 
                         buff = []
                         global_update += 1
 
                 ############## original method ######################################################
                 else:
-                #TODO. if local_map: change buff.append
                     buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
 
-                    # TODO check a, r_robot(real plus root), terminal_robot
                     memory_size += 1
 
                     if len(buff) > HORIZON - 1:
@@ -268,7 +262,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #####save policy and logger##############################################################################################
         if env.index == 0:
             if global_update != 0 and global_update % 5 == 0:
-                torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
+                #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
+                torch.save(policy.state_dict(), policy_path + '/Stage1')
                 torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
@@ -344,13 +339,13 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_150'
+        file = policy_path + '/Stage1'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')
-            logger.info('############Loading Model###########')
+            logger.info('########Loading Model###############')
             logger.info('####################################')
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)

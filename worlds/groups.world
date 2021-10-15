@@ -6,8 +6,8 @@ threads 16
 # -1: for maximum run time
 #speedup -1.000
 #speedup 20
-#speedup 1
-speedup -1
+speedup 5
+#speedup -1
 
 
 define sicklaser ranger
@@ -26,6 +26,7 @@ define sicklaser ranger
     point[2] [1 1]
     point[3] [1 0]
     z [0 0.21]
+    # z [0 1]  # try it!  
   )
 )
 

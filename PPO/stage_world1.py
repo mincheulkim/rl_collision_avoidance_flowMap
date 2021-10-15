@@ -204,7 +204,8 @@ class StageWorld():
         self.step_goal = [0., 0.]
         self.step_r_cnt = 0.
         self.start_time = time.time()
-        rospy.sleep(0.5)
+        #rospy.sleep(0.5)
+        rospy.sleep(1.0)   # 211214
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
@@ -454,8 +455,8 @@ class StageWorld():
         #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         random_pose = self.generate_group_pose()   # 211129. Groups initialize
         #rospy.sleep(0.01)
-        rospy.sleep(0.5)   # too laggy
-        #rospy.sleep(1.0)   # too laggy
+        #rospy.sleep(0.5)   # too laggy
+        rospy.sleep(1.0)   # too laggy
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
 
@@ -465,8 +466,8 @@ class StageWorld():
             self.control_pose(random_pose)
         
         #rospy.sleep(0.01)
-        rospy.sleep(0.5)
-        #rospy.sleep(1.0)   # too laggy
+        #rospy.sleep(0.5)
+        rospy.sleep(1.0)   # too laggy
         self.is_crashed=False
 
         # reset goal
