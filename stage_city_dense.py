@@ -182,9 +182,7 @@ class StageWorld():
         self.start_time = time.time()
         rospy.sleep(0.5)
 
-
     def generate_goal_point(self):
-
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         self.goal_point = [x_g, y_g]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
@@ -192,8 +190,7 @@ class StageWorld():
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)
         
-        
-        # TODO: Reward reshape: penalty for circuling around
+    # TODO: Reward reshape: penalty for circuling around
     def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
@@ -210,14 +207,14 @@ class StageWorld():
 
         if self.distance < self.goal_size:  # success reward
             terminate = True
-            #reward_g = 15
-            reward_g = 35
+            reward_g = 15
+            #reward_g = 35
             result = 'Reach Goal'
 
         if is_crash == 1:                   # collision penalty
             terminate = True
-            #reward_c = -15.
-            reward_c = -35
+            reward_c = -15.
+            #reward_c = -35
             result = 'Crashed'
 
         if np.abs(w) >  1.05:               # rotation penalty

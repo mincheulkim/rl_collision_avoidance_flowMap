@@ -461,6 +461,12 @@ def generate_action_human(env, state_list, pose_list, action_bound, velocity_pol
         #sim.processObstacles()
         # TODO concern about local obstacle
 
+        # Perturb a little to avoid deadlocks due to perfect symmetry.
+        # perturb_angle = np.random.random() * 2 * np.pi
+        # perturb_dist = np.random.random() * 0.01
+        # perturb_vel = np.array((np.cos(perturb_angle), np.sin(perturb_angle))) * perturb_dist
+        # pref_vel += perturb_vel
+
         sim.doStep()
 
         scaled_action = []       

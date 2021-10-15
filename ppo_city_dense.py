@@ -90,7 +90,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
             state_list = comm.gather(state, root=0)   # incorporate observation state
-
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             velocity_poly_list = comm.gather(speed_poly, root=0)  # 211104, for [vx,vy]
             goal_global_list = comm.gather(goal_global, root=0)
@@ -98,8 +97,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
             # 1. generate actions            
             # for human 211002
-            #v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 21102        
-            #print('original numbenb:',NUM_ENV)
             scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, action_bound=action_bound, velocity_poly_list=velocity_poly_list, goal_global_list=goal_global_list, rot_list=rot_list, num_env=NUM_ENV)   # from orca, 21102        
 
             # for robot  211101
@@ -108,27 +105,48 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             else:   # baseline RL policy
                 v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
                 #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=true)  # for test
-            # TODO 2. generate_action_human with global_flowmap
 
             # 2. execute actions
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             if live_flag:
-                if env.index ==0:
+                if env.index ==0:   # robot
                     env.control_vel(scaled_action_r)
-                else:  # TODO check rvo vel
+                else:  # TODO check rvo vel, humans
                     angles = np.arctan2(real_action[1], real_action[0])
                     diff = angles - rot
                     length = np.sqrt([real_action[0]**2+real_action[1]**2])
                     mod_vel = (length, diff)
-
                     env.control_vel(mod_vel)   # 211108
             # rate.sleep()
                 rospy.sleep(0.001)
 
             # 3. get informtion after action(reward, info)
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
+                #print(env.index,'s termination: ',terminal, result)  #erase
                 ep_reward += r   # for one episode culm reward
+
+            # 3.1 check collision via sanity check
+                # my position
+            if env.index==0:
+                #print(env.index,'s pose:',pose)
+                for i in range(1, NUM_ENV):  # human 1~NumEnv
+                    distance = np.sqrt((pose_list[0][0]-pose_list[i][0])**2+(pose_list[0][1]-pose_list[i][1])**2)
+                    print(pose_list[i], i, distance)                # other positions
+                    if distance <=1.15:
+                        print('whhoray!!')
+                        terminal = True
+                        result = 'Crashed'
+                        ep_reward -= r
+                        r = -15.
+                        ep_reward += r
+                        print('moded termianl:',terminal)
+            if env.index==0:            
+                print('ended terminal:',terminal)
+
+                # distance = my pose - other pose
+                # distance < 0
+                # termianl = true
 
             if terminal==True:
                 live_flag=False
@@ -159,11 +177,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                     #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
                 
             # 5. add transitons in buff and update policy
-            if env.index == 0:  # maybe env.index=0 means robot? or just one(VIP) act as?
+            if env.index == 0:  # maybe env.index=0 means robot
                 # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
-                '''
-                buff.append((state_list, a, r_list, terminal_list, logprob, v))   # intial buff = []  cummulnatively stacking buff for 128
-                '''
                 if local_map:
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r, occupancy_maps_r))   # for robot buffer
                 else:
@@ -171,24 +186,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 #print(buff_r)
                 # 3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
                 #                  state                                                         r_list           terminal_list         logprob                   v
-                '''
-                if len(buff) > HORIZON - 1:   # buffer exceed 128   # this part is for PPO
-                    s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
-                        transform_buffer(buff=buff)   # from model.ppo, batched buffer
-                    t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,  # r_batch, 0.99, v_batch
-                                                              last_value=last_v, dones=d_batch, lam=LAMDA)   # last_v(every 128, future v), terminal list, 0.95
-                    memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
-                    # TODO Real training part
-                    ppo_update_city(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,  # CNNPolicy, Adam, 1024, above lie about memory
-                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,  # 2, 5e-4, 0.1, 128
-                                            num_env=NUM_ENV, frames=LASER_HIST,   # 20, 3
-                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
-                    #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
-
-                    buff = []    # clean buffer
-                
-                    global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
-                '''
 
                 if len(buff_r) > HORIZON - 1:   # FOR ROBOT
                     if local_map:
@@ -221,17 +218,10 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+            #if env.index ==0:
+            #    print('final terminal:',terminal)   # erase
 
         # after terminate = True(end step)
-        
-        '''
-        if env.index == 0:
-            if global_update != 0 and global_update % 20 == 0:
-                #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
-                torch.save(policy_r.state_dict(), policy_path + '/Robot_Stage_city_dense_global:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
-                logger.info('########################## model saved when update {}global times and {} steps#########'
-                            '################'.format(global_update, step))
-        '''
 
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         
@@ -241,7 +231,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             logger_cal.info(ep_reward)
 
             if id != 0 and id % 20 == 0:
-                #torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
@@ -278,7 +267,6 @@ if __name__ == '__main__':
     file_handler.setLevel(logging.INFO)
     logger_cal.addHandler(cal_f_handler)
     
-
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -298,15 +286,14 @@ if __name__ == '__main__':
             policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
         
         policy_r.cuda()
-        #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
 
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        file_r = policy_path + '/final.pth'
-        #file_r = policy_path + '/Robot_r_3080_step.pth'
+        #file_r = policy_path + '/final.pth'
+        file_r = policy_path + '/Robot_r_2400_step.pth'
 
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):
