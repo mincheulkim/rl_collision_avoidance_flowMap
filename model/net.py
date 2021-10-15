@@ -250,51 +250,34 @@ class RobotPolicy(nn.Module):
     def __init__(self, frames, action_space):    # frames= 3, action_space= 2    from ppo_stage3.py/main()
         super(RobotPolicy, self).__init__()
         self.logstd = nn.Parameter(torch.zeros(action_space))
-
-        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        # in_channel: input's feature dimension, out_channel: want output dimension, kernel_size = frame size, stride = how moving
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)   # frame = 3
         self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
-        self.act_fc1 = nn.Linear(128*32, 256)
-        self.act_fc2 =  nn.Linear(256+2+2, 128)
-        self.actor1 = nn.Linear(128, 1)
+        self.act_fc1 = nn.Linear(128*32, 256)     # 4096->256
+        self.act_fc2 =  nn.Linear(256+2+2, 128)   # 260-> 128
+        self.actor1 = nn.Linear(128, 1)             
         self.actor2 = nn.Linear(128, 1)
 
 
-        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)   # frame = 3
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
         self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.critic = nn.Linear(128, 1)
 
-        ### incorporate ORCA 211020
-        
-        self.name = 'ORCA'
-        self.trainable = False
-        self.multiagent_training = None
-        self.kinematics = 'holonomic'
-        self.safety_space = 0
-        self.neighbor_dist = 10
-        self.max_neighbors = 10
-        self.time_horizon = 5
-        self.time_horizon_obst = 5
-        self.radius = 0.3
-        self.max_speed = 1
-        self.sim = None
-
-    def forward(self, x, goal, speed, occupancy_map):   # now create velocity
+    def forward(self, x, goal, speed, p_list):   # now create velocity
         """
             parameter
                 x: 
                 (local)goal: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')
                 speed: tensor([[0,0],[0,0],[0,0],[0,0],[0,0]], device='cuda:0')
             returns value estimation, action, log_action_prob
-
         """
-        '''
-        print('x:',x)
-        print('goal:',goal)
-        print('speed:',speed)
-        print('occupancy_map:',occupancy_map)
-        '''
+        
+        #print('lidar:',x[:,1,0],x[:,1,100],x[:,1,200],x[:,1,300],x[:,1,400],x[:,1,500])
+        #print('goal:',goal)
+        #print('speed:',speed)
+        #print('pose_robot:',p_list)
 
         # action
         a = F.relu(self.act_fea_cv1(x))
@@ -304,13 +287,13 @@ class RobotPolicy(nn.Module):
 
         a = torch.cat((a, goal, speed), dim=-1)
         a = F.relu(self.act_fc2(a))
-        mean1 = F.sigmoid(self.actor1(a))
-        mean2 = F.tanh(self.actor2(a))
+        mean1 = F.sigmoid(self.actor1(a))          # constrained the mean of traslational velocity in (0.0, 1.0)   sigmoid  linear vel
+        mean2 = F.tanh(self.actor2(a))             # constrained the mean of rotational velocity in (-1.0, 1.0)    tanh     angular vel
         mean = torch.cat((mean1, mean2), dim=-1)
 
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
-        action = torch.normal(mean, std)
+        action = torch.normal(mean, std)    # sampled from Gaussian dstribution (v_mean, v_logstd)
 
         # action prob on log scale
         logprob = log_normal_density(action, mean, std=std, log_std=logstd)
@@ -328,7 +311,7 @@ class RobotPolicy(nn.Module):
 
     def evaluate_actions(self, x, goal, speed, action):
         #v, _, _, mean = self.forward(x, goal, speed)
-        v, _, _, mean = self.forward(x, goal, speed, speed)
+        v, _, _, mean = self.forward(x, goal, speed, speed)    # batch 128 input
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
         # evaluate

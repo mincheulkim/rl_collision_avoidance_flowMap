@@ -417,7 +417,7 @@ def generate_action_rvo_dense(env, state_list, pose_list, policy, action_bound):
 
     return v, a, logprob, scaled_action
 
-def generate_action_human(env, state_list, pose_list, action_bound, velocity_poly_list, goal_global_list, rot_list, num_env):   # pose_list added
+def generate_action_human(env, state_list, pose_list, goal_global_list, num_env):   # pose_list added
     if env.index == 0:
         
         s_list, goal_list, speed_list = [], [], []
@@ -484,13 +484,7 @@ def generate_action_human(env, state_list, pose_list, action_bound, velocity_pol
 def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   # policy = RobotPolicy
     if env.index == 0:
         s_list, goal_list, speed_list, p_list = [], [], [], []
-        '''
-        for i in state:
-            s_list.append(i[0])      # lidar state
-            goal_list.append(i[1])   # local goal
-            speed_list.append(i[2])  # veloclity
-        '''
-        
+                
         s_list = state[0]
         goal_list = state[1]
         speed_list = state[2]
@@ -508,22 +502,19 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
         goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()
         speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # erase cuda()
 
-        #print('policy:',policy)
         # Get action for robot(RobotPolicy)
-
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action (net.py/forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        #print('mean:',a, action_bound[0], action_bound[1])
         raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # a[0] = (linear, angular), [0,-1], [1, 1]
-                            # TODO. see is action_bound really work
+        #print('cliped:',raw_scaled_action)
 
         # for evaluate(best action)
         if evaluate:
             mean = mean.data.cpu().numpy()
             scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])   
-
+        raw_scaled_action[1]=0    # erase me
         scaled_action = raw_scaled_action
-
-        
         
     else:  # env.index =! 0
         v = None

@@ -30,6 +30,8 @@ from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX
 
 #writer = SummaryWriter()
 
+import matplotlib.pyplot as plt
+
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
@@ -97,7 +99,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
             # 1. generate actions            
             # for human 211002
-            scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, action_bound=action_bound, velocity_poly_list=velocity_poly_list, goal_global_list=goal_global_list, rot_list=rot_list, num_env=NUM_ENV)   # from orca, 21102        
+            scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102        
 
             # for robot  211101
             if local_map:   # generate_action_human with local_flowmap
@@ -131,22 +133,19 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             if env.index==0:
                 #print(env.index,'s pose:',pose)
                 for i in range(1, NUM_ENV):  # human 1~NumEnv
-                    distance = np.sqrt((pose_list[0][0]-pose_list[i][0])**2+(pose_list[0][1]-pose_list[i][1])**2)
-                    print(pose_list[i], i, distance)                # other positions
-                    if distance <=1.15:
-                        print('whhoray!!')
+                    distance = np.sqrt((pose_list[0][0]-pose_list[i][0])**2+(pose_list[0][1]-pose_list[i][1])**2)       # distance = my pose - other pose
+                    #print(pose_list[i], i, distance)                # other positions
+                    if distance <=1.15:                         # distance < 0
+                        #print('whhoray!!')
                         terminal = True
                         result = 'Crashed'
                         ep_reward -= r
                         r = -15.
                         ep_reward += r
-                        print('moded termianl:',terminal)
-            if env.index==0:            
-                print('ended terminal:',terminal)
+                        #print('moded termianl:',terminal)
+            #if env.index==0:            
+                #print('ended terminal:',terminal)
 
-                # distance = my pose - other pose
-                # distance < 0
-                # termianl = true
 
             if terminal==True:
                 live_flag=False
@@ -293,7 +292,7 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         #file_r = policy_path + '/final.pth'
-        file_r = policy_path + '/Robot_r_2400_step.pth'
+        file_r = policy_path + '/Robot_r_760_step.pth'
 
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):

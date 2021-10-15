@@ -146,10 +146,12 @@ class StageWorld():
         for x in xrange(int(sparse_beam_num / 2)):
             sparse_scan_right.append(scan[int(index)])
             index -= step
-        scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan
+        scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
+        #scan_sparse = np.flip(scan_sparse)    # 211115
+        scan_sparse = scan_sparse[::-1]    # 211115
         #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        #return scan_sparse / 6.0 - 0.5
-        return scan_sparse / 6.0  # ????   211102 TODO fliped input
+        #return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
+        return scan_sparse / 6.0  # 211102 TODO fliped input
 
 
     def get_self_speed(self):
