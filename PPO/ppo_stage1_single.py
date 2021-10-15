@@ -13,6 +13,8 @@ import seaborn as sns
 
 import cv2
 
+import pickle  # 211215 for save buffer
+
 from mpi4py import MPI #test
 
 from torch.optim import Adam #test
@@ -48,19 +50,28 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
-LIDAR_visualize = False
+LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 
 
 #policy_path, optimizer 
 
-def run(comm, env, policy, policy_path, action_bound, optimizer):
+def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
     # rate = rospy.Rate(5)
     buff = []
+
+    last_v_r = 0.0
+
+    if env.index ==0 and buffer is not None:
+        buff = buffer
+        last_v_r = last_v_r_p
+        print('Loaded buffer memory')
+        print(len(buff))
     global_update = 0
     global_step = 0
-
     memory_size = 0
+
+    
 
     if env.index == 0:
         env.reset_world()  
@@ -156,10 +167,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
                 cv2.waitKey(1)
-                
 
-            # TODO check collision via sanity check
-            # get min(lidar) < threshold => collision
+            # LIDAR visualize, 3 * 512 2D LIDAR history map
+            if env.index ==0 and LIDAR_visualize:
+                dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                cv2.imshow("Local flow map", dist)
+                cv2.waitKey(1)
+            
 
             # get informtion
             r, terminal, result = env.get_reward_and_terminate(step)
@@ -173,7 +187,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             goal_next = np.asarray(env.get_local_goal())
             speed_next = np.asarray(env.get_self_speed())
             state_next = [obs_stack, goal_next, speed_next]
-
             # get next states(addon)
             pose_ori_next = env.get_self_stateGT()   # 211019
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
@@ -216,6 +229,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         #s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
                             transform_buffer_stacked_LM(buff=buff)
+                        
                         t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
                         #memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
@@ -226,6 +240,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
 
+                        with open('buff.pickle', 'wb') as f:                  # 211215. save buffer
+                            pickle.dump(buff[1:], f, pickle.HIGHEST_PROTOCOL)
+                        with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
+                            pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
+                        
                         buff = []
                         global_update += 1
 
@@ -264,7 +283,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if global_update != 0 and global_update % 5 == 0:
                 #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
                 torch.save(policy.state_dict(), policy_path + '/Stage1')
-                torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
+                #torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
+                torch.save(policy, policy_path + '/Stage1_tot')
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
             #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
@@ -349,10 +369,20 @@ if __name__ == '__main__':
             logger.info('####################################')
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)
+
+
+            if env.index == 0:
+                with open('buff.pickle', 'rb') as f:   # 211215
+                    buffer = pickle.load(f)
+                with open('last_v_r.pickle', 'rb') as f:   # 211215
+                    last_v_r_p = pickle.load(f)
         else:
             logger.info('#####################################')
             logger.info('############Start Training###########')
             logger.info('#####################################')
+            buffer = None                            # 211215
+            last_v_r_p = None
+
         if os.path.exists(file_tot):
             logger.info('####################################')
             logger.info('############Loading tot model#######')
@@ -362,8 +392,10 @@ if __name__ == '__main__':
         policy = None
         policy_path = None
         opt = None
+        buffer = None
+        last_v_r_p = None
 
     try:
-        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)
+        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt, buffer=buffer, last_v_r_p = last_v_r_p)
     except KeyboardInterrupt:
         pass

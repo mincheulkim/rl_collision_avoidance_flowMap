@@ -78,8 +78,9 @@ tensorboard --logdir runs/
 - [x] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
 - [x] check whether get_laser_observation need -0.5: for normalization [-0.5~0.5]
 - [x] collision checking module: current ros crash is not perferct. use min(lidar)<robot radius(0.4) to make collision detection
+- [ ] enhance collision checking module: make 360degree lidar for collision detection
 - [x] Fix segmentation fault issue: in stage_world1.py, there is rospy.sleep() in reset_pose() and reset_world(). make sleep last for a longer, try: set 1.0
-- [ ] save memory for next loading
+- [ ] save buffer for next loading
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
