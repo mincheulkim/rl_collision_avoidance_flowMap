@@ -77,7 +77,9 @@ tensorboard --logdir runs/
 - [x] modify model's pth file name from global step to episodes
 - [x] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
 - [x] check whether get_laser_observation need -0.5: for normalization [-0.5~0.5]
-- [ ] collision checking module: current ros crash is not perferct. use min(lidar)<threshold to make collision detection
+- [x] collision checking module: current ros crash is not perferct. use min(lidar)<robot radius(0.4) to make collision detection
+- [x] Fix segmentation fault issue: in stage_world1.py, there is rospy.sleep() in reset_pose() and reset_world(). make sleep last for a longer, try: set 1.0
+- [ ] save memory for next loading
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
@@ -88,17 +90,21 @@ tensorboard --logdir runs/
 - [x] create flowmap(local)    by 211201: ppo.py/generate_action_LM() 6x6 size
 - [ ] create flowmap(global as storage)
 - [x] enlarge local map(current 4*4): 6*6
-- [ ] more high resolution local map(current 1m -> 0.5, 0.1, ...)
+- [x] more high resolution local map(current 1m -> 0.1)   so width is 6m(-3~3), total cell is 60x60 (3600 cells).
 - [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
-- [ ] visualize local occupancy map(OpenCV)  (after 211105 meeting)
-- [ ] use conv2D, rather than FC for occupancy map
+- [x] visualize local occupancy map(OpenCV)  (after 211105 meeting)
+- [ ] visualize LIDAR map(OpenCV)  (after 211105 meeting)
+- [x] use conv2D, rather than FC for occupancy map: 2 Conv2D, 2 MaxPool2D
 - 3. Make subgroups
-- [ ] gather humans in similar groups
+- [x] gather humans in similar groups
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
-- 4. MISC
+- 4. Reward shaping
+- [ ] future lidar collision penalty linearly(proximity)
+- 5. MISC
 - [ ] visualize LIDAR 1D vector
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
+- [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t
 
 '''
 - 211105, after meeting

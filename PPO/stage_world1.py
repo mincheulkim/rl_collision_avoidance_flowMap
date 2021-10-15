@@ -245,18 +245,17 @@ class StageWorld():
             #reward_c = -30.
             result = 'Crashed'
 
-        # TODO Lidar collsion check 211103
-        '''
+        # TODO Lidar collsion check 211215
+        self.collision_laser_flag(r=0.4)
+        #if self.index == 0:
+            #print(self.index, 'is_collision : ',self.is_collision, 'min_dist_LIDAR:',self.scan_min)
         if self.is_collision == 1:
             terminate = True
             reward_c = -15.
             result = 'Crashed'
-        '''
 
         if np.abs(w) >  1.05:               # rotation penalty
-        #if np.abs(w) >  1.25:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
-            #reward_w = -0.08 * np.abs(w)
         
         '''    # for future lidar collision penalty
         if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
@@ -265,7 +264,6 @@ class StageWorld():
 
 
         #if t > 150:  # timeout check
-        #if t > 450:  # timeout check  211020 for long-term
         if t > 1000:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'

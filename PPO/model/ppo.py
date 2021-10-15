@@ -261,7 +261,6 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
         
         #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
 
-        #v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
