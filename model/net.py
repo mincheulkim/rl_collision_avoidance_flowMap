@@ -14,23 +14,6 @@ class Flatten(nn.Module):
 
         return input.view(input.shape[0], 1,  -1)
 
-class ORCA():
-    def __init__(self):
-        self.name = 'ORCA'
-        self.trainable = False
-        self.multiagent_training = None
-        self.kinematics = 'holonomic'
-        self.safety_space = 0
-        self.neighbor_dist = 10
-        self.max_neighbors = 10
-        self.time_horizon = 5
-        self.time_horizon_obst = 5
-        self.radius = 0.3
-        self.max_speed = 1
-        self.sim = None
-    
-    def predict(self, x, goal, speed, pose):
-        return
 
 
 class CNNPolicy(nn.Module):
@@ -203,10 +186,6 @@ class RVOPolicy(nn.Module):
         a = F.relu(self.act_fea_cv2(a))
         a = a.view(a.shape[0], -1)
         a = F.relu(self.act_fc1(a))
-        #print('x:',x)
-        #print('goal:',goal)
-        #print('speed:',speed)
-        #print('pose:',pose)
 
         a = torch.cat((a, goal, speed), dim=-1)
         a = F.relu(self.act_fc2(a))

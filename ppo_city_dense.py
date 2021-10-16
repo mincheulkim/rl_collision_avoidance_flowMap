@@ -51,6 +51,8 @@ LEARNING_RATE = 5e-5
 local_map = False
 
 
+
+
 # check 1.[city_dense.world] # of human position 2.[ppo_city_dense.py] NUM_ENV, local_map 3. mpiexec -np NUM_ENV
 
 def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
@@ -292,7 +294,7 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         #file_r = policy_path + '/final.pth'
-        file_r = policy_path + '/Robot_r_760_step.pth'
+        file_r = policy_path + '/Robot_r_1200_step.pth'
 
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):

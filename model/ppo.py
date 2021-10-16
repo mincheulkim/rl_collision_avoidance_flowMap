@@ -513,7 +513,7 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
         if evaluate:
             mean = mean.data.cpu().numpy()
             scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])   
-        raw_scaled_action[1]=0    # erase me
+        #raw_scaled_action[1]=0    # erase me
         scaled_action = raw_scaled_action
         
     else:  # env.index =! 0
