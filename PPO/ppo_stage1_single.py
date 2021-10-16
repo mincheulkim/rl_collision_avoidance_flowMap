@@ -56,17 +56,20 @@ policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 
 #policy_path, optimizer 
 
-def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
+#def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
+def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
 
     last_v_r = 0.0
 
+    '''
     if env.index ==0 and buffer is not None:
         buff = buffer
         last_v_r = last_v_r_p
         print('Loaded buffer memory')
         print(len(buff))
+    '''
     global_update = 0
     global_step = 0
     memory_size = 0
@@ -79,7 +82,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
     for id in range(MAX_EPISODES):
         # senario reset option
         if env.index ==0:    # 211129
-            env.reset_world()
+            env.reset_world()   # TODO maybe this part be problem
 
         #env.reset_pose()
         #env.generate_goal_point()
@@ -239,12 +242,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
                                                 #num_env=NUM_ENV, frames=LASER_HIST,
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
-
+                        '''
                         with open('buff.pickle', 'wb') as f:                  # 211215. save buffer
                             pickle.dump(buff[1:], f, pickle.HIGHEST_PROTOCOL)
                         with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
                             pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
-                        
+                        '''
+
                         buff = []
                         global_update += 1
 
@@ -370,18 +374,19 @@ if __name__ == '__main__':
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)
 
-
+            '''
             if env.index == 0:
                 with open('buff.pickle', 'rb') as f:   # 211215
                     buffer = pickle.load(f)
                 with open('last_v_r.pickle', 'rb') as f:   # 211215
                     last_v_r_p = pickle.load(f)
+            '''
         else:
             logger.info('#####################################')
             logger.info('############Start Training###########')
             logger.info('#####################################')
-            buffer = None                            # 211215
-            last_v_r_p = None
+            #buffer = None                            # 211215
+            #last_v_r_p = None
 
         if os.path.exists(file_tot):
             logger.info('####################################')
@@ -392,10 +397,11 @@ if __name__ == '__main__':
         policy = None
         policy_path = None
         opt = None
-        buffer = None
-        last_v_r_p = None
+        #buffer = None
+        #last_v_r_p = None
 
     try:
-        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt, buffer=buffer, last_v_r_p = last_v_r_p)
+        #run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt, buffer=buffer, last_v_r_p = last_v_r_p)
+        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)
     except KeyboardInterrupt:
         pass

@@ -239,11 +239,12 @@ class StageWorld():
             reward_g = 35
             result = 'Reach Goal'
 
-        if is_crash == 1:                   # collision penalty
-            terminate = True
-            reward_c = -15.
-            #reward_c = -30.
-            result = 'Crashed'
+        if self.index==0:
+            if is_crash == 1:                   # collision penalty
+                terminate = True
+                reward_c = -15.
+                #reward_c = -30.
+                result = 'Crashed'
 
         # TODO Lidar collsion check 211215
         self.collision_laser_flag(r=0.4)
