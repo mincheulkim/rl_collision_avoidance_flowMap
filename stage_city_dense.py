@@ -147,11 +147,9 @@ class StageWorld():
             sparse_scan_right.append(scan[int(index)])
             index -= step
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
-        #scan_sparse = np.flip(scan_sparse)    # 211115
-        scan_sparse = scan_sparse[::-1]    # 211115
+        scan_sparse = scan_sparse[::-1]    # 211115   # flipped laser input
         #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        #return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
-        return scan_sparse / 6.0  # 211102 TODO fliped input
+        return scan_sparse / 6.0 - 0.5   # for normalization [0~1] -> [-0.5,0.5]
 
 
     def get_self_speed(self):
@@ -327,7 +325,8 @@ class StageWorld():
             x = np.random.uniform(-8, 8)
             y = np.random.uniform(-8, 8)
             dis = np.sqrt(x ** 2 + y ** 2)
-            while (dis < 7.5 or dis > 8.5) and not rospy.is_shutdown():
+            #while (dis < 7.5 or dis > 8.5) and not rospy.is_shutdown():
+            while (dis < 7.5 or dis > 8.5) or (x>-0.5 and x<0.5 and y>-8.5 and y<-7.5) or (x>-0.5 and x<0.5 and y>7.5 and y<8.5) and not rospy.is_shutdown():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
@@ -384,7 +383,6 @@ class StageWorld():
         while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
-        
         rospy.sleep(0.01)
 
         # reset goal

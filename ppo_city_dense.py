@@ -13,11 +13,9 @@ from mpi4py import MPI
 from torch.optim import Adam
 from collections import deque
 
-from model.net import MLPPolicy, CNNPolicy, RVOPolicy, RobotPolicy, RobotPolicy_LM
+from model.net import MLPPolicy, CNNPolicy, RVOPolicy, RobotPolicy, RobotPolicy_LM, PPO
 from stage_city_dense import StageWorld
 from model.ppo import ppo_update_city, generate_train_data, generate_train_data_r, ppo_update_city_r
-from model.ppo import get_parameters
-from model.ppo import generate_action
 from model.ppo import transform_buffer, transform_buffer_r
 
 from model.ppo import generate_action_rvo_dense, generate_action_human, generate_action_robot, generate_action_robot_localmap   # 211027
@@ -30,8 +28,15 @@ from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX
 
 #writer = SummaryWriter()
 
-import matplotlib.pyplot as plt
+# for test Minimal_PPO!
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.distributions import Categorical
 
+
+# original
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
@@ -49,19 +54,21 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 local_map = False
+collision_sanity = False
 
+# TODO. Now, for test, import SAC
 
 # check 1.[city_dense.world] # of human position 2.[ppo_city_dense.py] NUM_ENV, local_map 3. mpiexec -np NUM_ENV
 
 def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
     # rate = rospy.Rate(5)
-    buff = []
     buff_r = [] # 211101
     global_update = 0  # for memory update(128)
     global_step = 0   # just for counting total step
 
     if env.index == 0:
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
+        model =  PPO()
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         
@@ -107,13 +114,22 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             else:   # baseline RL policy
                 v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
                 #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=true)  # for test
+                # minimal PPO
+                if env.index ==0:
+                    prob, action = model.pi(state)
+                    raw_scaled_action_new = np.clip(action.squeeze(0).detach().cpu().numpy(), a_min=action_bound[0], a_max=action_bound[1])
+                    prob = torch.squeeze(prob)
+                    m = Categorical(prob)
+                    action_minPPO = m.sample().item()
+
 
             # 2. execute actions
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             if live_flag:
                 if env.index ==0:   # robot
-                    env.control_vel(scaled_action_r)
+                    #env.control_vel(scaled_action_r)
+                    env.control_vel(raw_scaled_action_new)   # minimal PPO
                 else:  # TODO check rvo vel, humans
                     angles = np.arctan2(real_action[1], real_action[0])
                     diff = angles - rot
@@ -130,22 +146,16 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
             # 3.1 check collision via sanity check
                 # my position
-            if env.index==0:
+            if env.index==0 and collision_sanity:
                 #print(env.index,'s pose:',pose)
                 for i in range(1, NUM_ENV):  # human 1~NumEnv
                     distance = np.sqrt((pose_list[0][0]-pose_list[i][0])**2+(pose_list[0][1]-pose_list[i][1])**2)       # distance = my pose - other pose
-                    #print(pose_list[i], i, distance)                # other positions
                     if distance <=1.15:                         # distance < 0
-                        #print('whhoray!!')
                         terminal = True
                         result = 'Crashed'
                         ep_reward -= r
                         r = -15.
                         ep_reward += r
-                        #print('moded termianl:',terminal)
-            #if env.index==0:            
-                #print('ended terminal:',terminal)
-
 
             if terminal==True:
                 live_flag=False
@@ -166,6 +176,13 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
+
+            # for minimal_ppo
+            if env.index ==0:
+                # s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, done_lst
+                #print(state, action_minPPO, r/100.0, state_next, prob[action_minPPO].item(), terminal)
+                model.put_data((state, action_minPPO, r/100.0, state_next, prob[action_minPPO].item(), terminal))
+
 
             if global_step % HORIZON == 0:   # every 128, estimate future V???                
                 # For Robot 211001                              
@@ -217,6 +234,10 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+
+            # minimal ppo
+            if env.index ==0:
+                model.train_net()
             #if env.index ==0:
             #    print('final terminal:',terminal)   # erase
 
@@ -232,6 +253,9 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             if id != 0 and id % 20 == 0:
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
+                            '################'.format(global_update, step, id))
+                torch.save(policy_minRL.state_dict(), policy_path + '/minRL_{}_step'.format(id))
+                logger.info('########################## minRL saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
             
 
@@ -283,8 +307,10 @@ if __name__ == '__main__':
             policy_r = RobotPolicy_LM(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
         else:
             policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
+            policy_minRL = PPO()
         
         policy_r.cuda()
+        policy_minRL.cuda()
         opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
 
@@ -292,9 +318,11 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         #file_r = policy_path + '/final.pth'
-        file_r = policy_path + '/Robot_r_760_step.pth'
+        file_r = policy_path + '/Robot_r_1200_step.pth'
+        file_r_min = policy_path + '/minRL_140_step.pth'
 
         print('current Robot policy:',policy_r)
+        print('current new robot model:',policy_minRL)
         if os.path.exists(file_r):
             logger.info('####################################')
             logger.info('#########Loading Robot Model########')
@@ -305,6 +333,18 @@ if __name__ == '__main__':
         else:
             logger.info('#####################################')
             logger.info('############Start Training###########')
+            logger.info('#####################################')
+
+        if os.path.exists(file_r_min):
+            logger.info('####################################')
+            logger.info('#########Loading minRL Model########')
+            logger.info(file_r_min)   # which file is loaded
+            logger.info('####################################')
+            state_dict = torch.load(file_r_min)
+            policy_minRL.load_state_dict(state_dict)
+        else:
+            logger.info('#####################################')
+            logger.info('############Start Training minRL###########')
             logger.info('#####################################')
     else:
         policy_r = None  # 211101. robot's policy
