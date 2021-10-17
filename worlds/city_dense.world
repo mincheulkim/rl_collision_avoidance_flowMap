@@ -4,8 +4,8 @@ resolution 0.2
 threads 16
 #speedup 1
 # -1: for maximum run time
-#speedup -1.000
-speedup 20
+speedup -1.000
+#speedup 20
 #speedup 1
 
 

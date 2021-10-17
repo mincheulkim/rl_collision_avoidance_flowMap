@@ -31,6 +31,7 @@ class StageWorld():
 
         # used in generate goal point
         self.map_size = np.array([8., 8.], dtype=np.float32)  # 20x20m
+        #self.map_size = np.array([20., 20.], dtype=np.float32)  # 20x20m
         self.goal_size = 0.5
 
         self.robot_value = 10.
@@ -226,7 +227,8 @@ class StageWorld():
         reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
-        if t > 450:  # timeout check  211020 for long-term
+        #if t > 450:  # timeout check  211020 for long-term
+        if t > 500:  # timeout check  211116 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
@@ -322,7 +324,8 @@ class StageWorld():
     def generate_random_circle_pose(self):
         if self.index == 0:   # for robot
             x = 0
-            y = -8
+            #y = -8
+            y = -9
         else:           # For human
             x = np.random.uniform(-8, 8)
             y = np.random.uniform(-8, 8)
@@ -390,7 +393,8 @@ class StageWorld():
         # reset goal
         #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         if self.index == 0:
-            self.goal_point = [0, 8]
+            #self.goal_point = [0, 8]
+            self.goal_point = [0, 9]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal

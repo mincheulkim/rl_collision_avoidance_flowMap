@@ -692,6 +692,7 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
             value_loss = F.mse_loss(new_value, sampled_targets)
 
             loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -946,7 +947,8 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             sampled_targets = sampled_targets.view(-1, 1)
             value_loss = F.mse_loss(new_value, sampled_targets)       # value loss @ 211027
 
-            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
+            #loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
+            loss = policy_loss + 0.5 * value_loss - 0.01 * dist_entropy   # 211117
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
