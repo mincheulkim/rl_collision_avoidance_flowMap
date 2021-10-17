@@ -19,3 +19,8 @@ all archive backup_211101
 policy/
 worlds/circle - (copy).world
 .vscode/launch.json
+
+models_ppo.py
+ppo.py
+save/
+etc/

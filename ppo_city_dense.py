@@ -49,6 +49,7 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 local_map = False
+collision_sanity =False
 
 
 
@@ -129,10 +130,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
                 #print(env.index,'s termination: ',terminal, result)  #erase
                 ep_reward += r   # for one episode culm reward
+                step += 1   # time goes on +1
 
             # 3.1 check collision via sanity check
                 # my position
-            if env.index==0:
+            if env.index==0 and collision_sanity:
                 #print(env.index,'s pose:',pose)
                 for i in range(1, NUM_ENV):  # human 1~NumEnv
                     distance = np.sqrt((pose_list[0][0]-pose_list[i][0])**2+(pose_list[0][1]-pose_list[i][1])**2)       # distance = my pose - other pose
@@ -144,10 +146,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                         ep_reward -= r
                         r = -15.
                         ep_reward += r
-                        #print('moded termianl:',terminal)
-            #if env.index==0:            
-                #print('ended terminal:',terminal)
-
 
             if terminal==True:
                 live_flag=False
@@ -160,7 +158,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
             speed_next = np.asarray(env.get_self_speed())  # ???
-            
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'
                                                                # get (updated l-r+) obs_stack, new local goal and updated speed_next
             # 4.1 get next state(pose, vel)
@@ -169,10 +166,9 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
 
-            if global_step % HORIZON == 0:   # every 128, estimate future V???                
-                # For Robot 211001                              
+            if global_step % HORIZON == 0:   # every 128, estimate future V???             
                 if local_map:   # localMap
-                    last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
+                    last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state_next, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
                 else:
                     last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
                     #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
@@ -184,7 +180,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r, occupancy_maps_r))   # for robot buffer
                 else:
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r))   # for robot buffer
-                #print(buff_r)
                 # 3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
                 #                  state                                                         r_list           terminal_list         logprob                   v
 
@@ -213,17 +208,14 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                     buff_r = []          # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
 
-            step += 1   # time goes on +1
+            #step += 1   # time goes on +1
             state = state_next
             
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
-            #if env.index ==0:
-            #    print('final terminal:',terminal)   # erase
 
         # after terminate = True(end step)
-
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         
         if env.index ==0:   # log save
@@ -294,7 +286,7 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         #file_r = policy_path + '/final.pth'
-        file_r = policy_path + '/Robot_r_1200_step.pth'
+        file_r = policy_path + '/Robot_r_880_step.pth'
 
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):
