@@ -53,7 +53,8 @@ floorplan
   size [30.000 30.000 0.800]            # floor size
   pose [0.000 0.000 0.000 0.000]
   #bitmap "city.png"
-  bitmap "blank.png"
+  #bitmap "blank.png"
+  bitmap "flat_barricate.bmp"
 )
 
 
@@ -119,27 +120,29 @@ define agent position
 agent( pose [0.00 -8.00 0.00 90.00])
 #agent( pose [-17.00 -17.00 0.00 90.00])   # dummy
 # For humans(index>0)
-agent( pose [-6.00 -6.00 0.00 45.00])   # human1
+#agent( pose [-6.00 -6.00 0.00 45.00])   # human1
 #agent( pose [-5.50 -6.00 0.00 45.00])
 #agent( pose [-6.00 -5.50 0.00 45.00])
 #agent( pose [-5.00 -5.00 0.00 45.00])
 
-agent( pose [6.00 -6.00 0.00 135.00])    # human2
+#agent( pose [6.00 -6.00 0.00 135.00])    # human2
 #agent( pose [5.50 -5.50 0.00 135.00])
 #agent( pose [5.50 -6.00 0.00 135.00])
 #agent( pose [6.00 -5.50 0.00 135.00])
 #agent( pose [5.00 -5.00 0.00 135.00])
 
-agent( pose [6.00 6.00 0.00 225.00])     # human3
+#agent( pose [6.00 6.00 0.00 225.00])     # human3
 #agent( pose [5.50 5.50 0.00 225.00])
 #agent( pose [6.50 6.00 0.00 225.00])
 #agent( pose [6.00 5.50 0.00 225.00])
 #agent( pose [6.00 6.00 0.00 225.00])
 
-agent( pose [-6.00 6.00 0.00 315.00])    # human4
+#agent( pose [-6.00 6.00 0.00 315.00])    # human4
 #agent( pose [-5.50 5.50 0.00 315.00])
 #agent( pose [-5.50 6.00 0.00 315.00])
 #agent( pose [-6.00 5.50 0.00 315.00])
 #agent( pose [-5.00 5.00 0.00 315.00])
 
-agent( pose [6.00 0.00 0.00 180.00])    # human5
+#agent( pose [6.00 0.00 0.00 180.00])    # human5
+
+agent( pose [0.00 -17.00 0.00 180.00])    # dummy

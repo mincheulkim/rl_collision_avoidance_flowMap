@@ -48,7 +48,7 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #COEFF_ENTROPY = 1e-3   # 211102
 CLIP_VALUE = 0.1
-NUM_ENV = 6  # 211018   # human num
+NUM_ENV = 1  # 211018   # human num
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -72,6 +72,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         
+        env.reset_world()
         #env.reset_pose()   # reset initial pose(x,y,theta)
         #env.generate_goal_point()   # generate global goal & local goal
 
@@ -139,6 +140,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             # rate.sleep()
                 rospy.sleep(0.001)
 
+                global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
+
             # 3. get informtion after action(reward, info)
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
                 #print(env.index,'s termination: ',terminal, result)  #erase
@@ -160,7 +163,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             if terminal==True:
                 live_flag=False
 
-            global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
+            
 
             # 4. get next state
             s_next = env.get_laser_observation()   # get new lidar obs
@@ -241,6 +244,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             #if env.index ==0:
             #    print('final terminal:',terminal)   # erase
 
+            
+
         # after terminate = True(end step)
 
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
@@ -258,7 +263,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 logger.info('########################## minRL saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
             
-
+        rospy.sleep(1.0)
         # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
 
 
