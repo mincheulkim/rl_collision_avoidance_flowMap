@@ -35,18 +35,21 @@ import matplotlib.pyplot as plt
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
-HORIZON = 128
-GAMMA = 0.99
-LAMDA = 0.95
-BATCH_SIZE = 1024
-EPOCH = 2
-COEFF_ENTROPY = 5e-4
+#HORIZON = 128  # can be 32 ~ 5000                   # TODO increase time horizon?
+#HORIZON = 256  # can be 32 ~ 5000                   # TODO increase time horizon?
+HORIZON = 384  # can be 32 ~ 5000                   # TODO increase time horizon?
+GAMMA = 0.99   # can be 0.99(normal), discount factor
+LAMDA = 0.95   # can be 0.9~0.1, Factor for trade-off of bias vs variance of GAE
+#BATCH_SIZE = 1024   # can be 4~4096(minibatch?)     # TODO increase batch size?
+BATCH_SIZE = 2048   # can be 4~4096(minibatch?)     # TODO increase batch size?
+EPOCH = 2   # can be 3~30(number of epoch when optimizing the surrogate loss)
+COEFF_ENTROPY = 5e-4   # may be 0~0.01
 #COEFF_ENTROPY = 1e-3   # 211102
-CLIP_VALUE = 0.1
-NUM_ENV = 6  # 211018   # human num
+CLIP_VALUE = 0.1     # can be 0.1, 0.2, 0.3
+NUM_ENV = 1  # 211018   # Agents nom
 OBS_SIZE = 512
 ACT_SIZE = 2
-LEARNING_RATE = 5e-5
+LEARNING_RATE = 5e-5   # 0.003 ~ 5e-6
 
 local_map = False
 collision_sanity =False
@@ -131,6 +134,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 #print(env.index,'s termination: ',terminal, result)  #erase
                 ep_reward += r   # for one episode culm reward
                 step += 1   # time goes on +1
+                #print(step,' reward: ',r, 'ep_reard:',ep_reward)
 
             # 3.1 check collision via sanity check
                 # my position
@@ -166,7 +170,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
 
-            if global_step % HORIZON == 0:   # every 128, estimate future V???             
+            if global_step % HORIZON == 0:   # every 128, estimate future V???     
                 if local_map:   # localMap
                     last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state_next, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
                 else:
@@ -182,7 +186,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r))   # for robot buffer
                 # 3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
                 #                  state                                                         r_list           terminal_list         logprob                   v
-
+                #print('len buff_r:',len(buff_r))
                 if len(buff_r) > HORIZON - 1:   # FOR ROBOT
                     if local_map:
                         s_batch_r, goal_batch_r, speed_batch_r, a_batch_r, r_batch_r, d_batch_r, l_batch_r, v_batch_r, occupancy_maps_r = \
@@ -223,7 +227,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
             logger_cal.info(ep_reward)
 
-            if id != 0 and id % 20 == 0:
+            #if id != 0 and id % 20 == 0:
+            if global_update != 0 and global_update % 20 == 0:
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
@@ -285,8 +290,8 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        #file_r = policy_path + '/final.pth'
-        file_r = policy_path + '/Robot_r_880_step.pth'
+        file_r = policy_path + '/final.pth'
+        #file_r = policy_path + '/Robot_r_3260_step.pth'
 
         print('current Robot policy:',policy_r)
         if os.path.exists(file_r):

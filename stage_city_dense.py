@@ -201,7 +201,10 @@ class StageWorld():
         self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
         # Propotional Reward
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
-        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)
+        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
+        #reward_g = (self.pre_distance - self.distance) * 1.5  # REWARD for moving forward, later reach goal reward(+15)
+        #if reward_g<0:
+        #    reward_g =0
         reward_c = 0  # collision penalty
         reward_w = 0  # too much rotation penalty
         result = 0
@@ -209,24 +212,27 @@ class StageWorld():
 
         if self.distance < self.goal_size:  # success reward
             terminate = True
-            reward_g = 15
-            #reward_g = 35
+            #reward_g = 15
+            reward_g = 35
             result = 'Reach Goal'
 
         if is_crash == 1:                   # collision penalty
             terminate = True
             reward_c = -15.
-            #reward_c = -35
+            #reward_c = -30.
             result = 'Crashed'
 
         if np.abs(w) >  1.05:               # rotation penalty
+        #if np.abs(w) >  1.25:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
+            #reward_w = -0.08 * np.abs(w)
 
         ## TODO ADD must to reward(penalty proportional with rotation)  211102
         reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
-        if t > 450:  # timeout check  211020 for long-term
+        #if t > 450:  # timeout check  211020 for long-term
+        if t > 550:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w

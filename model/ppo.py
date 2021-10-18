@@ -616,7 +616,7 @@ def generate_train_data(rewards, gamma, values, last_value, dones, lam):
 
     for t in range(num_step - 1, -1, -1):
         delta = rewards[t, :] + gamma * values[t + 1, :] * (1 - dones[t, :]) - values[t, :]
-        gae = delta + gamma * lam * (1 - dones[t, :]) * gae
+        gae = delta + gamma * lam * (1 - dones[t, :]) * gae   # check dones=1 when terminal
 
         targets[t, :] = gae + values[t, :]
 
@@ -624,8 +624,8 @@ def generate_train_data(rewards, gamma, values, last_value, dones, lam):
     return targets, advs
 
 def generate_train_data_r(rewards, gamma, values, last_value, dones, lam):   # rewards=r_batch_r, gamma=0.99, values=v_batch_r, last_value=last_v_r, dones=d_batch_r, lam=LAMDA
-    num_step = rewards.shape[0]
-    #num_env = rewards.shape[1]
+    num_step = rewards.shape[0]   # TODO. is this 128?
+    #num_env = rewards.shape[1]   # TODO. is this 1 real?
     num_env = 1
     values = list(values)
     values.append(last_value)
@@ -637,7 +637,7 @@ def generate_train_data_r(rewards, gamma, values, last_value, dones, lam):   # r
     for t in range(num_step - 1, -1, -1):
         #delta = rewards[t, :] + gamma * values[t + 1, :] * (1 - dones[t, :]) - values[t, :]  # 211102 because indices error
         #gae = delta + gamma * lam * (1 - dones[t, :]) * gae
-        delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
+        delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]   # gamma=0.95
         gae = delta + gamma * lam * (1 - dones[t]) * gae
 
         #targets[t, :] = gae + values[t, :]
@@ -878,17 +878,7 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
                                                      float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
             # logger_ppo.info('p_loss: {}, v_loss: {}, entropy: {}'.format(info_p_loss, info_v_loss, info_entropy))
-            
-            # 211027 for logging     # https://www.infoking.site/64
-            global info_p_losss
-            info_p_losss = info_p_loss
-            global info_v_losss
-            info_v_losss = info_v_loss
-            global info_entropys
-            info_entropys = info_entropy
-        
-            
-
+    
     print('update_city')
 
 def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPolicy, Adam, 1024, above lie about memory, epoch=2
@@ -904,20 +894,20 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
     advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
 
     # 128= batch training data, num_env = agent num
-    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*1, 3, 512
+    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*1, 3, 512    # (batch, frame(3), feature size)
     goals = goals.reshape((num_step*num_env, 2))   # 128*1, 2(x,y)
     speeds = speeds.reshape((num_step*num_env, 2))  # 128*1, 2(vx,vy)
     actions = actions.reshape(num_step*num_env, act_size)  # 128*1, 2
     if LM:
         occupancy_maps = occupancy_maps.reshape((num_step*num_env, 48))
-    logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
-    advs = advs.reshape(num_step*num_env, 1)  # 128*5, 1
+    logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*1, 1(logprob e.g. -2.12323)
+    advs = advs.reshape(num_step*num_env, 1)  # 128*1, 1
     targets = targets.reshape(num_step*num_env, 1)  # targets?
 
     for update in range(epoch):  # 0, 1, 2
         sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,
                                drop_last=False)
-        for i, index in enumerate(sampler):
+        for i, index in enumerate(sampler):   # TODO check sampler size
             sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
             sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
             sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
@@ -946,8 +936,8 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             sampled_targets = sampled_targets.view(-1, 1)
             value_loss = F.mse_loss(new_value, sampled_targets)       # value loss @ 211027
 
-            #loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
-            loss = policy_loss + 0.5 * value_loss - 0.01 * dist_entropy   # 20 is value_loss_coefficient? maybe?
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
+            #loss = policy_loss + 0.5 * value_loss - 0.01 * dist_entropy   # 20 is value_loss_coefficient? maybe?
             #   reference.    loss = pg_loss + 0.5*v_loss - 0.01*ent_loss
 
             optimizer.zero_grad()

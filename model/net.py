@@ -288,7 +288,7 @@ class RobotPolicy(nn.Module):
 
         return v, action, logprob, mean
 
-    def evaluate_actions(self, x, goal, speed, action):
+    def evaluate_actions(self, x, goal, speed, action):    # for robot
         #v, _, _, mean = self.forward(x, goal, speed)
         v, _, _, mean = self.forward(x, goal, speed, speed)    # batch 128 input
         logstd = self.logstd.expand_as(mean)
