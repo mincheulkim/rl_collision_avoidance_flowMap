@@ -54,7 +54,36 @@ LEARNING_RATE = 5e-5   # 0.003 ~ 5e-6
 local_map = False
 collision_sanity =False
 
+# ERASE NOW!
+# for implement SAC
+import sac
+import models_sac
+#batch_size = 64    # need bigger
+batch_size = 256    # modified
+eval_eps = 10
 
+rl_core = sac.SAC(
+    model = [models_sac.PolicyNetGaussian, models_sac.QNet],
+    n_actions = 2,
+    learning_rate = [0.0001, 0.0001],
+    reward_decay = 0.99,
+    #memory_size = 10000,
+    memory_size = 20000,
+    batch_size = batch_size,
+    alpha = 0.1,
+    auto_entropy_tuning=True)
+
+is_train = True
+render = False
+load_model = True
+
+model_path = "save/"
+if not os.path.exists(model_path):
+    os.makedirs(model_path)
+
+if load_model:
+    print("Load model ...", model_path)
+    rl_core.save_load_model("load", model_path)
 
 
 # check 1.[city_dense.world] # of human position 2.[ppo_city_dense.py] NUM_ENV, local_map 3. mpiexec -np NUM_ENV
@@ -68,6 +97,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
     if env.index == 0:
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
+
+    # for SAC
+    total_step = 0
+    max_success_rate = 0
+    success_count = 0
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         
@@ -94,6 +128,10 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
         state = [obs_stack, goal, speed]  # state: [deque([array([]),array([]),array([])]), array([-0.2323, 8.23232]), array[0, 0]]    # 3 stacted 512 lidar, local goal, init speed
 
         goal_global = np.asarray(env.get_goal_point())
+
+        # for sac
+        loss_a = loss_c = 0.
+        acc_reward = 0.
         
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
@@ -114,12 +152,22 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
                 #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=true)  # for test
 
+            # for sac
+            if env.index ==0:
+                if is_train:
+                    action = rl_core.choose_action(state, eval=False)
+                else:
+                    action = rl_core.choose_action(state, eval=True)
+
             # 2. execute actions
             # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             if live_flag:
                 if env.index ==0:   # robot
-                    env.control_vel(scaled_action_r)
+                    # for sac
+                    scaled_action = np.clip(action, a_min=action_bound[0], a_max=action_bound[1])
+                    env.control_vel(scaled_action)
+                    #env.control_vel(scaled_action_r)  # original
                 else:  # TODO check rvo vel, humans
                     angles = np.arctan2(real_action[1], real_action[0])
                     diff = angles - rot
@@ -153,6 +201,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
             if terminal==True:
                 live_flag=False
+                if result == 'Reach Goal':
+                    success_count +=1
 
             global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
 
@@ -176,6 +226,26 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 else:
                     last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
                     #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
+
+            # for sac, add transition
+            if env.index ==0:
+                end = 0 if terminal else 1
+                rl_core.store_transition(state, action, r, state_next, end)
+                # learn the model
+                loss_a = loss_c = 0.
+                if total_step > batch_size and is_train:
+                    loss_a, loss_c = rl_core.learn()
+                total_step += 1
+
+                # print information
+                acc_reward += r
+                #print(id, step, total_step, action, r, loss_a, loss_c, rl_core.alpha, acc_reward/step)
+                
+                
+                print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Ravg:{:.2f}| Cum_avg:{:.3f}  '\
+                    .format(id, step, total_step, action[0], r, loss_a, loss_c, rl_core.alpha, acc_reward/step, acc_reward))
+                
+                
                 
             # 5. add transitons in buff and update policy
             if env.index == 0:  # maybe env.index=0 means robot
@@ -233,6 +303,19 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
             
+        if id > 0 and id % eval_eps ==0:
+            # Success rate
+            success_rate = success_count / eval_eps
+            success_count = 0
+            # save the best model
+            if success_rate >= max_success_rate:
+                max_success_rate = success_rate
+                if is_train:
+                    print("Save wiston SAC model to "+model_path)
+                    rl_core.save_load_model("save", model_path)
+                print("Success Rate (current/max):", success_rate, "/", max_success_rate)
+
+
 
         # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
 

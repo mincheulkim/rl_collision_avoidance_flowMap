@@ -959,7 +959,7 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
             global info_entropys
             info_entropys = info_entropy
         
-    print('update_city_r')
+    #print('update_city_r')
 
 
 #total_losss = None
