@@ -232,7 +232,8 @@ class StageWorld():
 
         #if t > 150:  # timeout check
         #if t > 450:  # timeout check  211020 for long-term
-        if t > 550:  # timeout check  211020 for long-term
+        #if t > 550:  # timeout check  211020 for long-term
+        if t > 750:  # timeout check  211118 for static obstacles
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w

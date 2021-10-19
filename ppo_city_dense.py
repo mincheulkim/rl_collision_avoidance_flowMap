@@ -58,8 +58,9 @@ collision_sanity =False
 # for implement SAC
 import sac
 import models_sac
-#batch_size = 64    # need bigger
-batch_size = 256    # modified
+#batch_size = 64    # [original]need bigger
+batch_size = 256    # modified(for onlyrobot)
+#batch_size = 512    # modified(for static obstacle)
 eval_eps = 10
 
 rl_core = sac.SAC(
@@ -67,8 +68,8 @@ rl_core = sac.SAC(
     n_actions = 2,
     learning_rate = [0.0001, 0.0001],
     reward_decay = 0.99,
-    #memory_size = 10000,
-    memory_size = 20000,
+    memory_size = 10000,
+    #memory_size = 20000,   # for onlyrobot, static obstacle
     batch_size = batch_size,
     alpha = 0.1,
     auto_entropy_tuning=True)
@@ -146,11 +147,13 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102        
 
             # for robot  211101
+            '''
             if local_map:   # generate_action_human with local_flowmap
                 v_r, a_r, logprob_r, scaled_action_r, occupancy_maps_r=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
             else:   # baseline RL policy
                 v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
                 #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=true)  # for test
+            '''
 
             # for sac
             if env.index ==0:
@@ -219,14 +222,14 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
-
+            '''
             if global_step % HORIZON == 0:   # every 128, estimate future V???     
                 if local_map:   # localMap
                     last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state_next, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
                 else:
                     last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
                     #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
-
+            '''
             # for sac, add transition
             if env.index ==0:
                 end = 0 if terminal else 1
@@ -241,14 +244,16 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                 acc_reward += r
                 #print(id, step, total_step, action, r, loss_a, loss_c, rl_core.alpha, acc_reward/step)
                 
+                #TODO 100 ter
+                if terminal: 
+                    print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Ravg:{:.2f}| Cum_avg:{:.3f}  '\
+                        .format(id, step, total_step, action[0], r, loss_a, loss_c, rl_core.alpha, acc_reward/step, acc_reward))
                 
-                print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Ravg:{:.2f}| Cum_avg:{:.3f}  '\
-                    .format(id, step, total_step, action[0], r, loss_a, loss_c, rl_core.alpha, acc_reward/step, acc_reward))
                 
-                
-                
+            '''
             # 5. add transitons in buff and update policy
             if env.index == 0:  # maybe env.index=0 means robot
+                
                 # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
                 if local_map:
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r, occupancy_maps_r))   # for robot buffer
@@ -281,6 +286,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
                     buff_r = []          # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
+            '''
 
             #step += 1   # time goes on +1
             state = state_next
@@ -298,10 +304,12 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             logger_cal.info(ep_reward)
 
             #if id != 0 and id % 20 == 0:
+            '''
             if global_update != 0 and global_update % 20 == 0:
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
+            '''
             
         if id > 0 and id % eval_eps ==0:
             # Success rate
@@ -376,7 +384,7 @@ if __name__ == '__main__':
         file_r = policy_path + '/final.pth'
         #file_r = policy_path + '/Robot_r_3260_step.pth'
 
-        print('current Robot policy:',policy_r)
+        #print('current Robot policy:',policy_r)
         if os.path.exists(file_r):
             logger.info('####################################')
             logger.info('#########Loading Robot Model########')

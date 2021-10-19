@@ -127,8 +127,8 @@ class SAC():
 
     def learn(self):
         # sample batch memory from all memory
-        if self.memory_counter > self.memory_size:
-            sample_index = np.random.choice(self.memory_size, size=self.batch_size)
+        if self.memory_counter > self.memory_size:     # memory counter > 40000
+            sample_index = np.random.choice(self.memory_size, size=self.batch_size)      # from 0~39999, pick 512
         else:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         
@@ -198,4 +198,4 @@ class SAC():
             self.alpha_optim.step()
             self.alpha = float(self.log_alpha.exp().detach().cpu().numpy())
         
-        return float(self.actor_loss.detach().cpu().numpy()), float(self.critic_loss.detach().cpu().numpy())
+        return float(self.actor_loss.detach().cpu().numpy()), float(self.critic_loss.detach().cpu().numpy())   # loss_a, loss_c
