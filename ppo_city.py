@@ -13,8 +13,8 @@ from torch.optim import Adam
 from collections import deque
 
 from model.net import MLPPolicy, CNNPolicy
-from stage_world3 import StageWorld   # double check!!
-from model.ppo import ppo_update_stage3, generate_train_data
+from stage_city import StageWorld
+from model.ppo import ppo_update_city, generate_train_data
 from model.ppo import generate_action
 from model.ppo import transform_buffer
 
@@ -131,7 +131,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                                                               last_value=last_v, dones=d_batch, lam=LAMDA)   # last_v(every 128, future v), terminal list, 0.95
                     memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                     # TODO Real training part
-                    ppo_update_stage3(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,  # CNNPolicy, Adam, 1024, above lie about memory
+                    ppo_update_city(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,  # CNNPolicy, Adam, 1024, above lie about memory
                                             epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,  # 2, 5e-4, 0.1, 128
                                             num_env=NUM_ENV, frames=LASER_HIST,   # 5, 3
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
@@ -146,7 +146,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         # after terminate = True(end step)
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
-                torch.save(policy.state_dict(), policy_path + '/Stage3_{}'.format(global_update))   # save pth at every 20th model updated
+                torch.save(policy.state_dict(), policy_path + '/Stage_city_{}'.format(global_update))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
         distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
@@ -207,7 +207,7 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        file = policy_path + '/stage3_2.pth'   # policy/stage3_2.pth
+        file = policy_path + '/stage_city_2.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         if os.path.exists(file):

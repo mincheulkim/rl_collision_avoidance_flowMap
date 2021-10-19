@@ -24,6 +24,10 @@ def test_init_pose(index):
                       ]
     return init_pose_list[index]
 
+def test_init_pose_new(index):
+    init_pose_list = [[-19.00, -19.00, np.pi/4], [-18.00, -18.00, np.pi*26/25], [-17.00, -17.00, np.pi*27/25], [-17.00, -18.00, np.pi*28/25], [-18.00, -17.00, np.pi*29/25]]
+    return init_pose_list[index]
+
 def test_goal_point(index):
     goal_list = [[-25.00, -0.00], [-24.80, -3.13], [-24.21, -6.22], [-23.24, -9.20], [-21.91, -12.04], [-20.23, -14.69],
                  [-18.22, -17.11], [-15.94, -19.26], [-13.40, -21.11], [-10.64, -22.62], [-7.73, -23.78],
@@ -36,7 +40,10 @@ def test_goal_point(index):
                  [-23.24, 9.20], [-24.21, 6.22], [-24.80, 3.13]
                  ]
     return goal_list[index]
-
+    
+def test_goal_point_new(index):
+    goal_list = [[17.00, 17.00], [18.00, 18.00], [19.00, 19.00], [18.00, 19.00], [19.00, 18.00]]
+    return goal_list[index]
 
 def get_init_pose(index):
     init_pose_list = [[-7.00, 11.50, np.pi], [-7.00, 9.50, np.pi], [-18.00, 11.50, 0.00], [-18.00, 9.50, 0.00],
