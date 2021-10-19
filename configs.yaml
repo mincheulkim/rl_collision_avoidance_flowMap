@@ -1,0 +1,37 @@
+Env:
+  map:
+    size_x: 20
+    size_y: 20 
+
+    # goal list (real value)
+    # - goal_list: [[0,1,2,3,4,5,6,7,8,9]]
+    goal_list: [
+      [0,0], # 0
+      [0,0], # 0
+      [0,0], # 0
+      [0,0], # 0
+      [0,0], # 0
+      [0,0], # 0
+      [0,0], # 0
+    ]
+
+  human:
+    speed: 1.2
+    radius: 0.5
+    
+  robot:
+    speed: 1.5
+    radius: 0.5
+
+    # laser specs.
+    min_range: 0
+    max_range: 5.2
+    min_angle: -2.35619 # -135 deg.
+    max_angle: 2.35619 # 135 deg.
+    # etc...
+
+
+Policy:
+  actor_lr: 0.003
+  critic_lr: 0.003
+  # etc...
