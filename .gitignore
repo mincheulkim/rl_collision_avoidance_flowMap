@@ -2,4 +2,8 @@
 .idea
 model/__pycache__/*
 model/*.pyc
-
+.venv
+.catkin_workspace
+build/
+devel/
+src/
