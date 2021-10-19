@@ -41,6 +41,8 @@ def enjoy(comm, env, policy, action_bound):
 
     env.reset_pose()
 
+    # just only once implement(no for episode num)
+
     env.generate_goal_point()
     step = 1
     terminal = False
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    env = StageWorld(OBS_SIZE, index=rank, num_env=NUM_ENV)
+    env = StageWorld(OBS_SIZE, index=rank, num_env=NUM_ENV)   # 512
     reward = None
     action_bound = [[0, -1], [1, 1]]
 
@@ -125,7 +127,7 @@ if __name__ == '__main__':
 
 
     try:
-        enjoy(comm=comm, env=env, policy=policy, action_bound=action_bound)
+        enjoy(comm=comm, env=env, policy=policy, action_bound=action_bound)   # not run, enjoy(no optimizer)
     except KeyboardInterrupt:
         import traceback
         traceback.print_exc()

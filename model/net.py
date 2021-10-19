@@ -14,7 +14,7 @@ class Flatten(nn.Module):
 
 
 class CNNPolicy(nn.Module):
-    def __init__(self, frames, action_space):
+    def __init__(self, frames, action_space):    # frames= 3, action_space= 2    from ppo_stage3.py/main()
         super(CNNPolicy, self).__init__()
         self.logstd = nn.Parameter(torch.zeros(action_space))
 
@@ -81,7 +81,7 @@ class CNNPolicy(nn.Module):
 
 
 class MLPPolicy(nn.Module):
-    def __init__(self, obs_space, action_space):
+    def __init__(self, obs_space, action_space):   # obs_space= 512, action_space= 2, called from ppo_stage3.py
         super(MLPPolicy, self).__init__()
         # action network
         self.act_fc1 = nn.Linear(obs_space, 64)

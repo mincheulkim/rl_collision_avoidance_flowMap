@@ -10,7 +10,7 @@ from sensor_msgs.msg import LaserScan
 from rosgraph_msgs.msg import Clock
 from std_srvs.srv import Empty
 from std_msgs.msg import Int8
-from model.utils import test_init_pose, test_goal_point
+from model.utils import test_init_pose, test_goal_point    # arbitrary start and goal position sets
 
 
 class StageWorld():
@@ -162,7 +162,7 @@ class StageWorld():
 
 
     def generate_goal_point(self):
-        self.goal_point = test_goal_point(self.index)
+        self.goal_point = test_goal_point(self.index)   # get index's goal_point
         self.pre_distance = 0
         self.distance = copy.deepcopy(self.pre_distance)
 

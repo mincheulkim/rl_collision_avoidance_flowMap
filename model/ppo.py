@@ -19,16 +19,17 @@ ppo_file_handler.setLevel(logging.INFO)
 logger_ppo.addHandler(ppo_file_handler)
 
 
-def transform_buffer(buff):
+def transform_buffer(buff):    # from 5 step at ppo_stage3.py  
+    # buff=3 stacked lidar+relative dist+vel, [[1.23,232],...,[1.123,2.323] #5], [0.212, ... 3 ..., 0.112], [F, F, F, F, F], [-2.232, ..., 02.222], [-0.222, ..., -0.222]
     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
     v_batch = [], [], [], [], [], [], [], []
     s_temp, goal_temp, speed_temp = [], [], []
 
     for e in buff:
-        for state in e[0]:
-            s_temp.append(state[0])
-            goal_temp.append(state[1])
-            speed_temp.append(state[2])
+        for state in e[0]:   # states data
+            s_temp.append(state[0])   # 1. lidar
+            goal_temp.append(state[1])   # 2. local goal
+            speed_temp.append(state[2])   # 3. velocity
         s_batch.append(s_temp)
         goal_batch.append(goal_temp)
         speed_batch.append(speed_temp)
@@ -36,11 +37,11 @@ def transform_buffer(buff):
         goal_temp = []
         speed_temp = []
 
-        a_batch.append(e[1])
-        r_batch.append(e[2])
-        d_batch.append(e[3])
-        l_batch.append(e[4])
-        v_batch.append(e[5])
+        a_batch.append(e[1])   # A
+        r_batch.append(e[2])   # reward_list
+        d_batch.append(e[3])   # terminal list(T or F)
+        l_batch.append(e[4])   # logprob
+        v_batch.append(e[5])   # 
 
     s_batch = np.asarray(s_batch)
     goal_batch = np.asarray(goal_batch)
@@ -169,7 +170,8 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
             sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
 
 
-            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)   # model/net.py  into the network inputs
+                                                  #policy = CNN policy(input lidar data, goal, velocity)
 
             sampled_logprobs = sampled_logprobs.view(-1, 1)
             ratio = torch.exp(new_logprob - sampled_logprobs)
@@ -257,6 +259,61 @@ def ppo_update_stage2(policy, optimizer, batch_size, memory, filter_index, epoch
 
 
     print('filter {} transitions; update'.format(len(filter_index)))
+
+def ppo_update_stage3(policy, optimizer, batch_size, memory, epoch,   # # CNNPolicy, Adam, 1024, above lie about memory, epoch=2
+               coeff_entropy=0.02, clip_value=0.2,    #  coeff_entropy= 5e-4, clip_val = 0.1
+               num_step=2048, num_env=12, frames=1, obs_size=24, act_size=4):  # num_step= 128, num_env=5, frames(laser_hist)=3, obs_size=512, act_size=2
+    # num_env=12 is default, ppo_stage2.py line 33 is real
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+
+    advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
+
+    # 128= batch training data, num_env = agent num
+    obss = obss.reshape((num_step*num_env, frames, obs_size))   # 128*5, 3, 512
+    goals = goals.reshape((num_step*num_env, 2))   # 128*5, 2(x,y)
+    speeds = speeds.reshape((num_step*num_env, 2))  # 128*5, 2(vx,vy)
+    actions = actions.reshape(num_step*num_env, act_size)  # 128*5, 2
+    logprobs = logprobs.reshape(num_step*num_env, 1)  # 128*5, 1(logprob e.g. -2.12323)
+    advs = advs.reshape(num_step*num_env, 1)  # same
+    targets = targets.reshape(num_step*num_env, 1)  # targets?
+
+    for update in range(epoch):  # 0, 1, 2
+        sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,
+                               drop_last=False)
+        for i, index in enumerate(sampler):
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
+
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
+
+
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+
+            sampled_logprobs = sampled_logprobs.view(-1, 1)
+            ratio = torch.exp(new_logprob - sampled_logprobs)
+
+            sampled_advs = sampled_advs.view(-1, 1)
+            surrogate1 = ratio * sampled_advs
+            surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()
+
+            sampled_targets = sampled_targets.view(-1, 1)
+            value_loss = F.mse_loss(new_value, sampled_targets)
+
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(
+                                                    dist_entropy.detach().cpu().numpy())
+            logger_ppo.info('{}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy))
+
+    print('update')
 
 
 
