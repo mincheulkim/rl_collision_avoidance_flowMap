@@ -32,6 +32,17 @@ $ source [VENV_PATH]/bin/activate
 $ which python
 ```
 
+### Installing RVO2
+
+```
+mkdir etc && cd etc
+git clone https://github.com/sybrenstuvel/Python-RVO2.git
+cd Python-RVO2
+pip install Cython
+sudo apt-get install cmake
+python setup.py build
+python setup.py install
+```
 
 
 ## References
