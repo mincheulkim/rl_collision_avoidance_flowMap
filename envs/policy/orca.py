@@ -9,9 +9,10 @@ class ORCA:
             configs['dt'], configs['neighbor_dist'],
             configs['max_neighbors'], configs['time_horizon'],
             configs['time_horizon_obs'], configs['human_radius'],
-            configs['max_speed'], (configs['velocity'], configs['velocity']))
+            configs['max_speed'], (configs['linear_vel'], configs['angular_vel']))
 
-    def add_static_obstacle(self, map_img):
+    def add_static_obstacle(self, map_img_path):
+        map_img = cv2.imread(map_img_path)
         # Get contours from image to distinguish obstacles
         imgray = cv2.cvtColor(map_img, cv2.COLOR_BGR2GRAY)
         _, thr = cv2.threshold(imgray, 0.3, 1, cv2.THRESH_BINARY)
@@ -29,11 +30,6 @@ class ORCA:
         for obs in obs_list:
             self.rvo_sim.addObstacle(obs)
         self.rvo_sim.processObstacles()
-
-
-    def add_dynamic_obstacle(self, index):
-        x, y = index['x'], index['y']
-        self.rvo_sim.addAgent(x, y)
 
 
 if __name__ == '__main__':

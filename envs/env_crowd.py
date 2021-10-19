@@ -1,6 +1,4 @@
-import time
 import rospy
-import copy
 import tf
 import numpy as np
 
@@ -9,194 +7,90 @@ from envs.human import Human
 
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import LaserScan
 from rosgraph_msgs.msg import Clock
-from std_srvs.srv import Empty
 from std_msgs.msg import Int8
 
 
 class Env:
-    def __init__(self, configs):    # called from ppo_stage3.py,   # 512, index, 5
+    def __init__(self, configs):
         self.configs = configs
+        self.human_list = []
+        self.human_index_list = []
+        self.rvo_agent_list = []
 
-        
-        self.humans = None 
-
-
-        # Setup ORCA
         self.sim = ORCA(configs)
 
-        map_img = configs['map_img']
-        self.sim.add_static_obstacle(map_img)
+        map_img_path = configs['map_img_path']
+        self.sim.add_static_obstacle(map_img_path)
 
-        for _ in range(human_num):
-            self.sim.add_dynamic_obstacle()
+        # pub list
+        self.cmd_vel_list = []
+        self.cmd_pose_list = []
+
+        # sub list
+        self.object_state_sub_list = []
+        self.odom_sub_list = []
+        self.check_crash_list = []
         
-
-        
-        
-
-
         self.sim_clock = rospy.Subscriber('clock', Clock, self.sim_clock_callback)
 
+    def generate_human(self, index, pos):
+        human = Human(pos)
+        self.human_list.append(human)
+        self.human_index_list.append(index)
+        agent = self.sim.addAgent(pos[0], pos[1])
+        self.rvo_agent_list.append(agent)
 
-        # -----------Service-------------------
-        self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
-
-
-        # # Wait until the first callback
-        self.speed = None
-        self.state = None
-        self.speed_GT = None
-        self.state_GT = None
-        while self.scan is None or self.speed is None or self.state is None\
-                or self.speed_GT is None or self.state_GT is None:
-            pass
-
-        rospy.sleep(1.)
-        # # What function to call when you ctrl + c
-        # rospy.on_shutdown(self.shutdown)
+    def init_pub(self, index):
+        cmd_vel_topic = 'human_' + str(index) + '/cmd_vel'
+        cmd_vel = rospy.Publisher(cmd_vel_topic, Twist, queue_size=10)
+        self.cmd_vel_list.append(cmd_vel)        
+        
+        cmd_pose_topic = 'human_' + str(index) + '/cmd_pose'
+        cmd_pose = rospy.Publisher(cmd_pose_topic, Pose, queue_size=2)
+        self.cmd_vel_list.append(cmd_pose)        
 
 
-    def generate_humans(self, human_num):
-        for i in range(human_num):
-            human = Human(i)
-            self.humans.append(human)    
-
-    def init_pub(self, human_num):
-        cmd_vel_topic = 'robot_' + str(index) + '/cmd_vel'
-        self.cmd_vel = rospy.Publisher(cmd_vel_topic, Twist, queue_size=10)
-
-        cmd_pose_topic = 'robot_' + str(index) + '/cmd_pose'
-        self.cmd_pose = rospy.Publisher(cmd_pose_topic, Pose, queue_size=2)
-
-
-    def init_sub(self, human_num):
-        object_state_topic = 'robot_' + str(index) + '/base_pose_ground_truth'
-        self.object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)    # input stage(argument), dataType, called function
-
-        laser_topic = 'robot_' + str(index) + '/base_scan'
-
-        self.laser_sub = rospy.Subscriber(laser_topic, LaserScan, self.laser_scan_callback)
-
-        odom_topic = 'robot_' + str(index) + '/odom'
-        self.odom_sub = rospy.Subscriber(odom_topic, Odometry, self.odometry_callback)
-
-        crash_topic = 'robot_' + str(index) + '/is_crashed'
-        self.check_crash = rospy.Subscriber(crash_topic, Int8, self.crash_callback)
-
+    def init_sub(self, index):
+        object_state_topic = 'human_' + str(index) + '/base_pose_ground_truth'
+        object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)
+        self.object_state_sub_list.append(object_state_sub)
+        
+        odom_topic = 'human_' + str(index) + '/odom'
+        odom_sub = rospy.Subscriber(odom_topic, Odometry, self.odometry_callback)
+        self.odom_sub_list.append(odom_sub)
+        
+        crash_topic = 'human_' + str(index) + '/is_crashed'
+        check_crash = rospy.Subscriber(crash_topic, Int8, self.crash_callback)
+        self.check_crash_list.append(check_crash)
 
     def step(self):
         self.sim.doStep()
+        for index in self.human_index_list:
+            human = self.human_list[index]
+            cur_pos = human.get_pos()
+            self.sim.setAgentPosition(cur_pos)
+            goal_pos = human.get_local_goal()
+            dt_vel = (goal_pos[0] - cur_pos[0], goal_pos[1] - cur_pos[1])
+            dt_angle = self.compute_rel_angle(goal_pos, cur_pos)
+            agent = self.rvo_agent_list[index]
+            self.sim.setAgentPrefVelocity(agent, dt_vel)
+            pref_linear_vel, pref_angular_vel = human.get_linear_vel[1], human.get_angular_vel[1]
+            self.control_vel([pref_linear_vel, pref_angular_vel * dt_angle])
 
-        for i in self.humans:
-            pos = self.sim.getAgentPosition(i)
+    def set_goal(self, index, goal_list):
+        human = self.human_list[index]
+        human.set_goal_list(goal_list)
 
-
-    def set_goal(self, human_index, goal_list):
-        pass
-
-
-
-
-
-    def get_self_stateGT(self):
-        return self.state_GT
-
-    def get_self_speedGT(self):
-        return self.speed_GT
-
-    def get_laser_observation(self):
-        scan = copy.deepcopy(self.scan)  # from laser_scan_callback   # self.scan = np.array(scan.ranges)
-        scan[np.isnan(scan)] = 6.0       # NaN or INF set 6
-        scan[np.isinf(scan)] = 6.0
-        raw_beam_num = len(scan)
-        sparse_beam_num = self.beam_mum   # 512
-        step = float(raw_beam_num) / sparse_beam_num
-        sparse_scan_left = []   # left scan
-        index = 0.
-        for x in xrange(int(sparse_beam_num / 2)):   # routine 256
-            sparse_scan_left.append(scan[int(index)])
-            index += step
-        sparse_scan_right = []   # right scan
-        index = raw_beam_num - 1.
-        for x in xrange(int(sparse_beam_num / 2)):
-            sparse_scan_right.append(scan[int(index)])
-            index -= step
-        scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan
-        #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        return scan_sparse / 6.0 - 0.5
-
-
-    def get_self_speed(self):
-        return self.speed
-
-    def get_self_state(self):
-        return self.state
+    def compute_rel_angle(self, start_point, end_point):
+        rel_angle = np.arctan2(end_point[1] - start_point[1], end_point[0] - start_point[0])
+        return rel_angle
 
     def get_crash_state(self):
-        return self.is_crashed   # from ROS callback F is_crashed int(1 or 0)
+        return self.is_crashed
 
     def get_sim_time(self):
         return self.sim_time
-
-    def get_local_goal(self):
-        [x, y, theta] = self.get_self_stateGT()   # robot state
-        [goal_x, goal_y] = self.goal_point        # robot generated goal
-        local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
-        local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
-        return [local_x, local_y]
-
-    def reset_world(self):
-        self.reset_stage()
-        self.self_speed = [0.0, 0.0]
-        self.step_goal = [0., 0.]
-        self.step_r_cnt = 0.
-        self.start_time = time.time()
-        rospy.sleep(0.5)
-
-
-    def generate_goal_point(self):
-        [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
-        self.goal_point = [x_g, y_g]                 # set global goal
-        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
-
-        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
-        self.distance = copy.deepcopy(self.pre_distance)
-
-
-    def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
-        terminate = False
-        laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
-        [x, y, theta] = self.get_self_stateGT()     # "updated" current state
-        [v, w] = self.get_self_speedGT()            # updated current velocity
-        self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
-        self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
-        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)
-        reward_c = 0  # collision penalty
-        reward_w = 0  # too much rotation penalty
-        result = 0
-        is_crash = self.get_crash_state()   # return self.is_crashed
-
-        if self.distance < self.goal_size:
-            terminate = True
-            reward_g = 15
-            result = 'Reach Goal'
-
-        if is_crash == 1:
-            terminate = True
-            reward_c = -15.
-            result = 'Crashed'
-
-        if np.abs(w) >  1.05:   # rotation penalty
-            reward_w = -0.1 * np.abs(w)
-
-        if t > 150:  # timeout check
-            terminate = True
-            result = 'Time out'
-        reward = reward_g + reward_c + reward_w
-
-        return reward, terminate, result   # float, T or F(base), description
 
     def reset_pose(self):
         random_pose = self.generate_random_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9
@@ -211,7 +105,7 @@ class Env:
         rospy.sleep(0.01)
 
 
-    def control_vel(self, action):   # real action as array[0.123023, -0.242424]. from 
+    def control_vel(self, action, index):
         move_cmd = Twist()
         move_cmd.linear.x = action[0]
         move_cmd.linear.y = 0.
@@ -219,10 +113,10 @@ class Env:
         move_cmd.angular.x = 0.
         move_cmd.angular.y = 0.
         move_cmd.angular.z = action[1]
-        self.cmd_vel.publish(move_cmd)
+        self.cmd_vel_list[index].publish(move_cmd)
 
 
-    def control_pose(self, pose):    # pose = [x, y, theta]
+    def control_pose(self, pose, index):    # pose = [x, y, theta]
         pose_cmd = Pose()
         assert len(pose)==3
         pose_cmd.position.x = pose[0]   # x
@@ -234,40 +128,12 @@ class Env:
         pose_cmd.orientation.y = qtn[1]
         pose_cmd.orientation.z = qtn[2]
         pose_cmd.orientation.w = qtn[3]
-        self.cmd_pose.publish(pose_cmd)
-
-    def generate_random_pose(self):
-        x = np.random.uniform(-9, 9)
-        y = np.random.uniform(-9, 9)
-        dis = np.sqrt(x ** 2 + y ** 2)
-        while (dis > 9) and not rospy.is_shutdown():
-            x = np.random.uniform(-9, 9)
-            y = np.random.uniform(-9, 9)
-            dis = np.sqrt(x ** 2 + y ** 2)
-        theta = np.random.uniform(0, 2 * np.pi)
-        return [x, y, theta]
-
-    def generate_random_goal(self):
-        self.init_pose = self.get_self_stateGT()
-        x = np.random.uniform(-9, 9)
-        y = np.random.uniform(-9, 9)
-        dis_origin = np.sqrt(x ** 2 + y ** 2)
-        dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
-        while (dis_origin > 9 or dis_goal > 10 or dis_goal < 8) and not rospy.is_shutdown():
-            x = np.random.uniform(-9, 9)
-            y = np.random.uniform(-9, 9)
-            dis_origin = np.sqrt(x ** 2 + y ** 2)
-            dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
-
-        return [x, y]
-
-
-
+        self.cmd_pose_list[index].publish(pose_cmd)
 
 #############################################################################################
 #                                   Callback function
 #############################################################################################
-    def ground_truth_callback(self, GT_odometry):   # topic: robot_0_base_pose_ground topic callback F
+    def ground_truth_callback(self, GT_odometry):
         Quaternious = GT_odometry.pose.pose.orientation
         Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
         self.state_GT = [GT_odometry.pose.pose.position.x, GT_odometry.pose.pose.position.y, Euler[2]]
@@ -275,13 +141,6 @@ class Env:
         v_y = GT_odometry.twist.twist.linear.y
         v = np.sqrt(v_x**2 + v_y**2)
         self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
-
-    def laser_scan_callback(self, scan):
-        self.scan_param = [scan.angle_min, scan.angle_max, scan.angle_increment, scan.time_increment,
-                           scan.scan_time, scan.range_min, scan.range_max]
-        self.scan = np.array(scan.ranges)
-        self.laser_cb_num += 1
-
 
     def odometry_callback(self, odometry):
         Quaternions = odometry.pose.pose.orientation
