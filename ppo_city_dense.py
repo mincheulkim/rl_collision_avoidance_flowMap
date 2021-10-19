@@ -37,12 +37,17 @@ LASER_BEAM = 512
 LASER_HIST = 3
 #HORIZON = 128  # can be 32 ~ 5000                   # TODO increase time horizon?
 #HORIZON = 256  # can be 32 ~ 5000                   # TODO increase time horizon?
-HORIZON = 384  # can be 32 ~ 5000                   # TODO increase time horizon?
+#HORIZON = 384  # can be 32 ~ 5000                   # TODO increase time horizon?
+#HORIZON = 512  # can be 32 ~ 5000                   # TODO increase time horizon?
+HORIZON = 2048  # can be 32 ~ 5000                   # 211119
 GAMMA = 0.99   # can be 0.99(normal), discount factor
 LAMDA = 0.95   # can be 0.9~0.1, Factor for trade-off of bias vs variance of GAE
-#BATCH_SIZE = 1024   # can be 4~4096(minibatch?)     # TODO increase batch size?
-BATCH_SIZE = 2048   # can be 4~4096(minibatch?)     # TODO increase batch size?
-EPOCH = 2   # can be 3~30(number of epoch when optimizing the surrogate loss)
+#BATCH_SIZE = 256   # can be 4~4096(minibatch?)     # TODO increase batch size?  # How many batches are inputed to model to update PPO. same as index
+#BATCH_SIZE = 2048   # can be 4~4096(minibatch?)     # TODO increase batch size?
+#BATCH_SIZE = 512   # can be 4~4096(minibatch?)     # 211119
+BATCH_SIZE = 4096   # can be 4~4096(minibatch?)     # 211119
+#EPOCH = 2   # can be 3~30(number of epoch when optimizing the surrogate loss)
+EPOCH = 3   # can be 3~30(number of epoch when optimizing the surrogate loss)
 COEFF_ENTROPY = 5e-4   # may be 0~0.01
 #COEFF_ENTROPY = 1e-3   # 211102
 CLIP_VALUE = 0.1     # can be 0.1, 0.2, 0.3
@@ -170,7 +175,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
 
-            if global_step % HORIZON == 0:   # every 128, estimate future V???     
+            #if global_step % HORIZON == 0:   # every 128, estimate future V???     
+            if global_step % HORIZON == 0 and step > 5:   # every 128, estimate future V???     
                 if local_map:   # localMap
                     last_v_r, _, _, _, _=generate_action_robot_localmap(env=env, state=state_next, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
                 else:
@@ -178,6 +184,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                     #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
                 
             # 5. add transitons in buff and update policy
+            #if env.index == 0:  # maybe env.index=0 means robot
             if env.index == 0:  # maybe env.index=0 means robot
                 # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
                 if local_map:
@@ -211,6 +218,10 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
                     buff_r = []          # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
+                    #print('----global_update:',global_update)
+                    #print(len(memory_r[2]))     #memory size = 2048(same as HORIZON)
+                    #print('memory_r:',len(memory_r))
+
 
             #step += 1   # time goes on +1
             state = state_next
@@ -228,8 +239,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             logger_cal.info(ep_reward)
 
             #if id != 0 and id % 20 == 0:
-            if global_update != 0 and global_update % 20 == 0:
-                torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
+            print('saving global update:',global_update)
+            if global_update != 0 and global_update % 5 == 0:
+                print('matched global update:',global_update)
+                #torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
+                torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(global_update))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
             
