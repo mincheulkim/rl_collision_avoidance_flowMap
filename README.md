@@ -1,53 +1,41 @@
-# rl-collision-avoidance
+# Ped/Crowd Flow
 
-This is a Pytorch implementation of the paper [Towards Optimally Decentralized Multi-Robot Collision Avoidance via Deep Reinforcement Learning](https://arxiv.org/abs/1709.10082)
-
-![](./doc/stage2.gif)  |  ![](./doc/circle_test.gif)
-:-------------------------:|:-------------------------:
-
-## Requirement
-
-- python2.7
-- [ROS Kinetic](http://wiki.ros.org/kinetic)
+- python3.6
+- [ROS Melodic](http://wiki.ros.org/melodic)
 - [mpi4py](https://mpi4py.readthedocs.io/en/stable/)
 - [Stage](http://rtv.github.io/Stage/)
 - [PyTorch](http://pytorch.org/)
 
-
-## How to train
-You may start with training in Stage1 and when it is well-trained you can transfer to Stage2 base on the policy model of Stage1, this is exactly what Curriculum Learning means. Training Stage2 from scratch may converge at a lower performance or not even converge.
-Please note that the motivation of training in Stage2 is to generalize the model, which hopefully can work well in real environment.
-
-Please use the `stage_ros-add_pose_and_crash` package instead of the default package provided by ROS.
-```
-mkdir -p catkin_ws/src
-cp stage_ros-add_pose_and_crash catkin_ws/src
-cd catkin_ws
-catkin_make
-source devel/setup.bash
-```
-
-To train Stage1, modify the hyper-parameters in `ppo_stage1.py` as you like, and running the following command:
-```
-(leave out the -g if you want to see the GUI while training)
-rosrun stage_ros_add_pose_and_crash stageros -g worlds/stage1.world
-mpiexec -np 24 python ppo_stage1.py
-```
-To train Stage2, modify the hyper-parameters in `ppo_stage2.py` as you like, and running the following command:
-```
-rosrun stage_ros_add_pose_and_crash stageros -g worlds/stage2.world
-mpiexec -np 44 python ppo_stage2.py
-```
-## How to test
+## setup
 
 ```
-rosrun stage_ros_add_pose_and_crash stageros worlds/circle.world
-mpiexec -np 50 python circle_test.py
+$ mkdir PROJECT_WS/src
 ```
 
-## Notice
-I am not the author of the paper and not in their group either. You may contact [Jia Pan](https://sites.google.com/site/panjia/) (jpan@cs.hku.hk) for the paper related issues. 
-If you find it useful and use it in your project, please consider citing:
+### Using python3 and tf in ROS, Stage-ros
+```
+$ virtualenv -p /usr/bin/python3 [VENV_PATH]
+$ source [VENV_PATH]/bin/activate
+$ pip install catkin_pkg pyyaml empy rospkg numpy
+$ cd PROJECT_WS/src
+$ cp stage_ros-add_pose_and_crash PROJECT_WS/src
+$ git clone --branch melodic-devel https://github.com/ros/geometry.git
+$ git clone --branch melodic-devel https://github.com/ros/geometry2.git
+$ cd ..
+$ catkin_make -DPYTHON_EXECUTABLE:FILEPATH=[VENV_PYTHON_PATH]
+$ source devel/setup.bash
+```
+
+Note that you can find your own "VENV_PYTHON_PATH" using the following commands.
+```
+$ source [VENV_PATH]/bin/activate
+$ which python
+```
+
+
+
+## References
+
 ```
 @misc{Tianyu2018,
 	author = {Tianyu Liu},
