@@ -71,6 +71,15 @@ tensorboard --logdir runs/
 }
 ```
 # TODOList
+"MOST PRIOR TASK"
+1. LIDAR t-10, t-5, t
+2. visualise LIDAR as 3*512 2D MAP
+3. model humans behavior by social force
+4. robot only use 1 single mpiexec: human behavior(con_vel) is controlled by other python file, not implementing mpiexecs
+   because base human agent already created by groups.world.
+5. validate buffer saver
+6
+
 ```
 - [x] seperate human and robot policy: generate_action_human(), generate_action_robot() or generate_action_robot_localmap()
 - [x] seperate train / test function for ppo: argument evaluate=True(test), False(train)
@@ -87,6 +96,7 @@ tensorboard --logdir runs/
 -- Follower: Standard RVO velocity + To-Leader velocity(maintain cohensity) sum vector velocity
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
 - [ ] after reaching the goal, human change their next goal
+- [ ] using social force, create behavior of humans and groups
 - 2. Generate Flow Map
 - [x] create flowmap(local)    by 211201: ppo.py/generate_action_LM() 6x6 size
 - [ ] create flowmap(global as storage)

@@ -54,30 +54,30 @@ LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map
 policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 
 
-#policy_path, optimizer 
+#policy_path, optimizer
 
-#def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
-def run(comm, env, policy, policy_path, action_bound, optimizer):
+def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
+#def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
 
     last_v_r = 0.0
 
-    '''
+
     if env.index ==0 and buffer is not None:
         buff = buffer
         last_v_r = last_v_r_p
         print('Loaded buffer memory')
         print(len(buff))
-    '''
+
     global_update = 0
     global_step = 0
     memory_size = 0
 
-    
+
 
     if env.index == 0:
-        env.reset_world()  
+        env.reset_world()
 
     for id in range(MAX_EPISODES):
         # senario reset option
@@ -88,7 +88,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #env.generate_goal_point()
         # use this one!
         env.generate_pose_goal_circle()  # shafeshift above two line
-        
+
         if env.is_crashed:   # 211201
             env.generate_pose_goal_circle()
             env.is_crashed = False
@@ -113,18 +113,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         # for visualize
 
         while not terminal and not rospy.is_shutdown():
-            
+
             state_list = comm.gather(state, root=0)
-            
+
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             speed_poly_list = comm.gather(speed_poly, root=0)
             goal_global_list = comm.gather(goal_global, root=0)
 
             env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
-            
+
             if env.index==0:
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
-            
+
             # generate humans action_space
             #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             human_actions=generate_action_human_groups(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
@@ -138,12 +138,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
-            
+
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
 
             # distribute actions btwn robot and humans
-            if env.index == 0:    
+            if env.index == 0:
                 env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
             else: # pre-RVO vel, humans
                 angles = np.arctan2(real_action[1], real_action[0])
@@ -163,10 +163,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
                     cv2.imshow("Local flow map", dist)
                 elif policy_list == 'stacked_LM':
-                    dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   
-                    dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  
-                    dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  
-                    cv2.imshow("Local flow map", dist)    
+                    dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    cv2.imshow("Local flow map", dist)
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
                 cv2.waitKey(1)
@@ -176,7 +176,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
                 cv2.imshow("Local flow map", dist)
                 cv2.waitKey(1)
-            
+
 
             # get informtion
             r, terminal, result = env.get_reward_and_terminate(step)
@@ -212,7 +212,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 else:
                     last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
-            
+
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
@@ -232,7 +232,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         #s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
                             transform_buffer_stacked_LM(buff=buff)
-                        
+
                         t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
                         #memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
@@ -242,12 +242,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                 #num_env=NUM_ENV, frames=LASER_HIST,
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
-                        '''
+
                         with open('buff.pickle', 'wb') as f:                  # 211215. save buffer
                             pickle.dump(buff[1:], f, pickle.HIGHEST_PROTOCOL)
                         with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
                             pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
-                        '''
+
 
                         buff = []
                         global_update += 1
@@ -270,9 +270,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)
 
+                        with open('buff.pickle', 'wb') as f:                  # 211215. save buffer
+                            pickle.dump(buff[1:], f, pickle.HIGHEST_PROTOCOL)
+                        with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
+                            pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
+
                         buff = []
                         global_update += 1
-                    
+
 
             step += 1
             ###################################################################################################
@@ -281,10 +286,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
 
-        
+
         #####save policy and logger##############################################################################################
         if env.index == 0:
-            if global_update != 0 and global_update % 5 == 0:
+            #if global_update != 0 and global_update % 5 == 0:
+            if global_update != 0 and global_update % 2 == 0:   # 211217
                 #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
                 torch.save(policy.state_dict(), policy_path + '/Stage1')
                 #torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
@@ -297,10 +303,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
                 logger_cal.info(ep_reward)
-    
+
         ###################################################################################################
-    
-    
+
+
 
 if __name__ == '__main__':
     # config log
@@ -335,9 +341,10 @@ if __name__ == '__main__':
     # Check backward
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)
-    
+
     print("RANK:",rank," ENV")
-    
+    buffer = None
+
     reward = None
     action_bound = [[0, -1], [1, 1]] ####
     # torch.manual_seed(1)
@@ -353,10 +360,10 @@ if __name__ == '__main__':
             policy = CNNPolicy(frames=LASER_HIST, action_space=2)
         print(policy)
         policy.cuda()
-        
+
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
-        
+
 
         if not os.path.exists(policy_path):
             os.makedirs(policy_path)
@@ -374,34 +381,36 @@ if __name__ == '__main__':
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)
 
-            '''
+
             if env.index == 0:
                 with open('buff.pickle', 'rb') as f:   # 211215
                     buffer = pickle.load(f)
                 with open('last_v_r.pickle', 'rb') as f:   # 211215
                     last_v_r_p = pickle.load(f)
-            '''
+
         else:
             logger.info('#####################################')
             logger.info('############Start Training###########')
             logger.info('#####################################')
-            #buffer = None                            # 211215
-            #last_v_r_p = None
+            buffer = None                            # 211215
+            last_v_r_p = None
 
         if os.path.exists(file_tot):
             logger.info('####################################')
             logger.info('############Loading tot model#######')
             logger.info('####################################')
             policy = torch.load(file_tot)
+            buffer = None                            # 211215
+            last_v_r_p = None
     else:
         policy = None
         policy_path = None
         opt = None
-        #buffer = None
-        #last_v_r_p = None
+        buffer = None
+        last_v_r_p = None
 
     try:
-        #run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt, buffer=buffer, last_v_r_p = last_v_r_p)
-        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)
+        run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt, buffer=buffer, last_v_r_p = last_v_r_p)
+        #run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)
     except KeyboardInterrupt:
         pass
