@@ -160,12 +160,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
                     cv2.imshow("Local flow map3", dist3)
                 cv2.waitKey(1)
 
-            # LIDAR visualize, 3 * 512 2D LIDAR history map
+            # LIDAR visualize, 3 * 512 2D LIDAR history map  # 211220
             if env.index ==0 and LIDAR_visualize:
-                dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
-                cv2.imshow("Local flow map", dist)
+                greyscale = False
+                if greyscale:
+                    #robot_state[0][0][0](t-2), [0][0][1], [0][0][2](current)
+                    lidar = np.stack(((robot_state[0][0][0]+0.5), (robot_state[0][0][1]+0.5), (robot_state[0][0][2]+0.5)), axis=0)   # https://everyday-image-processing.tistory.com/87
+                else:
+                    lidar = np.stack(((robot_state[0][0][0]+0.5)*255, (robot_state[0][0][1]+0.5)*255, (robot_state[0][0][2]+0.5)*255), axis=0)   # RGB?
+                    lidar = np.uint8(lidar)
+                    #lidar = cv2.applyColorMap(lidar, cv2.COLORMAP_BONE)
+                    lidar = cv2.applyColorMap(255-lidar, cv2.COLORMAP_JET)
+                lidar = cv2.resize(lidar, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
+                cv2.imshow("Local flow map", lidar)
                 cv2.waitKey(1)
-
 
             # get informtion
             r, terminal, result = env.get_reward_and_terminate(step)
