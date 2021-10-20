@@ -89,7 +89,7 @@ tensorboard --logdir runs/
 - [x] collision checking module: current ros crash is not perferct. use min(lidar)<robot radius(0.4) to make collision detection
 - [ ] enhance collision checking module: make 360degree lidar for collision detection
 - [x] Fix segmentation fault issue: in stage_world1.py, there is rospy.sleep() in reset_pose() and reset_world(). make sleep last for a longer, try: set 1.0
-- [ ] save buffer for next loading
+- [x] save buffer for next loading: buffer and last_r_v
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
@@ -97,6 +97,7 @@ tensorboard --logdir runs/
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
 - [ ] after reaching the goal, human change their next goal
 - [ ] using social force, create behavior of humans and groups
+- [ ] On/Off for visible/invisible robot for human
 - 2. Generate Flow Map
 - [x] create flowmap(local)    by 211201: ppo.py/generate_action_LM() 6x6 size
 - [ ] create flowmap(global as storage)
@@ -104,18 +105,22 @@ tensorboard --logdir runs/
 - [x] more high resolution local map(current 1m -> 0.1)   so width is 6m(-3~3), total cell is 60x60 (3600 cells).
 - [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
 - [x] visualize local occupancy map(OpenCV)  (after 211105 meeting)
-- [ ] visualize LIDAR map(OpenCV)  (after 211105 meeting)
 - [x] use conv2D, rather than FC for occupancy map: 2 Conv2D, 2 MaxPool2D
 - 3. Make subgroups
 - [x] gather humans in similar groups
+- [ ] DBSCAN or KNN utilize (on-time real group algorithm)
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
-- 4. Reward shaping
+- 4. Reward shaping (after 211217 meeting)
 - [ ] future lidar collision penalty linearly(proximity)
-- 5. MISC
-- [ ] visualize LIDAR 1D vector
+- 5. Evaluation Metric
+- [ ] most closest(minest) distance with human
+- [ ] # of intrusion of personal space
+- 6. MISC
+- [ ] visualize LIDAR map(OpenCV)  (after 211105 meeting)
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
 - [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t
+- [ ] change python 3 environment (for social force)
 
 '''
 - 211105, after meeting

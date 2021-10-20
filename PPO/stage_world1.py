@@ -40,7 +40,6 @@ class StageWorld():
 
         self.flow_map = None  # 211026
 
-
         # for get reward and terminate(Didn't use)
         self.stop_counter = 0
 
@@ -70,8 +69,8 @@ class StageWorld():
         # -----------Service-------------------
         self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
 
-        
-        
+
+
         # # Wait until the first callback
         self.speed = None
         self.state = None
@@ -144,7 +143,7 @@ class StageWorld():
         step = float(raw_beam_num) / sparse_beam_num
         sparse_scan_left = []   # left scan
         index = 0.
-    
+
         for x in xrange(int(sparse_beam_num / 2)):   # routine 256
             sparse_scan_left.append(scan[int(index)])
             index += step
@@ -156,10 +155,8 @@ class StageWorld():
             index -= step
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
-        scan_sparse = scan_sparse[::-1]    # 211115
-        #print('laser scan: ',scan_sparse / 6.0 - 0.5)
+        scan_sparse = scan_sparse[::-1]    # 211115  fliped input
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
-        #return scan_sparse / 6.0  # 211102 TODO fliped input
 
     def collision_laser_flag(self, r):
         scan = copy.deepcopy(self.scan)
@@ -214,7 +211,7 @@ class StageWorld():
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)
-        
+
     # TODO: Reward reshape: penalty for circuling around
     def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
@@ -257,23 +254,21 @@ class StageWorld():
 
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
-        
+
         '''    # for future lidar collision penalty
         if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
             reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
         '''
-
 
         #if t > 150:  # timeout check
         if t > 1000:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
-        '''  
+        '''
         else:  # TODO time penalty
             reward_t = -0.1
         '''
-
 
         return reward, terminate, result   # float, T or F(base), description
 
@@ -288,11 +283,9 @@ class StageWorld():
         while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
-        
         rospy.sleep(0.01)
 
-
-    def control_vel(self, action):   # real action as array[0.123023, -0.242424]. from 
+    def control_vel(self, action):   # real action as array[0.123023, -0.242424]. from
         move_cmd = Twist()
         move_cmd.linear.x = action[0]
         move_cmd.linear.y = 0.
@@ -301,7 +294,6 @@ class StageWorld():
         move_cmd.angular.y = 0.
         move_cmd.angular.z = action[1]
         self.cmd_vel.publish(move_cmd)
-
 
     def control_pose(self, pose):    # pose = [x, y, theta]
         pose_cmd = Pose()
@@ -370,7 +362,7 @@ class StageWorld():
             x=self.index - 10
             y=self.index - 10
         '''
-        
+
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
         if self.index ==0:
@@ -403,7 +395,7 @@ class StageWorld():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
-        
+
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
         if self.index ==0:
@@ -454,7 +446,6 @@ class StageWorld():
         #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         random_pose = self.generate_group_pose()   # 211129. Groups initialize
         #rospy.sleep(0.01)
-        #rospy.sleep(0.5)   # too laggy
         rospy.sleep(1.0)   # too laggy
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
@@ -463,9 +454,8 @@ class StageWorld():
         while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
-        
+
         #rospy.sleep(0.01)
-        #rospy.sleep(0.5)
         rospy.sleep(1.0)   # too laggy
         self.is_crashed=False
 

@@ -8,9 +8,6 @@ import rospy #test
 import torch #test
 import torch.nn as nn #test
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 import cv2
 
 import pickle  # 211215 for save buffer
@@ -25,8 +22,6 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
-from drawnow import drawnow
-
 
 
 MAX_EPISODES = 5000
@@ -52,28 +47,23 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+blind_human = True
 
 
-#policy_path, optimizer
-
-def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):
+def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):   # buffer loader
 #def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
-
     last_v_r = 0.0
 
-
-    if env.index ==0 and buffer is not None:
+    if env.index ==0 and buffer is not None:   # buffer and last_v_r loader
         buff = buffer
         last_v_r = last_v_r_p
-        print('Loaded buffer memory')
-        print(len(buff))
+        print('Loaded buffer memory: len ', len(buff))
 
     global_update = 0
     global_step = 0
     memory_size = 0
-
 
 
     if env.index == 0:
@@ -110,7 +100,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
 
         goal_global = np.asarray(env.get_goal_point())
 
-        # for visualize
 
         while not terminal and not rospy.is_shutdown():
 
@@ -190,6 +179,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
             goal_next = np.asarray(env.get_local_goal())
             speed_next = np.asarray(env.get_self_speed())
             state_next = [obs_stack, goal_next, speed_next]
+
             # get next states(addon)
             pose_ori_next = env.get_self_stateGT()   # 211019
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
@@ -248,7 +238,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
                         with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
                             pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
 
-
                         buff = []
                         global_update += 1
 
@@ -305,7 +294,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_
                 logger_cal.info(ep_reward)
 
         ###################################################################################################
-
 
 
 if __name__ == '__main__':
@@ -368,8 +356,7 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):
             os.makedirs(policy_path)
 
-        # Load total model
-
+        # Load model
         file = policy_path + '/Stage1'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
@@ -380,7 +367,6 @@ if __name__ == '__main__':
             logger.info('####################################')
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)
-
 
             if env.index == 0:
                 with open('buff.pickle', 'rb') as f:   # 211215
