@@ -7,6 +7,7 @@ import numpy as np
 import socket
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
+
 hostname = socket.gethostname()
 if not os.path.exists('./log/' + hostname):
     os.makedirs('./log/' + hostname)
@@ -104,8 +105,45 @@ def generate_action_no_sampling(env, state_list, policy, action_bound):
     else:
         mean = None
         scaled_action = None
-
+    
     return mean, scaled_action
+
+def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # pose_list added
+    if env.index == 0:
+        s_list, goal_list, speed_list = [], [], []
+        for i in state_list:
+            s_list.append(i[0])      # lidar state
+            goal_list.append(i[1])   # local goal
+            speed_list.append(i[2])  # veloclity
+        
+        s_list = np.asarray(s_list)
+        goal_list = np.asarray(goal_list)
+        speed_list = np.asarray(speed_list)
+
+        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+
+        # 211020 pose_list create        
+        p_list = []
+        for i in pose_list:
+            p_list.append(i)
+        p_list = np.asarray(p_list)
+        p_list = Variable(torch.from_numpy(p_list)).float().cuda()
+
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)
+        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
+
+        # TODO get action based rvo
+        scaled_action = np.array([[0.123,0.00],[0.23,0.00],[0.33,0.00],[0.43,0.00],[0.232,0.003]])
+    else:
+        v = None
+        a = None
+        scaled_action = None
+        logprob = None
+
+    return v, a, logprob, scaled_action
 
 
 

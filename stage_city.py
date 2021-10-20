@@ -11,7 +11,7 @@ from sensor_msgs.msg import LaserScan
 from rosgraph_msgs.msg import Clock
 from std_srvs.srv import Empty
 from std_msgs.msg import Int8
-from model.utils import test_init_pose_new, test_goal_point_new    # arbitrary start and goal position sets
+#from model.utils import test_init_pose_new, test_goal_point_new    # arbitrary start and goal position sets
 
 
 
@@ -212,7 +212,8 @@ class StageWorld():
         if np.abs(w) >  1.05:   # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
-        if t > 150:  # timeout check
+        #if t > 150:  # timeout check
+        if t > 450:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w

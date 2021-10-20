@@ -12,11 +12,16 @@ from mpi4py import MPI
 from torch.optim import Adam
 from collections import deque
 
-from model.net import MLPPolicy, CNNPolicy
+from model.net import MLPPolicy, CNNPolicy, RVOPolicy
 from stage_city import StageWorld
 from model.ppo import ppo_update_city, generate_train_data
 from model.ppo import generate_action
 from model.ppo import transform_buffer
+
+from model.ppo import generate_action_rvo   # 211020
+
+#import model.orca as orcas  # 211020
+ 
 
 
 
@@ -62,23 +67,41 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         obs = env.get_laser_observation()   # e.g. array([0.5, 0.5, ...., 0.24598769, 24534221]), total list length 512
         #print('laser scan: ',len(obs))
         obs_stack = deque([obs, obs, obs])
-        goal = np.asarray(env.get_local_goal())
+        goal = np.asarray(env.get_local_goal())   # local goal: perspective of robot coordinate
         speed = np.asarray(env.get_self_speed())
+        
+        pose_ori = env.get_self_stateGT()   # 211019
+        pose = np.asarray(pose_ori[:2])   # 211019
+
+        #print('pose:',pose)
         state = [obs_stack, goal, speed]  # state: [deque([array([]),array([]),array([])]), array([-0.2323, 8.23232]), array[0, 0]]    # 3 stacted 512 lidar, local goal, init speed
         #print('state:',state)
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
             state_list = comm.gather(state, root=0)   # incorporate observation state
+            pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
+            #goals_list = comm.gather(goal, root=0)     # 211019
+            #print('pose_list:',pose_list)   # TODO   send state
+            #print('goals_list:',goals_list)
+            # [array([-6.50951869, -8.42569113]), array([-7.39730693, -8.33040246]), array([-8.64532387, -7.73384512]), array([-8.9156547 , -8.98302644]), array([-8.77155013, -8.20209891])])
+            # to rvo2
+            # then get action tuples
 
 
             # 1. generate actions at rank==0
             # TODO human part
             # env: <stage_world1.StageWorld instace at 0x7ff758640050> as manything, state_list=[3 stacked 512 lidar, local_goal, self_speed], policy: 'CNNPolicy(~~, action_boud:[[0,-1],[1,1]]
-            v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
-                                                         policy=policy, action_bound=action_bound)   # from ppo
+            #print('policy:',policy)
+            #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)   # from ppo
+            #print('scaled action:',scaled_action)
             # v: array[[-0.112323],[0.2323],[0.123123],[-1.2323],[-0.023232]] like dummy_vec, a: array({[[0.123,0.23],[0.23,0.23],..,[0.232,0.2323]]})  total 5 like dummy_vec, log_prob:[[-2],...,[-2]] as dummy_vec 5, scaled_action: array([[0.232, 0.2323], [0.2323, 0.2323], ..., [0.2323, 0.2323]]) as 5 agent's action
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
+
+            v, a, logprob, scaled_action=generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            #print('pose list:',pose_list)
+            #print('goal list:',goal_list)
+            #print('scaled action:',scaled_action)
 
             # 2. execute actions
             # TODO human
@@ -110,11 +133,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             speed_next = np.asarray(env.get_self_speed())  # ???
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'
                                                                # get (updated l-r+) obs_stack, new local goal and updated speed_next
+            # 4.1 get next state(pose)
+            pose_ori_next = env.get_self_stateGT()   # 211019
+            pose_next = np.asarray(pose_ori_next[:2])   # 211019
 
             if global_step % HORIZON == 0:   # every 128, estimate future V???
                 state_next_list = comm.gather(state_next, root=0)
-                last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy,
-                                                               action_bound=action_bound)
+                #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                last_v, _, _, _ = generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                
             # 5. add transitons in buff and update policy
             r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
             terminal_list = comm.gather(terminal, root=0)   # e.g. [F, F, F, F, F] ... most... [F, F, F, T, F]
@@ -142,6 +169,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
             step += 1   # time goes on +1
             state = state_next
+            
+            pose = pose_next   # 211020
 
         # after terminate = True(end step)
         if env.index == 0:
@@ -199,7 +228,9 @@ if __name__ == '__main__':
     if rank == 0:   # may this run?
         policy_path = 'policy'
         # policy = MLPPolicy(obs_size, act_size)    # 512, 2   # from model/net.py
-        policy = CNNPolicy(frames=LASER_HIST, action_space=2)   # 3, 2
+        #policy = CNNPolicy(frames=LASER_HIST, action_space=2)   # 3, 2   # TODO: callback to this funct
+        policy = RVOPolicy(frames=LASER_HIST, action_space=2)   # 3, 2
+        
         policy.cuda()
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
