@@ -148,7 +148,8 @@ def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # p
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         
-        sim = rvo2.PyRVOSimulator(1/60., 1.5, 5, 1.5, 2, 0.4, 2)
+        #sim = rvo2.PyRVOSimulator(1/60., 1.5, 5, 1.5, 2, 0.4, 2)
+        sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
         #sim = rvo2.PyRVOSimulator(1/60., 10, 10, 5, 5, 0.3, 1)
 
         a0=sim.addAgent(tuple(p_list[0]))
@@ -161,11 +162,20 @@ def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # p
         #print('g_list[0]=',goal_list_new[0])
         #print('aaaa:',aaaa)
 
+        '''
         h0v = goal_list_new[0]-p_list[0]   # velocity
         h1v = goal_list_new[1]-p_list[1]
         h2v = goal_list_new[2]-p_list[2]
         h3v = goal_list_new[3]-p_list[3]
         h4v = goal_list_new[4]-p_list[4]
+        '''
+
+        h0v = goal_list_new[0]   # TODO because goal's here is local goal, there is no need to minus current position!!!
+        h1v = goal_list_new[1]
+        h2v = goal_list_new[2]
+        h3v = goal_list_new[3]
+        h4v = goal_list_new[4]
+
         h0s = np.linalg.norm(h0v)          # speed
         h1s = np.linalg.norm(h1v)
         h2s = np.linalg.norm(h2v)
@@ -187,25 +197,10 @@ def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # p
 
         velocitiys = [sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)]
 
-        #print('orca vel:',velocitiys)
-
-        
-
-        #print(prefv0,prefv1,prefv2,prefv3,prefv4)
-        
-        
-
-        
-        #v1 = (tuple(goal_list_new[0])[:1]-tuple(p_list[0])[:1], tuple(goal_list_new[0])[1:2]-tuple(p_list[0])[1:2])
-        #print('v1:',v1)
-        #      gx-px, gy-py
-
-        #v1 = (tuple(goal_list[0][0])-tuple(p_list[0][0]),tuple(goal_list[0][1])-tuple(p_list[0][1]))
-        #print('v1:',v1)
-
         #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
         #scaled_action = np.array([[0.123,0.00],[0.23,0.00],[0.33,0.00],[0.43,0.00],[0.232,0.003]])
         scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)
+        #scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), (0.5,0.0), (0.5,0.0)
     else:
         v = None
         a = None
