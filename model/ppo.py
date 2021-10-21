@@ -6,6 +6,7 @@ from torch.nn import functional as F
 import numpy as np
 import socket
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
+import rvo2
 
 
 hostname = socket.gethostname()
@@ -118,6 +119,7 @@ def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # p
         
         s_list = np.asarray(s_list)
         goal_list = np.asarray(goal_list)
+        goal_list_new = goal_list  # 211021   nparray style, not torch as below
         speed_list = np.asarray(speed_list)
 
         s_list = Variable(torch.from_numpy(s_list)).float().cuda()
@@ -129,14 +131,81 @@ def generate_action_rvo(env, state_list, pose_list, policy, action_bound):   # p
         for i in pose_list:
             p_list.append(i)
         p_list = np.asarray(p_list)
-        p_list = Variable(torch.from_numpy(p_list)).float().cuda()
+        
+        #p_list = Variable(torch.from_numpy(p_list)).float().cuda()  # to tensor
+        #print('goal_list_new', tuple(goal_list_new[0]))
+        #print('p_list:',tuple(p_list[0]))
 
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)
-        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
+        #slice tuple(x,y) -> (x), (y)
+        #print('ori_goal_list_new', tuple(goal_list_new[0]))    # original (x, y)
+        #print('x_goal_list_new', tuple(goal_list_new[0])[:1])  # slice (x,)
+        #print('y_goal_list_new', tuple(goal_list_new[0])[1:2]) # slice (y,)
+        
+        #print('changed:',tuple(goal_list[0]))   # nd_array to tuple   https://www.kite.com/python/answers/how-to-convert-a-numpy-array-to-a-tuple-in-python
+        #print('changed:',tuple(p_list[0]))   # nd_array to tuple   https://www.kite.com/python/answers/how-to-convert-a-numpy-array-to-a-tuple-in-python
 
         # TODO get action based rvo
-        scaled_action = np.array([[0.123,0.00],[0.23,0.00],[0.33,0.00],[0.43,0.00],[0.232,0.003]])
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        
+        sim = rvo2.PyRVOSimulator(1/60., 1.5, 5, 1.5, 2, 0.4, 2)
+        #sim = rvo2.PyRVOSimulator(1/60., 10, 10, 5, 5, 0.3, 1)
+
+        a0=sim.addAgent(tuple(p_list[0]))
+        a1=sim.addAgent(tuple(p_list[1]))
+        a2=sim.addAgent(tuple(p_list[2]))
+        a3=sim.addAgent(tuple(p_list[3]))
+        a4=sim.addAgent(tuple(p_list[4]))
+
+        #print('p_list[0]=',p_list[0])
+        #print('g_list[0]=',goal_list_new[0])
+        #print('aaaa:',aaaa)
+
+        h0v = goal_list_new[0]-p_list[0]   # velocity
+        h1v = goal_list_new[1]-p_list[1]
+        h2v = goal_list_new[2]-p_list[2]
+        h3v = goal_list_new[3]-p_list[3]
+        h4v = goal_list_new[4]-p_list[4]
+        h0s = np.linalg.norm(h0v)          # speed
+        h1s = np.linalg.norm(h1v)
+        h2s = np.linalg.norm(h2v)
+        h3s = np.linalg.norm(h3v)
+        h4s = np.linalg.norm(h4v)
+        prefv0=h0v/h0s if h0s >1 else h0v
+        prefv1=h1v/h1s if h1s >1 else h1v
+        prefv2=h2v/h2s if h2s >1 else h2v
+        prefv3=h3v/h3s if h3s >1 else h3v
+        prefv4=h4v/h4s if h4s >1 else h4v
+
+        sim.setAgentPrefVelocity(a0, tuple(prefv0))
+        sim.setAgentPrefVelocity(a1, tuple(prefv1))
+        sim.setAgentPrefVelocity(a2, tuple(prefv2))
+        sim.setAgentPrefVelocity(a3, tuple(prefv3))
+        sim.setAgentPrefVelocity(a4, tuple(prefv4))
+
+        sim.doStep()
+
+        velocitiys = [sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)]
+
+        #print('orca vel:',velocitiys)
+
+        
+
+        #print(prefv0,prefv1,prefv2,prefv3,prefv4)
+        
+        
+
+        
+        #v1 = (tuple(goal_list_new[0])[:1]-tuple(p_list[0])[:1], tuple(goal_list_new[0])[1:2]-tuple(p_list[0])[1:2])
+        #print('v1:',v1)
+        #      gx-px, gy-py
+
+        #v1 = (tuple(goal_list[0][0])-tuple(p_list[0][0]),tuple(goal_list[0][1])-tuple(p_list[0][1]))
+        #print('v1:',v1)
+
+        #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
+        #scaled_action = np.array([[0.123,0.00],[0.23,0.00],[0.33,0.00],[0.43,0.00],[0.232,0.003]])
+        scaled_action = sim.getAgentVelocity(0), sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4)
     else:
         v = None
         a = None

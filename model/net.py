@@ -14,6 +14,24 @@ class Flatten(nn.Module):
 
         return input.view(input.shape[0], 1,  -1)
 
+class ORCA():
+    def __init__(self):
+        self.name = 'ORCA'
+        self.trainable = False
+        self.multiagent_training = None
+        self.kinematics = 'holonomic'
+        self.safety_space = 0
+        self.neighbor_dist = 10
+        self.max_neighbors = 10
+        self.time_horizon = 5
+        self.time_horizon_obst = 5
+        self.radius = 0.3
+        self.max_speed = 1
+        self.sim = None
+    
+    def predict(self, x, goal, speed, pose):
+        return
+
 
 class CNNPolicy(nn.Module):
     def __init__(self, frames, action_space):    # frames= 3, action_space= 2    from ppo_stage3.py/main()
@@ -156,7 +174,22 @@ class RVOPolicy(nn.Module):
         self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.critic = nn.Linear(128, 1)
 
-    def forward(self, x, goal, speed, pose):
+        ### incorporate ORCA 211020
+        
+        self.name = 'ORCA'
+        self.trainable = False
+        self.multiagent_training = None
+        self.kinematics = 'holonomic'
+        self.safety_space = 0
+        self.neighbor_dist = 10
+        self.max_neighbors = 10
+        self.time_horizon = 5
+        self.time_horizon_obst = 5
+        self.radius = 0.3
+        self.max_speed = 1
+        self.sim = None
+
+    def forward(self, x, goal, speed, pose):   # now create velocity
         """
             parameter
                 x: 
@@ -170,10 +203,21 @@ class RVOPolicy(nn.Module):
         a = F.relu(self.act_fea_cv2(a))
         a = a.view(a.shape[0], -1)
         a = F.relu(self.act_fc1(a))
-        print('x:',x)
-        print('goal:',goal)
-        print('speed:',speed)
-        print('pose:',pose)
+        #print('x:',x)
+        #print('goal:',goal)
+        #print('speed:',speed)
+        #print('pose:',pose)
+
+        #### ORCA PART ####
+        '''
+        params = self.neighbor_dist, self.max_neighbors, self.time_horizon, self.time_horizon_obst
+        
+        if self.sim is not None:
+            del self.sim
+            self.sim = None
+        if self.sim is None:
+            self.sim = rvo2.pyRVOSimulator()
+        '''
 
         a = torch.cat((a, goal, speed), dim=-1)
         a = F.relu(self.act_fc2(a))

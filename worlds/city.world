@@ -47,6 +47,7 @@ floorplan
   #size [40.000 40.000 0.800]            # floor size
   pose [0.000 0.000 0.000 0.000]
   bitmap "city.png"
+  #bitmap "blank.png"
 )
 
 
