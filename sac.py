@@ -13,12 +13,12 @@ class SAC():
         self,
         model,     # models_sac.PolicyNetGaussian, models_sac.QNet
         n_actions,
-        learning_rate = [1e-4, 2e-4],
+        learning_rate = [1e-4, 2e-4],     # defualt:3e-4
         reward_decay = 0.98,
         replace_target_iter = 300,
         memory_size = 5000,
         batch_size = 64,
-        tau = 0.01,
+        tau = 0.01,   # maybe 0.005?   target smoothing coefficient(default:5e-3)
         alpha = 0.5,
         auto_entropy_tuning = True,
         criterion = nn.MSELoss()
@@ -140,8 +140,8 @@ class SAC():
 
     def learn(self):
         # sample batch memory from all memory
-        if self.memory_counter > self.memory_size:     # memory counter > 40000
-            sample_index = np.random.choice(self.memory_size, size=self.batch_size)      # from 0~39999, pick 512
+        if self.memory_counter > self.memory_size:     # memory counter(every +1 cumulative) > 10000
+            sample_index = np.random.choice(self.memory_size, size=self.batch_size)      # memory size=10000, batch_size = 128 => pick 128 random number from 0~9999 [2422 972 7063 357 ... 9855]
         else:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         
@@ -171,10 +171,7 @@ class SAC():
         goal_n_list = torch.FloatTensor(np.array(goal_n_list)).to(device)
         speed_n_list = torch.FloatTensor(np.array(speed_n_list)).to(device)
 
-        end_ts = torch.FloatTensor(np.array(end_batch)).to(device).view(self.batch_size, 1)
-        #print('s_list:',s_list, s_list.shape)
-        #print('s_n_list:',s_n_list, s_n_list.shape)
-        #print('diff:',s_list-s_n_list)
+        end_ts = torch.FloatTensor(np.array(end_batch)).to(device).view(self.batch_size, 1)   # 1:keep going, 0:end
         
         # TD-target
         with torch.no_grad():
@@ -190,7 +187,7 @@ class SAC():
         q_eval = self.critic(s_list, goal_list, speed_list, a_ts)
         self.critic_loss = self.criterion(q_eval, q_target)
 
-        self.critic_optim.zero_grad()
+        self.critic_optim.zero_grad()   # reset calculated parameter's gradient as set 0(initialize) from previous epoch
         self.critic_loss.backward()
         self.critic_optim.step()
 
@@ -201,9 +198,9 @@ class SAC():
         q_current = self.critic(s_list, goal_list, speed_list, a_curr)
         self.actor_loss = ((self.alpha*logpi_curr) - q_current).mean()
 
-        self.actor_optim.zero_grad()
-        self.actor_loss.backward()
-        self.actor_optim.step()
+        self.actor_optim.zero_grad()   
+        self.actor_loss.backward()   # using loss and chain rule, calculate gradient(delta w) for each layers of model
+        self.actor_optim.step()      # update model's parameter(w=w-alpha*delta w)
 
         self.soft_update()
         

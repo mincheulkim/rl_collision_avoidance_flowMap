@@ -237,7 +237,7 @@ class StageWorld():
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
-        #reward = reward_g + reward_c + reward_w + reward_spin
+        #reward = reward_g + reward_c + reward_w + reward_spin  
 
         return reward, terminate, result   # float, T or F(base), description
 

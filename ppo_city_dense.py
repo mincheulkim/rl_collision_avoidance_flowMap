@@ -59,7 +59,7 @@ import sac
 import models_sac
 #batch_size = 64    # [original]need bigger
 #batch_size = 256    # modified(for onlyrobot)
-batch_size = 128    # modified(for onlyrobot)
+batch_size = 128    # maybe 256?
 #batch_size = 512    # modified(for static obstacle)
 #eval_eps = 10
 eval_eps = 20
@@ -186,8 +186,7 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
 
             if terminal==True:
                 live_flag=False
-                if result == 'Reach Goal':
-                    success_count +=1
+                
 
             global_step += 1   # 0 to add 1   # always increase(do not regard reset env)
 
@@ -222,8 +221,14 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                 
                 #TODO 100 ter
                 if terminal: 
-                    print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Ravg:{:.2f}| Cum_avg:{:.3f}  '\
+                    print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Acc_Rew/step:{:.2f}| Cum_avg:{:.3f}  '\
                         .format(id, step, total_step, action[0], r, loss_a, loss_c, rl_core.alpha, acc_reward/step, acc_reward))
+                    if result == 'Reach Goal':
+                        
+                        success_count +=1
+                        print('resutl:',result,success_count)
+
+                
 
             state = state_next        
             pose = pose_next              
@@ -304,7 +309,7 @@ if __name__ == '__main__':
             n_actions = 2,
             learning_rate = [0.0001, 0.0001],
             reward_decay = 0.99,
-            memory_size = 10000,
+            memory_size = 10000,      # maybe 1000000?
             #memory_size = 20000,   # for onlyrobot, static obstacle
             batch_size = batch_size,
             alpha = 0.1,
