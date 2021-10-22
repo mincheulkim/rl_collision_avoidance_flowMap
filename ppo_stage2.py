@@ -86,6 +86,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             global_step += 1
 
             # get next state
+            print('before:',)
             s_next = env.get_laser_observation()
             left = obs_stack.popleft()
             obs_stack.append(s_next)
@@ -121,8 +122,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                     buff = []
                     global_update += 1
-
-
+            if env.index==0:
+                print('state:',state)
+                print('state_next:',state_next)
             state = state_next
 
 

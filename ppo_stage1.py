@@ -29,7 +29,8 @@ BATCH_SIZE = 1024
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
 CLIP_VALUE = 0.1
-NUM_ENV = 24
+#NUM_ENV = 24
+NUM_ENV = 1
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -117,6 +118,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             step += 1
             state = state_next
+            #if env.index ==0:
+                #print('state[0]:',state[0][0])
+                #print('state[1]:',state_next[0][0])
+                #print('diff:',state[0][0]-state_next[0][0])
 
 
         if env.index == 0:

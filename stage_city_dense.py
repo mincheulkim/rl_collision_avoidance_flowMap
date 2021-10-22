@@ -397,7 +397,8 @@ class StageWorld():
         # reset goal
         #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         if self.index == 0:
-            self.goal_point = [0, 8]
+            #self.goal_point = [0, 8]
+            self.goal_point = [8, 4]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal

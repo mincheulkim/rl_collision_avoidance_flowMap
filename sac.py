@@ -58,6 +58,7 @@ class SAC():
         if op == "save":
             torch.save(self.critic.state_dict(), cnet_path)
             torch.save(self.actor.state_dict(), anet_path)
+            print('successfully saved')
         elif op == "load":
             self.critic.load_state_dict(torch.load(cnet_path, map_location=device))
             self.critic_target.load_state_dict(torch.load(cnet_path, map_location=device))
@@ -83,16 +84,16 @@ class SAC():
         speed_list = torch.FloatTensor(np.expand_dims(speed_list, 0)).to(device)
 
         #print('g:',goal_list,goal_list.shape)
-        #print('s:',speed_list, speed_list.shape)
+        
         #print('lidar:',s_list,s_list.shape)
+        
 
         if eval == False:
-            action, _, _ = self.actor.sample(s_list, goal_list, speed_list)
+            action, _, _ = self.actor.sample(s_list, goal_list, speed_list)   # action: tensor[[0.5083, 0.2180]] (1,2)
+            #print('action:',action)
         else:
             _, _, action = self.actor.sample(s_list, goal_list, speed_list)
-        #print('raw acton:',action)
-        action = action.cpu().detach().numpy()[0]   # tensor(1,2) to array(2,)
-#        print('actionsss:',action)
+        action = action.cpu().detach().numpy()[0]   # tensor(1,2) to array(2,)   # array([-0.5083, 0.2180])
         
 
 
@@ -159,6 +160,9 @@ class SAC():
         speed_n_list = torch.FloatTensor(np.array(speed_n_list)).to(device)
 
         end_ts = torch.FloatTensor(np.array(end_batch)).to(device).view(self.batch_size, 1)
+        #print('s_list:',s_list, s_list.shape)
+        #print('s_n_list:',s_n_list, s_n_list.shape)
+        #print('diff:',s_list-s_n_list)
         
         # TD-target
         with torch.no_grad():
@@ -167,6 +171,7 @@ class SAC():
             #q_next_target = self.critic_target(sn_ts, a_next) - self.alpha * logpi_next
             q_next_target = self.critic_target(s_n_list, goal_n_list, speed_n_list, a_next) - self.alpha * logpi_next
             q_target = r_ts + end_ts * self.gamma * q_next_target
+            #print(q_next_target,q_target)
         
         # Critic loss
         #q_eval = self.critic(s_ts, a_ts)

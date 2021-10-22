@@ -654,7 +654,7 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
     obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
 
     advs = (advs - advs.mean()) / advs.std()
-
+    #print('num_step:',num_step,'num_env:',num_env)   #num_step=128, num_env=24
     obss = obss.reshape((num_step*num_env, frames, obs_size))
     goals = goals.reshape((num_step*num_env, 2))
     speeds = speeds.reshape((num_step*num_env, 2))
@@ -709,7 +709,7 @@ def ppo_update_stage2(policy, optimizer, batch_size, memory, filter_index, epoch
     obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
 
     advs = (advs - advs.mean()) / advs.std()
-
+    print('num_step:',num_step,'num_env:',num_env)
     obss = obss.reshape((num_step*num_env, frames, obs_size))
     goals = goals.reshape((num_step*num_env, 2))
     speeds = speeds.reshape((num_step*num_env, 2))
