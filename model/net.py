@@ -9,6 +9,8 @@ from model.utils import log_normal_density
 
 import torch.optim as optim
 
+from torch.distributions import Categorical
+
 
 class Flatten(nn.Module):
     def forward(self, input):
@@ -78,10 +80,14 @@ class PPO(nn.Module):
         std = torch.exp(logstd)
         action = torch.normal(mean, std)
 
+        # action prob on log scale
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+
         #print('action:',action)
 
-        prob = F.softmax(x, dim=softmax_dim)
-        return prob, action
+        #prob = F.softmax(x, dim=softmax_dim)
+        #return prob, action
+        return logprob, action
 
     def pi_batch(self, s1, s2, s3, softmax_dim = 0):
         s_list, goal_list, speed_list = [], [], []
@@ -98,9 +104,16 @@ class PPO(nn.Module):
         goal_list = torch.from_numpy(goal_list).float()
         speed_list = torch.from_numpy(speed_list).float()
 
+        '''
         s_list=torch.squeeze(s_list, dim=0)
         goal_list=torch.squeeze(goal_list, dim=0)
         speed_list=torch.squeeze(speed_list, dim=0)
+        '''
+        s_list=torch.squeeze(s_list)
+        goal_list=torch.squeeze(goal_list)
+        speed_list=torch.squeeze(speed_list)
+
+        #print('s_list_:',s_list.shape)
 
         #x = F.relu(self.fc1(x))
         a = F.relu(self.act_fea_cv1(s_list))
@@ -122,7 +135,10 @@ class PPO(nn.Module):
         std = torch.exp(logstd)
         action = torch.normal(mean, std)
 
-        return prob, action
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+
+        #return prob, action     # (128, 2), (128, 2)
+        return logprob, action
     
     def v(self, x, y, z):
         #x = F.relu(self.fc1(x))
@@ -142,9 +158,9 @@ class PPO(nn.Module):
 
 
         #x = F.relu(self.fc1(x))
-        s_list=torch.squeeze(s_list, dim=0)
-        goal_list=torch.squeeze(goal_list, dim=0)
-        speed_list=torch.squeeze(speed_list, dim=0)
+        s_list=torch.squeeze(s_list)
+        goal_list=torch.squeeze(goal_list)
+        speed_list=torch.squeeze(speed_list)
 
         a = F.relu(self.act_fea_cv1(s_list))
         a = F.relu(self.act_fea_cv2(a))
@@ -162,14 +178,15 @@ class PPO(nn.Module):
         
     def make_batch(self):   # 0,1,2,3
         s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, done_lst = [], [], [], [], [], []
-        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
-        v_batch, occupancy_maps_batch = [], [], [], [], [], [], [], [], []
+        s_batch, goal_batch, speed_batch, a0_batch, a1_batch, r_batch, d_batch, l_batch, \
+        v_batch, occupancy_maps_batch = [], [], [], [], [], [], [], [], [], []
         s_temp, goal_temp, speed_temp = [], [], []
         s_prime_temp, goal_prime_temp, speed_prime_temp = [], [], []
         s_prime_batch, goal_prime_batch, speed_prime_batch=[],[],[]
 
         for transition in self.data:
-            s, a, r, s_prime, prob_a, done = transition
+            #s, a, r, s_prime, prob_a, done = transition
+            s, a0, a1, r, s_prime, prob_a, done = transition
 
             s_temp.append(s[0])   # 1. lidar
             goal_temp.append(s[1])   # 2. local goal
@@ -183,7 +200,9 @@ class PPO(nn.Module):
             goal_temp = []
             speed_temp = []
 
-            a_batch.append(a)   # A
+            #a_batch.append(a)   # A
+            a0_batch.append(a0)   # A0
+            a1_batch.append(a1)   # A1
             r_batch.append(r)   # reward
 
             s_prime_temp.append(s_prime[0])   # 1. lidar
@@ -207,7 +226,8 @@ class PPO(nn.Module):
         s11=torch.tensor(s_prime_batch, dtype=torch.float)
         s22=torch.tensor(goal_prime_batch, dtype=torch.float)
         s33=torch.tensor(speed_prime_batch, dtype=torch.float)
-        a=torch.tensor(a_batch)
+        a0=torch.tensor(a0_batch)
+        a1=torch.tensor(a1_batch)
         r= torch.tensor(r_batch)
         s_prime= torch.tensor(s_prime_lst, dtype=torch.float)
         done_mask=torch.tensor(d_batch, dtype=torch.float)
@@ -216,18 +236,27 @@ class PPO(nn.Module):
 
         self.data = []
         #return s, a, r, s_prime, done_mask, prob_a
-        return s1, s2, s3, a, r, s11, s22, s33, done_mask, prob_a
+        #return s1, s2, s3, a, r, s11, s22, s33, done_mask, prob_a
+        return s1, s2, s3, a0, a1, r, s11, s22, s33, done_mask, prob_a
         
     def train_net(self):
         #s, a, r, s_prime, done_mask, prob_a = self.make_batch()
-        s1, s2, s3, a, r, s11, s22, s33, done_mask, prob_a = self.make_batch()
+        #s1, s2, s3, a, r, s11, s22, s33, done_mask, prob_a = self.make_batch()
+        s1, s2, s3, a0, a1, r, s11, s22, s33, done_mask, prob_a = self.make_batch()
         #s,               s_prime
-        a=torch.unsqueeze(a, dim=0)
+        #a=torch.unsqueeze(a, dim=0)
+        r=r.unsqueeze(dim=1)
+        done_mask= done_mask.unsqueeze(dim=1)
 
         for i in range(K_epoch):
+            #print('epoch:',i)
             #td_target = r + gamma * self.v(s_prime) * done_mask
+            
+            
             td_target = r + gamma * self.v(s11, s22, s33) * done_mask
+            #print('td_Target.shape:',td_target.shape, 'r:',r.shape, 'v:',self.v(s11,s22,s33).shape, 'done:',done_mask.shape)
             delta = td_target - self.v(s1, s2, s3)
+            #print(td_target.shape, self.v(s1, s2, s3).shape, 'delta:',delta.shape)
             delta = delta.detach().numpy()
 
             advantage_lst = []
@@ -238,15 +267,47 @@ class PPO(nn.Module):
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-            pi, _ = self.pi_batch(s1, s2, s3, softmax_dim=1)
-            pi_a = pi.gather(1,a)
+            pi, _ = self.pi_batch(s1, s2, s3, softmax_dim=1)             # prob_batch, action_batch
+            #print('pi:',pi, pi.shape)      # 128, 1
+            #print('prob_a:',prob_a, prob_a.shape)    # 128,
+            #print(a0.shape, a1.shape)
+            pi=pi.squeeze()
+            #print('pi.reshqpe:',pi.shape, prob_a.shape)
 
-            ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
+            #pi_a = pi.gather(1,a)   # pi.shape = (128, 2), a.shape = (1,128)
+            
+            #print('pi:',pi)
+            #print('prob_a:',prob_a)
+            #ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))    # prob_a.shape = (128,)
+            #print('torch.log(pi):',torch.log(pi))
+            #print('torch.log(prob_a):',torch.log(prob_a))
 
+            eps = 1e-7
+            t_pi = F.relu(pi)
+            t_prob_a=F.relu(prob_a)
+            #print('t_pi:',t_pi)
+            #print('t_prob_a:',t_prob_a)
+
+            
+            #ratio = torch.exp(torch.log(pi) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))    # prob_a.shape = (128,)   # log has only x>0, but prob_a<0->nan
+            #ratio = torch.exp(torch.log(t_pi+eps) - torch.log(t_prob_a+eps))  # TODO first solution
+            ratio = torch.exp(torch.log(-1*pi) - torch.log(-1*prob_a))# TODO second solution
+            ratio=ratio.unsqueeze(dim=1)
+            #print('ratio.shape:',ratio.shape)
+            #print('advatage shape:',advantage.shape)
+            
             surr1 = ratio * advantage
+            #print('surr1 shape:',surr1.shape)
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
+            #print('surr2.shape:',surr2.shape)
             #loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach())
-            loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s1, s2, s3) , td_target.detach())
+            
+            #print('td_target:',td_target, td_target.shape)
+            #print(self.v(s1, s2, s3).shape, 't:', td_target.detach().shape)
+            loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s1, s2, s3) , td_target.detach())    # self.v -> input, td_target.detach() ->target
+                            #(128,128)                        # (128, 1)                        (128, 128)
+                            # need to make (128, 1)
+            #print('loss:',loss)
 
             self.optimizer.zero_grad()
             loss.mean().backward()

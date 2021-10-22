@@ -56,11 +56,15 @@ LEARNING_RATE = 5e-5
 local_map = False
 collision_sanity = False
 
-# TODO. Now, for test, import SAC
+
+
+# TODO. for minimal PPO
+T_horizon = 128
 
 # check 1.[city_dense.world] # of human position 2.[ppo_city_dense.py] NUM_ENV, local_map 3. mpiexec -np NUM_ENV
 
-def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
+#def run(comm, env, policy_minRL, policy_path, action_bound, optimizer):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
+def run(comm, env, policy_minRL, policy_path, action_bound):     # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam           from main()
     # rate = rospy.Rate(5)
     buff_r = [] # 211101
     global_update = 0  # for memory update(128)
@@ -68,7 +72,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
     if env.index == 0:
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
-        model =  PPO()
+        #model =  PPO()
+        #policy_minRL =  PPO()
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         
@@ -111,17 +116,24 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
             # for robot  211101
             if local_map:   # generate_action_human with local_flowmap
-                v_r, a_r, logprob_r, scaled_action_r, occupancy_maps_r=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
+                #v_r, a_r, logprob_r, scaled_action_r, occupancy_maps_r=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, velocity_poly_list=velocity_poly_list, evaluate=False)  # for training
+                pass
             else:   # baseline RL policy
-                v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
+                #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
                 #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=true)  # for test
                 # minimal PPO
                 if env.index ==0:
-                    prob, action = model.pi(state)
+                    #prob, action = model.pi(state)
+                    #logprob, action = model.pi(state)
+                    logprob, action = policy_minRL.pi(state)
                     raw_scaled_action_new = np.clip(action.squeeze(0).detach().cpu().numpy(), a_min=action_bound[0], a_max=action_bound[1])
-                    prob = torch.squeeze(prob)
-                    m = Categorical(prob)
-                    action_minPPO = m.sample().item()
+                    #print('action:',action,action.shape, 'logprob:',logprob,logprob.shape)
+                    #prob = torch.squeeze(prob)
+                    
+                    
+                    #m = Categorical(prob)
+                    #print('original m:',m)
+                    #action_minPPO = m.sample().item()
 
 
             # 2. execute actions
@@ -184,9 +196,23 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             if env.index ==0:
                 # s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, done_lst
                 #print(state, action_minPPO, r/100.0, state_next, prob[action_minPPO].item(), terminal)
-                model.put_data((state, action_minPPO, r/100.0, state_next, prob[action_minPPO].item(), terminal))
+                #model.put_data((state, action_minPPO, r/100.0, state_next, prob[action_minPPO].item(), terminal))
+                #model.put_data((state, action, r/100.0, state_next, logprob, terminal))
+                
+                #model.put_data((state, action.squeeze()[0], action.squeeze()[1], r/100.0, state_next, logprob, terminal))
+                policy_minRL.put_data((state, action.squeeze()[0], action.squeeze()[1], r/100.0, state_next, logprob, terminal))
+                #print('data(memory)s length:',len(model.data), 'action_min_PPO:',action_minPPO,prob[action_minPPO].item())
 
+            # minimal ppo
+            #if env.index ==0 and len(model.data) % T_horizon == 0:
+            if env.index ==0 and len(policy_minRL.data) % T_horizon == 0:
+                print('minimalPPO train')
+                #model.train_net()
+                policy_minRL.train_net()
 
+            
+
+            '''
             if global_step % HORIZON == 0:   # every 128, estimate future V???                
                 # For Robot 211001                              
                 if local_map:   # localMap
@@ -230,6 +256,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
                     buff_r = []          # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
+            '''
 
             step += 1   # time goes on +1
             state = state_next
@@ -238,9 +265,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
 
-            # minimal ppo
-            if env.index ==0:
-                model.train_net()
+            
             #if env.index ==0:
             #    print('final terminal:',terminal)   # erase
 
@@ -255,10 +280,13 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
             logger_cal.info(ep_reward)
 
+
             if id != 0 and id % 20 == 0:
+                '''
                 torch.save(policy_r.state_dict(), policy_path + '/Robot_r_{}_step'.format(id))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
+                '''
                 torch.save(policy_minRL.state_dict(), policy_path + '/minRL_{}_step'.format(id))
                 logger.info('########################## minRL saved when update {}global times and {} steps, {} episode#########'
                             '################'.format(global_update, step, id))
@@ -308,15 +336,17 @@ if __name__ == '__main__':
     # np.random.seed(1)
     if rank == 0:   # (env.index=0))
         policy_path = 'policy'
+        '''
         if local_map:
             policy_r = RobotPolicy_LM(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
         else:
             policy_r = RobotPolicy(frames=LASER_HIST, action_space=2)   # 211104 robot with lm
-            policy_minRL = PPO()
-        
-        policy_r.cuda()
-        policy_minRL.cuda()
-        opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
+            
+        '''
+        policy_minRL = PPO()
+        #policy_r.cuda()
+        #policy_minRL.cuda()
+        #opt = Adam(policy_r.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
 
         if not os.path.exists(policy_path):   # 'policy'
@@ -324,10 +354,11 @@ if __name__ == '__main__':
 
         #file_r = policy_path + '/final.pth'
         file_r = policy_path + '/Robot_r_1200_step.pth'
-        file_r_min = policy_path + '/minRL_140_step.pth'
+        file_r_min = policy_path + '/minRL_4980_step.pth'
 
-        print('current Robot policy:',policy_r)
-        print('current new robot model:',policy_minRL)
+        #print('current Robot policy:',policy_r)
+        print('current minRL robot model:',policy_minRL)
+        '''
         if os.path.exists(file_r):
             logger.info('####################################')
             logger.info('#########Loading Robot Model########')
@@ -339,7 +370,7 @@ if __name__ == '__main__':
             logger.info('#####################################')
             logger.info('############Start Training###########')
             logger.info('#####################################')
-
+        '''
         if os.path.exists(file_r_min):
             logger.info('####################################')
             logger.info('#########Loading minRL Model########')
@@ -357,7 +388,8 @@ if __name__ == '__main__':
         opt = None
 
     try:
-        run(comm=comm, env=env, policy_r=policy_r, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
+        #run(comm=comm, env=env, policy_minRL=policy_minRL, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
+        run(comm=comm, env=env, policy_minRL=policy_minRL, policy_path=policy_path, action_bound=action_bound)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
     except KeyboardInterrupt:
         pass
 

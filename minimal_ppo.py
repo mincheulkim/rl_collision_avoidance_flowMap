@@ -77,9 +77,13 @@ class PPO(nn.Module):
             #print('pi:',pi)
             #print('a:',a)
             #print('pi_a:',pi_a)
+            print('pi:',pi.shape, 'pi_a:',pi_a.shape)
+            print('piiii:',pi)
+            print('pi_aaa:',pi_a)
             ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
 
             surr1 = ratio * advantage
+            print(ratio.shape, advantage.shape, surr1.shape)
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
             loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach())
 
