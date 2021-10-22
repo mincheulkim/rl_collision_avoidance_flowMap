@@ -227,6 +227,7 @@ class StageWorld():
 
     def reset_pose(self):
         
+        '''
         reset_pose = test_init_pose_new(self.index)   # from model.utils
         self.control_pose(reset_pose)                 # if want static start pose, use above two lines 211021
         '''
@@ -239,7 +240,7 @@ class StageWorld():
         while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
-        '''
+        
         rospy.sleep(0.01)
 
 
@@ -271,8 +272,18 @@ class StageWorld():
     def generate_random_pose(self):
         #x = np.random.uniform(-9, 9)
         #y = np.random.uniform(-9, 9)
-        x = np.random.uniform(-9, -6)
-        y = np.random.uniform(-9, -6)
+        if self.index > 14:
+            x = np.random.uniform(-7, -9)
+            y = np.random.uniform(7, 9)
+        elif self.index > 9:
+            x = np.random.uniform(7, 9)
+            y = np.random.uniform(7, 9)
+        elif self.index > 4:
+            x = np.random.uniform(7, 9)
+            y = np.random.uniform(-7, -9)
+        else:
+            x = np.random.uniform(-9, -7)
+            y = np.random.uniform(-9, -7)
         
         #dis = np.sqrt(x ** 2 + y ** 2)
         #while (dis > 9) and not rospy.is_shutdown():
@@ -284,14 +295,24 @@ class StageWorld():
 
     def generate_random_goal(self):
         self.init_pose = self.get_self_stateGT()
-        #x = np.random.uniform(-9, 9)
-        #y = np.random.uniform(-9, 9)
+        if self.index > 14:
+            x = np.random.uniform(-7, -9)
+            y = np.random.uniform(-7, -9)
+        elif self.index > 9:
+            x = np.random.uniform(-7, -9)
+            y = np.random.uniform(7, 9)
+        elif self.index > 4:
+            x = np.random.uniform(7, 9)
+            y = np.random.uniform(7, 9)
+        else:
+            x = np.random.uniform(7, 9)
+            y = np.random.uniform(-7, -9)
         #x = np.random.uniform(6, 9)
         #y = np.random.uniform(6, 9)
         #x = np.random.uniform(6, 7)
         #y = np.random.uniform(7, 8)
-        x = -4
-        y = 8
+        #x = -4
+        #y = 8
         dis_origin = np.sqrt(x ** 2 + y ** 2)
         dis_goal = np.sqrt((x - self.init_pose[0]) ** 2 + (y - self.init_pose[1]) ** 2)
         #while (dis_origin > 9 or dis_goal > 10 or dis_goal < 8) and not rospy.is_shutdown():

@@ -64,7 +64,11 @@ def enjoy(comm, env, policy, action_bound):
         # execute actions
         real_action = comm.scatter(scaled_action, root=0)
         if terminal == True:
-            real_action[0] = 0
+            real_action[2] = 0
+        #print('real action:',real_action)
+        #real_action = [1, 0]   # [1, 0] move straight,[0, -1] rotate right
+        #print('real aciton[0]:',real_action[1])  # real_action[0]:linear vel(0~1), real_cation[1]:angular vel(-1~1)
+
         env.control_vel(real_action)
         # rate.sleep()
         rospy.sleep(0.001)

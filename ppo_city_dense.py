@@ -13,12 +13,12 @@ from torch.optim import Adam
 from collections import deque
 
 from model.net import MLPPolicy, CNNPolicy, RVOPolicy
-from stage_city import StageWorld
+from stage_city_dense import StageWorld
 from model.ppo import ppo_update_city, generate_train_data
 from model.ppo import generate_action
 from model.ppo import transform_buffer
 
-from model.ppo import generate_action_rvo   # 211020
+from model.ppo import generate_action_rvo, generate_action_rvo_dense   # 211020
 
 #import model.orca as orcas  # 211020
  
@@ -36,7 +36,7 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 CLIP_VALUE = 0.1
 #NUM_ENV = 24
-NUM_ENV = 5  # 211018
+NUM_ENV = 20  # 211018   # human num
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -84,7 +84,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         print(env,'s local goal:',goal)
         print(env,'s pos:',pose_ori)
         '''
-        print(env.index, 'goal:',goal)
+        #print(env.index, 'goal:',goal)
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
             state_list = comm.gather(state, root=0)   # incorporate observation state
@@ -107,7 +107,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
 
-            v, a, logprob, scaled_action=generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            #v, a, logprob, scaled_action=generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            v, a, logprob, scaled_action=generate_action_rvo_dense(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
             #print('pose list:',pose_list)
             #print('goal list:',goal_list)
             #print('scaled action:',scaled_action)
@@ -140,7 +141,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             obs_stack.append(s_next)     # add right data to stack
             goal_next = np.asarray(env.get_local_goal())   # get updated local goal based on changed agent state
             speed_next = np.asarray(env.get_self_speed())  # ???
-            print('env.index:',env.index, goal_next, speed_next)
+            #print('env.index:',env.index, goal_next, speed_next)
             state_next = [obs_stack, goal_next, speed_next]    # original state declare like 'state = [obs_stack, goal, speed]'
                                                                # get (updated l-r+) obs_stack, new local goal and updated speed_next
             # 4.1 get next state(pose)
@@ -193,7 +194,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         distance=2
 
-        print('envgoal:',env.goal_point)
+        #print('envgoal:',env.goal_point)
 
         logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
@@ -235,7 +236,7 @@ if __name__ == '__main__':
     size = comm.Get_size()
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)   # 512(obs_size as lidar size), index, 5
-    print('env:',env.index)    # create rank'th different env
+    #print('env:',env.index)    # create rank'th different env
     reward = None
     action_bound = [[0, -1], [1, 1]]
 

@@ -115,10 +115,26 @@ define agent position
 
 # for fixed pose start
 agent( pose [-8.00 -8.00 0.00 00.00])
-agent( pose [-4.00 -8.00 0.00 00.00])
-agent( pose [0.00 -8.00 0.00 00.00])
-agent( pose [4.00 -8.00 0.00 00.00])
+agent( pose [-7.50 -7.50 0.00 00.00])
+agent( pose [-7.50 -8.00 0.00 00.00])
+agent( pose [-8.00 -7.50 0.00 00.00])
+agent( pose [-7.00 -7.00 0.00 00.00])
+
 agent( pose [8.00 -8.00 0.00 00.00])
+agent( pose [7.50 -7.50 0.00 00.00])
+agent( pose [7.50 -8.00 0.00 00.00])
+agent( pose [8.00 -7.50 0.00 00.00])
+agent( pose [7.00 -7.00 0.00 00.00])
 
+agent( pose [7.00 7.00 0.00 00.00])
+agent( pose [7.50 7.50 0.00 00.00])
+agent( pose [7.50 8.00 0.00 00.00])
+agent( pose [8.00 7.50 0.00 00.00])
+agent( pose [8.00 8.00 0.00 00.00])
 
+agent( pose [-8.00 8.00 0.00 00.00])
+agent( pose [-7.50 7.50 0.00 00.00])
+agent( pose [-7.50 8.00 0.00 00.00])
+agent( pose [-8.00 7.50 0.00 00.00])
+agent( pose [-7.00 7.00 0.00 00.00])
 
