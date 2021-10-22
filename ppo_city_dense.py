@@ -383,7 +383,8 @@ if __name__ == '__main__':
             logger.info('############Start Training minRL###########')
             logger.info('#####################################')
     else:
-        policy_r = None  # 211101. robot's policy
+        #policy_r = None  # 211101. robot's policy
+        policy_minRL=None
         policy_path = None
         opt = None
 

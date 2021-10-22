@@ -224,7 +224,8 @@ class StageWorld():
         reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
-        if t > 450:  # timeout check  211020 for long-term
+        #if t > 450:  # timeout check  211020 for long-term
+        if t > 600:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
