@@ -5,6 +5,7 @@
 - [mpi4py](https://mpi4py.readthedocs.io/en/stable/)
 - [Stage](http://rtv.github.io/Stage/)
 - [PyTorch](http://pytorch.org/)
+- [RVO2](https://github.com/sybrenstuvel/Python-RVO2)
 
 ## setup
 
