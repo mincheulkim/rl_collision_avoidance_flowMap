@@ -55,15 +55,27 @@ class SAC():
     def save_load_model(self, op, path):
         anet_path = path + "sac_anet.pt"
         cnet_path = path + "sac_cnet.pt"
+        anet_path_tot = path + "sac_anet_tot.pt"
+        cnet_path_tot = path + "sac_cnet_tot.pt"
         if op == "save":
             torch.save(self.critic.state_dict(), cnet_path)
             torch.save(self.actor.state_dict(), anet_path)
             print('successfully saved')
+            # For Total Save
+            torch.save(self.critic, cnet_path_tot)
+            torch.save(self.actor, anet_path_tot)
         elif op == "load":
-            self.critic.load_state_dict(torch.load(cnet_path, map_location=device))
-            self.critic_target.load_state_dict(torch.load(cnet_path, map_location=device))
-            self.actor.load_state_dict(torch.load(anet_path, map_location=device))
+            #self.critic.load_state_dict(torch.load(cnet_path, map_location=device))
+            #self.critic_target.load_state_dict(torch.load(cnet_path, map_location=device))
+            #self.actor.load_state_dict(torch.load(anet_path, map_location=device))
             print('successfully loaded')
+            #For Total Load   https://jdjin3000.tistory.com/17
+            self.critic=torch.load(cnet_path_tot, map_location=device)
+            self.critic_target=torch.load(cnet_path_tot, map_location=device)
+            self.actor=torch.load(anet_path_tot, map_location=device)
+
+            print('tot loaded!')
+            
 
     def choose_action(self, s, eval=False):
         '''
@@ -104,14 +116,14 @@ class SAC():
         self.memory = {"s":[], "a":[], "r":[], "sn":[], "end":[]}
 
     def store_transition(self, s, a, r, sn, end):
-        if self.memory_counter <= self.memory_size:
+        if self.memory_counter <= self.memory_size:     # 10000 from ppo_city_dense.
             self.memory["s"].append(s)
             self.memory["a"].append(a)
             self.memory["r"].append(r)
             self.memory["sn"].append(sn)
             self.memory["end"].append(end)
         else:
-            index = self.memory_counter % self.memory_size
+            index = self.memory_counter % self.memory_size    # replace old memory
             self.memory["s"][index] = s
             self.memory["a"][index] = a
             self.memory["r"][index] = r

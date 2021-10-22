@@ -61,7 +61,8 @@ import models_sac
 #batch_size = 256    # modified(for onlyrobot)
 batch_size = 128    # modified(for onlyrobot)
 #batch_size = 512    # modified(for static obstacle)
-eval_eps = 10
+#eval_eps = 10
+eval_eps = 20
 
 
 
@@ -128,13 +129,16 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
             if env.index ==0:
                 if is_train:
                     action = rl_core.choose_action(state, eval=False)
-                    #print('action:',action)
+                    #print('==============')
+                    #print('network action:',action)
+                    '''
                     if action[0]>max_lin:
                         max_lin=action[0]
                         print('max_lin:',max_lin)
                     if action[0]<min_lin:
                         min_lin=action[0]
                         print('min_lin:',min_lin)
+                    '''
                 else:
                     action = rl_core.choose_action(state, eval=True)
 
@@ -144,8 +148,11 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
             if live_flag:
                 if env.index ==0:   # robot
                     # for SAC
-                    #action = np.clip(action, a_min=action_bound[0], a_max=action_bound[1])
+                    #action = np.clip(action, a_min=action_bound[0], a_max=action_bound[1])   # 211122 original clipping
+                    #print('original action:',action)
+                    action[0] = (action[0] + 1)/2    # 211122 new linear clipping
                     env.control_vel(action)
+                    #print('after action:',action)
                     #env.control_vel([1,0])
                     #env.control_vel(scaled_action_r)  # original
                 else:  # TODO check rvo vel, humans
@@ -162,10 +169,8 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
                 ep_reward += r   # for one episode culm reward
                 step += 1   # time goes on +1
-                #print(step,' reward: ',r, 'ep_reard:',ep_reward)
 
             # 3.1 check collision via sanity check
-                # my position
             if env.index==0 and collision_sanity:
                 #print(env.index,'s pose:',pose)
                 for i in range(1, NUM_ENV):  # human 1~NumEnv
@@ -204,20 +209,8 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
             if env.index ==0:
                 end = 0 if terminal else 1
                 rl_core.store_transition(state, action, r, state_next, end)
-                #print('diff:',state[0][0]-state_next[0][0])
-                #print('action:',action)
-                #print('state:',state[0][2]-state_next[0][2])
-                #print('pose diff:',state[1]-state_next[1])
-                #print('diff pose:',pose_next-pose)
-                #print('action:',action)
-                #print('state:',state[0][0])
-                #print('r:',r)
-                #print('end:',end)
-                #print('original goal:',state[1],'after goal:',state_next[1])
-                #print('original speed:',state[2], 'after speed:',state_next[2])
-                #print('original pose:',pose, 'after pose:',pose_next)
                 
-                # learn the model
+                # Learn the model
                 loss_a = loss_c = 0.
                 if total_step > batch_size and is_train:
                     loss_a, loss_c = rl_core.learn()
@@ -232,16 +225,9 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                     print('\rEps:{:3d} /{:4d} /{:6d}| action:{:+.2f}| R:{:+.2f}| Loss:[A>{:+.2f} C>{:+.2f}]| Alpha: {:.3f}| Ravg:{:.2f}| Cum_avg:{:.3f}  '\
                         .format(id, step, total_step, action[0], r, loss_a, loss_c, rl_core.alpha, acc_reward/step, acc_reward))
 
-            #step += 1   # time goes on +1
-            '''
-            state = state_next#            
-            pose = pose_next   # 2l.,j,j,11020
-            speed_poly = speed_next_poly  # 211104
-            rot = rot_next
-            '''
             state = state_next        
-            pose = pose_next               # 2l.,j,j,11020
-            speed_poly = speed_next_poly             # 211104
+            pose = pose_next              
+            speed_poly = speed_next_poly  
             rot = rot_next     
 
         # after terminate = True(end step)
@@ -253,7 +239,7 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
             logger_cal.info(ep_reward)
           
             
-        if id > 0 and id % eval_eps ==0:
+        if id > 0 and id % eval_eps ==0:   # every 10 times
             # Success rate
             success_rate = success_count / eval_eps
             success_count = 0
@@ -264,11 +250,6 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                     print("Save wiston SAC model to "+model_path)
                     rl_core.save_load_model("save", model_path)
                 print("Success Rate (current/max):", success_rate, "/", max_success_rate)
-
-
-
-        # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
-
 
 
 if __name__ == '__main__':

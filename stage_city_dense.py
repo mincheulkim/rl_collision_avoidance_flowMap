@@ -231,9 +231,9 @@ class StageWorld():
         reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
-        #if t > 450:  # timeout check  211020 for long-term
-        #if t > 550:  # timeout check  211020 for long-term
-        if t > 750:  # timeout check  211118 for static obstacles
+        #if t > 450:  # timeout check 
+        if t > 550:  # timeout check  211020 for nonhuman, robot only
+        #if t > 750:  # timeout check  211118 for static obstacles
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
@@ -397,8 +397,8 @@ class StageWorld():
         # reset goal
         #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         if self.index == 0:
-            #self.goal_point = [0, 8]
-            self.goal_point = [8, 4]
+            self.goal_point = [0, 8]
+            #self.goal_point = [10, 4]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
