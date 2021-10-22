@@ -506,6 +506,7 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action (net.py/forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         #print('mean:',a, action_bound[0], action_bound[1])
+        print('raw action:',a)
         raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # a[0] = (linear, angular), [0,-1], [1, 1]
         #print('cliped:',raw_scaled_action)
 

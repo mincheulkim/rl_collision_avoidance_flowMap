@@ -74,6 +74,11 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
     if env.index == 0:
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
 
+    min_lin=99.
+    max_lin=0.
+    min_ang=99.
+    max_ang=0.
+
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         
         #env.reset_pose()   # reset initial pose(x,y,theta)
@@ -99,6 +104,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
         state = [obs_stack, goal, speed]  # state: [deque([array([]),array([]),array([])]), array([-0.2323, 8.23232]), array[0, 0]]    # 3 stacted 512 lidar, local goal, init speed
 
         goal_global = np.asarray(env.get_goal_point())
+
+        
         
         
         while not terminal and not rospy.is_shutdown():   # terminal is similar as info(done)
@@ -124,7 +131,23 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             if live_flag:
                 if env.index ==0:   # robot
+                    #print('action:',scaled_action_r, scaled_action_r[0], scaled_action_r[1])
                     env.control_vel(scaled_action_r)
+                    '''
+                    if scaled_action_r[0]>max_lin:
+                        max_lin=scaled_action_r[0]
+                        #print('max_lin:',max_lin)
+                    if scaled_action_r[0]<min_lin:
+                        min_lin=scaled_action_r[0]
+                        #print('min_lin:',min_lin)
+                    if scaled_action_r[1]>max_ang:
+                        max_ang=scaled_action_r[1]
+                        #print('max_ang:',max_lin)
+                    if scaled_action_r[1]<min_ang:
+                        min_ang=scaled_action_r[1]
+                        #print('min_ang:',min_lin)
+                    print(max_lin, min_lin, max_ang, min_ang)
+                    '''
                 else:  # TODO check rvo vel, humans
                     angles = np.arctan2(real_action[1], real_action[0])
                     diff = angles - rot
