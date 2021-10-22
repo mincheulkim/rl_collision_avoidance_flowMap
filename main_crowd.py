@@ -38,10 +38,6 @@ class CrowdSimulator:
 
     def check_all_sub_done(self, human_num):
         for i in range(human_num):
-            self.object_state_sub_list = []
-            self.odom_sub_list = []
-            self.check_crash_list = []
-
             while self.env.object_state_sub_list[i] is None \
                 or self.env.odom_sub_list[i] is None \
                 or self.env.check_crash_list[i] is None:
