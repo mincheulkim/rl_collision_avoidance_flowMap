@@ -202,7 +202,7 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                 
                 #print('oristae:',state[0][0])
                 #print('nxtstae:',state_next[0][0])
-                print('diff:',state_next[0][0]-state[0][0])
+                #print('diff:',state_next[0][0]-state[0][0])
                 # Learn the model
                 loss_a = loss_c = 0.
                 if total_step > batch_size and is_train:
@@ -223,7 +223,7 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                         print('resutl:',result,success_count)
 
             
-                print('after_diff:',state_next[0][0]-state[0][0])
+                #print('after_diff:',state_next[0][0]-state[0][0])
             #print(state[0][0]-state[0][1])
 
             state = state_next        
