@@ -78,9 +78,11 @@ class StageWorld():
         self.speed_GT = None
         self.state_GT = None
         self.speed_poly = None  # 211103
+
         while self.scan is None or self.speed is None or self.state is None\
                 or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
             pass
+
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
         # rospy.on_shutdown(self.shutdown)
@@ -137,21 +139,24 @@ class StageWorld():
         step = float(raw_beam_num) / sparse_beam_num
         sparse_scan_left = []   # left scan
         index = 0.
+
         for x in xrange(int(sparse_beam_num / 2)):   # routine 256
             sparse_scan_left.append(scan[int(index)])
             index += step
 
         sparse_scan_right = []   # right scan
         index = raw_beam_num - 1.
+
         for x in xrange(int(sparse_beam_num / 2)):
             sparse_scan_right.append(scan[int(index)])
             index -= step
+
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
         scan_sparse = scan_sparse[::-1]    # 211115
         #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        #return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
-        return scan_sparse / 6.0  # 211102 TODO fliped input
+        return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
+        #return scan_sparse / 6.0  # 211102 TODO fliped input
 
 
     def get_self_speed(self):
@@ -182,7 +187,8 @@ class StageWorld():
         self.step_goal = [0., 0.]
         self.step_r_cnt = 0.
         self.start_time = time.time()
-        rospy.sleep(0.5)
+        #rospy.sleep(0.5)
+        rospy.sleep(1.0)
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10

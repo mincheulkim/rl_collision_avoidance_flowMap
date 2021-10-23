@@ -162,8 +162,8 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                     mod_vel = (length, diff)
                     env.control_vel(mod_vel)   # 211108
             # rate.sleep()
-                #rospy.sleep(0.001)
-                rospy.sleep(0.00001)
+                rospy.sleep(0.001)
+                #rospy.sleep(0.00001)
 
             # 3. get informtion after action(reward, info)
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
