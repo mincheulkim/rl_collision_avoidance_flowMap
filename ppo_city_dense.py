@@ -36,16 +36,16 @@ MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
 #HORIZON = 128  # can be 32 ~ 5000                   # TODO increase time horizon?
-#HORIZON = 256  # can be 32 ~ 5000                   # TODO increase time horizon?
+HORIZON = 256  # can be 32 ~ 5000                   # TODO increase time horizon?
 #HORIZON = 384  # can be 32 ~ 5000                   # TODO increase time horizon?
 #HORIZON = 512  # can be 32 ~ 5000                   # TODO increase time horizon?
-HORIZON = 2048  # can be 32 ~ 5000                   # 211119
+#HORIZON = 2048  # can be 32 ~ 5000                   # 211119
 GAMMA = 0.99   # can be 0.99(normal), discount factor
 LAMDA = 0.95   # can be 0.9~0.1, Factor for trade-off of bias vs variance of GAE
 #BATCH_SIZE = 256   # can be 4~4096(minibatch?)     # TODO increase batch size?  # How many batches are inputed to model to update PPO. same as index
-#BATCH_SIZE = 2048   # can be 4~4096(minibatch?)     # TODO increase batch size?
+BATCH_SIZE = 1024   # can be 4~4096(minibatch?)     # TODO increase batch size?
 #BATCH_SIZE = 512   # can be 4~4096(minibatch?)     # 211119
-BATCH_SIZE = 4096   # can be 4~4096(minibatch?)     # 211119
+#BATCH_SIZE = 4096   # can be 4~4096(minibatch?)     # 211119
 #EPOCH = 2   # can be 3~30(number of epoch when optimizing the surrogate loss)
 EPOCH = 3   # can be 3~30(number of epoch when optimizing the surrogate loss)
 COEFF_ENTROPY = 5e-4   # may be 0~0.01
@@ -247,6 +247,8 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
 
 
             #step += 1   # time goes on +1
+            #if env.index ==0:
+            #    print('diff:',state[0][0]-state_next[0][1])
             state = state_next
             
             pose = pose_next   # 2l.,j,j,11020
