@@ -129,16 +129,6 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
             if env.index ==0:
                 if is_train:
                     action = rl_core.choose_action(state, eval=False)
-                    #print('==============')
-                    #print('network action:',action)
-                    '''
-                    if action[0]>max_lin:
-                        max_lin=action[0]
-                        print('max_lin:',max_lin)
-                    if action[0]<min_lin:
-                        min_lin=action[0]
-                        print('min_lin:',min_lin)
-                    '''
                 else:
                     action = rl_core.choose_action(state, eval=True)
 
@@ -162,13 +152,14 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                     mod_vel = (length, diff)
                     env.control_vel(mod_vel)   # 211108
             # rate.sleep()
-                rospy.sleep(0.001)
                 #rospy.sleep(0.00001)
 
             # 3. get informtion after action(reward, info)
                 r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
                 ep_reward += r   # for one episode culm reward
                 step += 1   # time goes on +1
+
+            rospy.sleep(0.001)
 
             # 3.1 check collision via sanity check
             if env.index==0 and collision_sanity:
@@ -209,6 +200,9 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                 end = 0 if terminal else 1
                 rl_core.store_transition(state, action, r, state_next, end)
                 
+                #print('oristae:',state[0][0])
+                #print('nxtstae:',state_next[0][0])
+                print('diff:',state_next[0][0]-state[0][0])
                 # Learn the model
                 loss_a = loss_c = 0.
                 if total_step > batch_size and is_train:
@@ -228,7 +222,9 @@ def run(comm, env, rl_core, policy_path, action_bound):     # comm, env.stagewor
                         success_count +=1
                         print('resutl:',result,success_count)
 
-                
+            
+                print('after_diff:',state_next[0][0]-state[0][0])
+            #print(state[0][0]-state[0][1])
 
             state = state_next        
             pose = pose_next              

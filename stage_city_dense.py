@@ -152,9 +152,9 @@ class StageWorld():
             index -= step
 
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
-        #scan_sparse = np.flip(scan_sparse)    # 211115
-        scan_sparse = scan_sparse[::-1]    # 211115
-        #print('laser scan: ',scan_sparse / 6.0 - 0.5)
+        
+        #scan_sparse = scan_sparse[::-1]    # 211115
+        
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
         #return scan_sparse / 6.0  # 211102 TODO fliped input
 
@@ -187,8 +187,7 @@ class StageWorld():
         self.step_goal = [0., 0.]
         self.step_r_cnt = 0.
         self.start_time = time.time()
-        #rospy.sleep(0.5)
-        rospy.sleep(1.0)
+        rospy.sleep(0.5)
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
