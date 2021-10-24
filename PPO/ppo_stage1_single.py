@@ -17,6 +17,7 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
 from model.ppo import generate_action, generate_action_human
 from model.ppo import transform_buffer #test
+from itertools import islice
 
 
 MAX_EPISODES = 5000
@@ -50,11 +51,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     for id in range(MAX_EPISODES):
         #test
-        env.reset_pose()
-        env.generate_goal_point()
+        #env.reset_pose()
+        #env.generate_goal_point()
 
         # use this one!
-        #env.generate_pose_goal_circle()  # shafeshift above two line
+        env.generate_pose_goal_circle()  # shafeshift above two line
 
 
         terminal = False
@@ -83,11 +84,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # TODO add humans action
 
             # generate humans action_space
+            
+            #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            #print('human actions:',human_actions)
 
+            #print('state_list:',len(state_list))
+            #print('state=',len(state))
+            
+            #print(np.array(state_list).shape,np.array(state).shape)
 
+            
             # generate robot action (at rank==0)
-            v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
+            if env.index == 0:
+                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
                                                          policy=policy, action_bound=action_bound)
 
             # execute actions
@@ -134,7 +144,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
-                last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                if env.index ==0:
+                    last_v, _, _, _ = generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
@@ -143,6 +155,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                 #TODO. if local_map: change buff.append
                 buff.append((state_list, a, r_list, terminal_list, logprob, v))
+                print(a, r_list, terminal_list, logprob, v)
+                # (array([[ 2.4515967, -1.1015964]], dtype=float32), [0.0], [False], array([[-4.3833094]], dtype=float32), array([[-0.07423574]], dtype=float32))
+                #print(state_list)
+                # deque(array[],array[],array[]), array[1,2], array[1,2])
+                #buff.append((state_list, a, r, terminal, logprob, v))
+
                 if len(buff) > HORIZON - 1:
                     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         transform_buffer(buff=buff)
@@ -176,10 +194,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
-            distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+            #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+            #distance = 0
 
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
             logger_cal.info(ep_reward)
     
         ###################################################################################################
