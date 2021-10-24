@@ -60,7 +60,6 @@ class StageWorld():
         self.object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)
 
         '''
-
         laser_topic = '/robot_'+ str(index) + '/base_scan_0'
         self.laser_sub = rospy.Subscriber(laser_topic, LaserScan, self.laser_scan_callback)
 
@@ -78,6 +77,7 @@ class StageWorld():
 
         crash_topic = 'robot_' + str(index) + '/is_crashed'
         self.check_crash = rospy.Subscriber(crash_topic, Int8, self.crash_callback)
+        # TODO crash_topic is insufficient for collision check. need to think another method to validate crashed states (e.g. min length of LIDAR<threshold)
 
 
         self.sim_clock = rospy.Subscriber('clock', Clock, self.sim_clock_callback)
@@ -92,11 +92,13 @@ class StageWorld():
         self.state = None
         self.speed_GT = None
         self.state_GT = None
+        self.speed_poly = None  # 211103
 
-        while self.scan is None or self.speed is None or self.state is None or self.speed_GT is None or self.state_GT is None:
-            print(index, self.scan, self.speed, self.state, self.speed_GT, self.state_GT)
+        while self.scan is None or self.speed is None or self.state is None\
+                or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
+            print(index, self.scan, self.speed, self.state, self.speed_GT, self.state_GT, self.speed_poly)
             pass
-        print(index, self.scan, self.speed, self.state, self.speed_GT, self.state_GT)
+        print('init ros topic:',index, self.scan, self.speed, self.state, self.speed_GT, self.state_GT)
         
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
@@ -111,6 +113,7 @@ class StageWorld():
         v_y = GT_odometry.twist.twist.linear.y
         v = np.sqrt(v_x**2 + v_y**2)
         self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
+        self.speed_poly = [v_x, v_y]
 
     def laser_scan_callback(self, scan):
         self.scan_param = [scan.angle_min, scan.angle_max, scan.angle_increment, scan.time_increment,
@@ -145,6 +148,12 @@ class StageWorld():
     def get_self_speedGT(self):
         return self.speed_GT
 
+    def get_self_speed_poly(self):
+        return self.speed_poly
+    
+    def get_self_state_rot(self):   # made, but really used?
+        return self.state_GT[2]
+
     def get_laser_observation(self):
         scan = copy.deepcopy(self.scan)
         scan[np.isnan(scan)] = 6.0
@@ -155,7 +164,7 @@ class StageWorld():
         sparse_scan_left = []
         index = 0.
 
-        for x in xrange(int(sparse_beam_num / 2)):
+        for x in xrange(int(sparse_beam_num / 2)):   # TODO need to change others?
             sparse_scan_left.append(scan[int(index)])
             index += step
 
@@ -181,6 +190,9 @@ class StageWorld():
 
     def get_sim_time(self):
         return self.sim_time
+
+    def get_goal_point(self):  # 211102
+        return self.goal_point
 
     def get_local_goal(self):
         [x, y, theta] = self.get_self_stateGT()
@@ -220,7 +232,7 @@ class StageWorld():
 
         if self.distance < self.goal_size:
             terminate = True
-            reward_g = 15
+            reward_g = 15.
             result = 'Reach Goal'
 
         if is_crash == 1:
@@ -332,8 +344,27 @@ class StageWorld():
 
         return [x, y]
 
+    def generate_pose_goal_circle(self):   # 211124
+        # reset pose
+        random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        rospy.sleep(0.01)
+        self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
+        [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
 
+        # start_time = time.time()
+        while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
+            [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
+            self.control_pose(random_pose)
+        
+        rospy.sleep(0.01)
 
+        # reset goal
+        #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
+        if self.index == 0:
+            self.goal_point = [0, 8]
+        else:
+            self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
+        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
 
-
- 
+        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
+        self.distance = copy.deepcopy(self.pre_distance)

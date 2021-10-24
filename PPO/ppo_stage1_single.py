@@ -2,7 +2,8 @@ import os #test
 import logging
 import sys
 import socket
-import numpy as np #test
+import numpy as np
+from torch.optim.optimizer import Optimizer #test
 import rospy #test
 import torch #test
 import torch.nn as nn #test
@@ -14,7 +15,7 @@ from collections import deque #test
 from model.net import MLPPolicy, CNNPolicy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
-from model.ppo import generate_action
+from model.ppo import generate_action, generate_action_human
 from model.ppo import transform_buffer #test
 
 
@@ -50,8 +51,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     for id in range(MAX_EPISODES):
         #test
         env.reset_pose()
-
         env.generate_goal_point()
+
+        # use this one!
+        #env.generate_pose_goal_circle()  # shafeshift above two line
+
+
         terminal = False
         ep_reward = 0
         step = 1
@@ -62,24 +67,47 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         speed = np.asarray(env.get_self_speed())
         state = [obs_stack, goal, speed]
 
+        speed_poly = np.asarray(env.get_self_speed_poly())  # 211103
+        pose_ori = env.get_self_stateGT()   # 211019
+        pose = np.asarray(pose_ori[:2])   # 211019
+        rot = np.asarray(pose_ori[2])
+
+        goal_global = np.asarray(env.get_goal_point())
+
         while not terminal and not rospy.is_shutdown():
         
             state_list = comm.gather(state, root=0)
+            pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
+            goal_global_list = comm.gather(goal_global, root=0)
             
             # TODO add humans action
 
+            # generate humans action_space
+            human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
 
-            # generate actions at rank==0
+
+            # generate robot action (at rank==0)
             v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
                                                          policy=policy, action_bound=action_bound)
 
             # execute actions
-            real_action = comm.scatter(scaled_action, root=0)
+            real_action = comm.scatter(human_actions, root=0)
 
-            env.control_vel(real_action)
+            # distribute actions btwn robot and humans
+            if env.index == 0:
+                env.control_vel(scaled_action)
+            else: # pre-RVO vel, humans
+                angles = np.arctan2(real_action[1], real_action[0])
+                diff = angles - rot
+                length = np.sqrt([real_action[0]**2+real_action[1]**2])
+                mod_vel = (length, diff)
+                env.control_vel(mod_vel)   # 211108
 
             # rate.sleep()
             rospy.sleep(0.001)
+
+            # TODO check collision via sanity check
+            # get min(lidar) < threshold => collision
 
             # get informtion
             r, terminal, result = env.get_reward_and_terminate(step)
@@ -87,26 +115,33 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             global_step += 1
 
 
-            # get next state
+            # get next states
             s_next = env.get_laser_observation()
             left = obs_stack.popleft()
             obs_stack.append(s_next)
             goal_next = np.asarray(env.get_local_goal())
             speed_next = np.asarray(env.get_self_speed())
             state_next = [obs_stack, goal_next, speed_next]
+
+            # get next states(addon)
+            pose_ori_next = env.get_self_stateGT()   # 211019
+            pose_next = np.asarray(pose_ori_next[:2])   # 211019
+            speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
+            rot_next = np.asarray(pose_ori_next[2])   # 211108
             #print("len(state_next)")
             #print(len(state_next))
             ############training#######################################################################################
 
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
-                last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy,
-                                                               action_bound=action_bound)
+                last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
 
             if env.index == 0:
+
+                #TODO. if local_map: change buff.append
                 buff.append((state_list, a, r_list, terminal_list, logprob, v))
                 if len(buff) > HORIZON - 1:
                     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
@@ -122,29 +157,30 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                     buff = []
                     global_update += 1
-                    print('update ppo',global_update)
+                    print('update ppo:',global_update,' th global steps')
 
             step += 1
 
-            
-
             ###################################################################################################
             state = state_next
+            pose = pose_next   # 2l.,j,j,11020
+            speed_poly = speed_next_poly  # 211104
+            rot = rot_next
 
         
         #####save policy and logger##############################################################################################
     
         if env.index == 0:
-            if global_update != 0 and global_update % 20 == 0:
+            if global_update != 0 and global_update % 10 == 0:
                 torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
                 torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
-        distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+            distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
 
-        logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
-        logger_cal.info(ep_reward)
+            logger_cal.info(ep_reward)
     
         ###################################################################################################
     
@@ -177,14 +213,13 @@ if __name__ == '__main__':
     logger_cal.addHandler(cal_f_handler)
 
     comm = MPI.COMM_WORLD
-
     rank = comm.Get_rank()
     size = comm.Get_size()
     
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)
     
-    print("ENV")
+    print("RANK:",rank," ENV")
     
     reward = None
     action_bound = [[0, -1], [1, 1]] ####
@@ -198,14 +233,17 @@ if __name__ == '__main__':
         
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
+        
 
         if not os.path.exists(policy_path):
             os.makedirs(policy_path)
 
         # Load total model
 
-        file = policy_path + '/Stage1_40'
-        file_tot = policy_path + '/stage_____tot'
+        #file = policy_path + '/Stage1_100'
+        file = policy_path + '/_____'
+        #file_tot = policy_path + '/stage_____tot'
+        file_tot = policy_path + '/Stage1_10_tot'
         if os.path.exists(file):
             logger.info('####################################')
             logger.info('############Loading Model###########')
