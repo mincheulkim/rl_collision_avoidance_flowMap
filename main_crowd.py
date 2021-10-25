@@ -26,12 +26,12 @@ class CrowdSimulator:
         else:
             sign = 1
         
-        while True:
+        while True:   # can this work?
             x = np.random.random() * max_x * 0.5 * sign
             y = (np.random.random() - 0.5) * max_y
             collide = False
             for human in env.human_list:
-                if norm((x - human.x, y - human.y)) < configs.human.radius * 2:
+                if np.norm((x - human.x, y - human.y)) < configs.human.radius * 2:
                     collide = True
                     break
             if not collide:
@@ -45,15 +45,15 @@ class CrowdSimulator:
         Generate a goal list of the i-th human 
         """
         #self.goal_num = configs.goal_num
-
-        self.goal_list = configs.goal_list
+        goal_num = configs.goal_num
+        prior_goal_list = configs.goal_list
         init_goal_index = np.random.rand(0, 10)   # 0 ~ 9
-        goal_num = np.random.rand(0, 4)   # max 3 relay goal
+        goal_num = np.random.rand(0, 4)   # max 4 relay goal
 
         init_goal_list = []
         for i in range(goal_num):
-            next_goal = self.goal_list[init_goal_index+i+1]
-            init_goal_index.append(next_goal)
+            next_goal = prior_goal_list[(init_goal_index+i)%goal_num]
+            init_goal_list.append(next_goal)
 
         goal_list = init_goal_list
 
@@ -74,9 +74,9 @@ class CrowdSimulator:
         for index in range(configs['human_num']):
             self.env.init_pub(index)
             self.env.init_sub(index)
-            pos = self.generate_pos(index)
+            pos = self.generate_pos(index)    # set pose
             self.env.generate_human(index, pos)
-            goal_list = self.generate_goal_list(index)
+            goal_list = self.generate_goal_list(index)   # set goal + goal_list
             self.env.set_goal(index, goal_list)
 
         self.check_all_sub_done()
