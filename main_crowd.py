@@ -1,15 +1,15 @@
 import argparse
-from random import randrange
 import rospy
 import numpy as np
 import yaml
 
-from envs import Env, human
+from envs.env_crowd import Env 
 
 
 class CrowdSimulator:
-    def __init__(self):
+    def __init__(self, configs):
         self.env = None
+        self.configs = configs
 
     def generate_pos(self, configs, index):
         """
