@@ -20,7 +20,7 @@ class Env:
 
         self.sim = ORCA(configs)
 
-        map_img_path = configs['map_img_path']
+        map_img_path = configs['Env']['map']['map_img_path']
         self.sim.add_static_obstacle(map_img_path)
 
         # pub list
@@ -35,7 +35,8 @@ class Env:
         self.sim_clock = rospy.Subscriber('clock', Clock, self.sim_clock_callback)
 
     def generate_human(self, index, pos):
-        human = Human(pos)
+        #human = Human(pos)
+        human = Human()
         self.human_list.append(human)
         self.human_index_list.append(index)
         agent = self.sim.addAgent(pos[0], pos[1])

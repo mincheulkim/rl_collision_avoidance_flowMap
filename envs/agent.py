@@ -1,4 +1,5 @@
-class Agent:
+#class Agent:
+class Agent(object):
     def __init__(self):
         self.pos = None
         self.linear_vel = None # [min_vel, max_vel]

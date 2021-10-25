@@ -11,14 +11,17 @@ class CrowdSimulator:
         self.env = None
         self.configs = configs
 
-    def generate_pos(self, configs, index):
+    #def generate_pos(self, configs, index):
+    def generate_pos(self, index):
         """
         Generate a position of the i-th human 
         """
         x, y = 0, 0
 
-        max_x = configs.size_x
-        max_y = configs.size_y
+        #max_x = configs.size_x
+        #max_y = configs.size_y
+        max_x = 20
+        max_y = 20
         
         if np.random.random() > 0.5:
             sign = -1
@@ -70,7 +73,7 @@ class CrowdSimulator:
     def main(self):
         self.env = Env(self.configs)
         
-        for index in range(self.configs['human_num']):
+        for index in range(self.configs['Env']['map']['human_num']):
             self.env.init_pub(index)
             self.env.init_sub(index)
             pos = self.generate_pos(index)    # set pose

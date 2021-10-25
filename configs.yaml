@@ -3,6 +3,9 @@ Env:
     time_limit: 25
     size_x: 40
     size_y: 40 
+
+    # Static Image
+    map_img_path: worlds/city.png
     
 
     # goal list (real value)
@@ -32,6 +35,7 @@ Env:
     #train_val_scenario: 
     #test_scenario: 
 
+    human_num: 5
     group_num: 1
     group_lambda: 4
 
@@ -74,13 +78,13 @@ Policy:
   # etc...
 
 ORCA:
-  dt: 1/60        # timestep of sim
+  dt: 0.016666666666        # timestep of sim(1/60)
   neighbor_dist: 1.5     # max dist to other agents consider
   max_neighbors: 5       # max # of other agent consider
   time_horizon: 1.5      # min amount of time compute others
   time_horizon_obs: 1.5 # min amount of time compute obstacles
   human_radius: 0.3
-  max_speed: 1.0
+  max_speed: 0.8
   linear_vel: 1.0
   angular_vel: 0.0
   
