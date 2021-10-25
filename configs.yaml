@@ -72,3 +72,16 @@ Policy:
   epsilon_deacy: 4000
   checkpoint_interval: 100
   # etc...
+
+ORCA:
+  time_step: 1/60        # timestep of sim
+  neighbor_dist: 1.5     # max dist to other agents consider
+  max_neighbors: 5       # max # of other agent consider
+  time_horizon: 1.5      # min amount of time compute others
+  time_horizon_obst: 1.5 # min amount of time compute obstacles
+  radius: 0.3
+  max_speed: 1
+
+  
+
+  
