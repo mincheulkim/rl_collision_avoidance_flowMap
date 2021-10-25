@@ -235,7 +235,7 @@ class StageWorld():
 
         #if t > 150:  # timeout check
         #if t > 450:  # timeout check  211020 for long-term
-        if t > 2000:  # timeout check  211020 for long-term
+        if t > 1000:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
@@ -332,7 +332,10 @@ class StageWorld():
                 dis = np.sqrt(x ** 2 + y ** 2)
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
-        theta = np.arctan2(y, x) + np.pi
+        if self.index ==0:
+            theta = np.random.uniform(0, 2*np.pi)
+        else:
+            theta = np.arctan2(y, x) + np.pi
         #if self.index ==0:
         #    theta = np.pi*0.5
         return [x, y, theta]
@@ -391,6 +394,7 @@ class StageWorld():
         self.init_pose = self.get_self_stateGT()
         if self.index == 0:
             self.goal_point = [0, 8]
+            #self.goal_point = [-13, 10]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal

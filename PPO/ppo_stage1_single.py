@@ -17,20 +17,21 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
 from model.ppo import generate_action, generate_action_human
 from model.ppo import transform_buffer #test
-from itertools import islice
 
 
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
-#HORIZON = 1000    # originaly 128. maybe it is memory size?
-HORIZON = 3000    # for city scene
+HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
+#HORIZON = 3000    # for city scene
 GAMMA = 0.99
 LAMDA = 0.95
-BATCH_SIZE = 1024
+#BATCH_SIZE = 1024   # is small batch is good? 64?
+BATCH_SIZE = 128   # is small batch is good? 64?
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
-CLIP_VALUE = 0.1
+#CLIP_VALUE = 0.1
+CLIP_VALUE = 0.2
 NUM_ENV = 1
 OBS_SIZE = 512
 ACT_SIZE = 2
@@ -42,8 +43,11 @@ LEARNING_RATE = 5e-5
 def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
+    buff_c = []
     global_update = 0
     global_step = 0
+
+    memory_size = 0
 
 
     if env.index == 0:
@@ -80,25 +84,34 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             state_list = comm.gather(state, root=0)
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             goal_global_list = comm.gather(goal_global, root=0)
+
+            env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
+            #print('envindex=',env_index_list)
             
             # TODO add humans action
 
             # generate humans action_space
             
-            #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             #print('human actions:',human_actions)
 
-            #print('state_list:',len(state_list))
-            #print('state=',len(state))
-            
-            #print(np.array(state_list).shape,np.array(state).shape)
-
-            
             # generate robot action (at rank==0)
-            if env.index == 0:
-                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
-                                                         policy=policy, action_bound=action_bound)
+            # ERASE ME!
+            if env.index==0:
+                state_robot=[]
+                state_robot.append(state)
+                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)                
+                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
+
+                #v_b, a_b, logprob_b, scaled_action_b=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
+                #v_c, a_c, logprob_c, scaled_action_c=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
+                # For debugging
+                #print('#####round 1#####')
+                #print('original v,a,logprob,scaled_action:',v,a,logprob,scaled_action)
+                #print('original(double) v,a,logprob,scaled_action:',v_b,a_b,logprob_b,scaled_action_b)
+                #print('modified v,a,logprob,scaled_action:',v_c, a_c, logprob_c, scaled_action_c)
+                #print('original state:',state_list)
+                #print('modified state:',state_robot)
 
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
@@ -124,7 +137,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             ep_reward += r
             global_step += 1
 
-
             # get next states
             s_next = env.get_laser_observation()
             left = obs_stack.popleft()
@@ -144,28 +156,45 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
-                #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
                 if env.index ==0:
-                    last_v, _, _, _ = generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
+                    state_next_robot=[]
+                    state_next_robot.append(state_next)
+                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
+                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                    
+                    #last_v_c, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
+                    #print('####round 2#####')
+                    #print('original last_v:',last_v)
+                    #print('modified last_v:',last_v_c)
+                else:
+                    last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
 
-            if env.index == 0:
+            #if env.index == 0:
+            if env.index == 0 and not (step == 1 and terminal):
 
                 #TODO. if local_map: change buff.append
-                buff.append((state_list, a, r_list, terminal_list, logprob, v))
-                print(a, r_list, terminal_list, logprob, v)
-                # (array([[ 2.4515967, -1.1015964]], dtype=float32), [0.0], [False], array([[-4.3833094]], dtype=float32), array([[-0.07423574]], dtype=float32))
-                #print(state_list)
-                # deque(array[],array[],array[]), array[1,2], array[1,2])
-                #buff.append((state_list, a, r, terminal, logprob, v))
+                
+                r_robot = []
+                r_robot.append(r)
+                terminal_robot = []
+                terminal_robot.append(terminal)
+                buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                memory_size += 1
+                #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
 
+                #buff_c.append((state_robot, a_c, r_robot, terminal_robot, logprob_c, v_c))   # state_list, r_list, terminal_list: can we manage
+                #print('#####Round 3######')
+                #print('original buff:',buff)
+                #print('modified buff:',buff_c)
+                
                 if len(buff) > HORIZON - 1:
                     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         transform_buffer(buff=buff)
                     t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
-                                                              last_value=last_v, dones=d_batch, lam=LAMDA)
+                                                              last_value=last_v_r, dones=d_batch, lam=LAMDA)
                     memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                     ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
                                             epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
@@ -189,7 +218,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #####save policy and logger##############################################################################################
     
         if env.index == 0:
-            if global_update != 0 and global_update % 10 == 0:
+            if global_update != 0 and global_update % 5 == 0:
                 torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
                 torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
                 logger.info('########################## model saved when update {} times#########'
@@ -197,11 +226,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
             #distance = 0
 
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result))
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
             logger_cal.info(ep_reward)
     
         ###################################################################################################
+    rospy.sleep(0.5)
     
 
 if __name__ == '__main__':
@@ -231,10 +261,11 @@ if __name__ == '__main__':
     file_handler.setLevel(logging.INFO)
     logger_cal.addHandler(cal_f_handler)
 
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    
+    comm = MPI.COMM_WORLD    # instantize the communication world
+    rank = comm.Get_rank()   # get this particular processes' `rank` ID
+    size = comm.Get_size()   # get the size of the communication world
+    # PID = os.getpid()
+    # Check backward
 
     env = StageWorld(512, index=rank, num_env=NUM_ENV)
     
@@ -262,7 +293,7 @@ if __name__ == '__main__':
         #file = policy_path + '/Stage1_100'
         file = policy_path + '/_____'
         #file_tot = policy_path + '/stage_____tot'
-        file_tot = policy_path + '/Stage1_10_tot'
+        file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')
             logger.info('############Loading Model###########')
