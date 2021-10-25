@@ -1,6 +1,6 @@
 Env:
   map:
-    time_limit = 25
+    time_limit: 25
     size_x: 40
     size_y: 40 
     
@@ -21,31 +21,31 @@ Env:
     goal_num: 10
 
     # Reward
-    progress_reward = 0.1
-    success_reard = 1.0
-    discomfort_penalty = -0.25
-    collision_penalty = -0.25
-    collision_distant = 0.3
-    discomfort_distant = 0.3
+    progress_reward: 0.1
+    success_reard: 1.0
+    discomfort_penalty: -0.25
+    collision_penalty: -0.25
+    collision_distant: 0.3
+    discomfort_distant: 0.3
 
     # scenario
-    #train_val_scenario = 
-    #test_scenario = 
+    #train_val_scenario: 
+    #test_scenario: 
 
-    group_num = 1
-    group_lambda = 4
+    group_num: 1
+    group_lambda: 4
 
   human:
     speed: 1.2
     radius: 0.5
-    randomize_attribute = false
-    policy = orca
+    randomize_attribute: false
+    policy: "orca"
     
     
   robot:
     speed: 1.5
     radius: 0.5
-    policy = none
+    policy: "none"
 
     # laser specs.
     min_range: 0
@@ -58,17 +58,17 @@ Env:
 Policy:
   actor_lr: 0.003
   critic_lr: 0.003
-  rl_optimizer = adam
-  rl_epsilon = 0.00001
-  train_batches = 100
-  train_episodes = 400
-  sample_episodes = 1
-  target_update_interval = 50
-  evaluation_interval = 100
+  rl_optimizer: "adam"
+  rl_epsilon: 0.00001
+  train_batches: 100
+  train_episodes: 400
+  sample_episodes: 1
+  target_update_interval: 50
+  evaluation_interval: 100
   # memory pool
-  capacity = 100000
-  epsilon_start = 0.5
-  epsilon_end = 0.1
-  epsilon_deacy = 4000
-  checkpoint_interval = 100
+  capacity: 100000
+  epsilon_start: 0.5
+  epsilon_end: 0.1
+  epsilon_deacy: 4000
+  checkpoint_interval: 100
   # etc...
