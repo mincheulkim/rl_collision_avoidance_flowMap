@@ -67,10 +67,10 @@ class CrowdSimulator:
 
         rospy.sleep(1.)
 
-    def main(self, configs):
-        self.env = Env(configs)
+    def main(self):
+        self.env = Env(self.configs)
         
-        for index in range(configs['human_num']):
+        for index in range(self.configs['human_num']):
             self.env.init_pub(index)
             self.env.init_sub(index)
             pos = self.generate_pos(index)    # set pose
