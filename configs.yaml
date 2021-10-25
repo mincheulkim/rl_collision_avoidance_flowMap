@@ -18,6 +18,7 @@ Env:
       [8,6], # 8
       [3,-7], # 9
     ]
+    goal_num: 10
 
     # Reward
     progress_reward = 0.1

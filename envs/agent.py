@@ -3,6 +3,8 @@ class Agent:
         self.pos = None
         self.linear_vel = None # [min_vel, max_vel]
         self.angular_vel = None # [min_vel, max_vel]
+        self.goal = None
+        self.goal_list = None
 
     def get_pos(self):
         return self.pos

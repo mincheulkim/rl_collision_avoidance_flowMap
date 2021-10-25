@@ -1,6 +1,7 @@
 import argparse
 from random import randrange
 import rospy
+import numpy as np
 
 
 from envs import Env, human
@@ -17,9 +18,24 @@ class CrowdSimulator:
         """
         x, y = 0, 0
 
-        # TODO
-        # Do something
-        #
+        max_x = configs.size_x
+        max_y = configs.size_y
+        
+        if np.random.random() > 0.5:
+            sign = -1
+        else:
+            sign = 1
+        
+        while True:
+            x = np.random.random() * max_x * 0.5 * sign
+            y = (np.random.random() - 0.5) * max_y
+            collide = False
+            for human in env.human_list:
+                if norm((x - human.x, y - human.y)) < configs.human.radius * 2:
+                    collide = True
+                    break
+            if not collide:
+                break
 
         return x, y
 
@@ -28,11 +44,18 @@ class CrowdSimulator:
         """
         Generate a goal list of the i-th human 
         """
-        goal_list = []
+        #self.goal_num = configs.goal_num
 
-        # TODO
-        # Do something
-        #
+        self.goal_list = configs.goal_list
+        init_goal_index = np.random.rand(0, 10)   # 0 ~ 9
+        goal_num = np.random.rand(0, 4)   # max 3 relay goal
+
+        init_goal_list = []
+        for i in range(goal_num):
+            next_goal = self.goal_list[init_goal_index+i+1]
+            init_goal_index.append(next_goal)
+
+        goal_list = init_goal_list
 
         return goal_list
 
@@ -47,12 +70,13 @@ class CrowdSimulator:
 
     def main(self, configs):
         self.env = Env(configs)
+        
         for index in range(configs['human_num']):
             self.env.init_pub(index)
             self.env.init_sub(index)
-            pos = self.generate_pos(index)  # TODO
+            pos = self.generate_pos(index)
             self.env.generate_human(index, pos)
-            goal_list = self.generate_goal_list(index)  # TODO
+            goal_list = self.generate_goal_list(index)
             self.env.set_goal(index, goal_list)
 
         self.check_all_sub_done()
