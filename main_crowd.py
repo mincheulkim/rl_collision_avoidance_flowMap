@@ -2,7 +2,7 @@ import argparse
 from random import randrange
 import rospy
 import numpy as np
-
+import yaml
 
 from envs import Env, human
 
@@ -10,7 +10,6 @@ from envs import Env, human
 class CrowdSimulator:
     def __init__(self):
         self.env = None
-
 
     def generate_pos(self, configs, index):
         """
@@ -30,7 +29,7 @@ class CrowdSimulator:
             x = np.random.random() * max_x * 0.5 * sign
             y = (np.random.random() - 0.5) * max_y
             collide = False
-            for human in env.human_list:
+            for human in self.env.human_list:
                 if np.norm((x - human.x, y - human.y)) < configs.human.radius * 2:
                     collide = True
                     break
@@ -95,12 +94,14 @@ class CrowdSimulator:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Parse configuration file')
-    parser.add_argument('--env_config', type=str, default='configs')
+    parser.add_argument('--config_path', type=str, default='./configs.yaml')
+    parser.add_argument('--seed', type=int, default='999')
     args = parser.parse_args()
 
-    rospy.init_node('crowd_node')
+    with open(args.config_path) as f:
+        configs = yaml.load(f, Loader=yaml.FullLoader)
 
-    configs = []
+    rospy.init_node('crowd_node')
 
     sim = CrowdSimulator(configs)
     sim.main()
