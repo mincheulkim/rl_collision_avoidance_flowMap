@@ -5,7 +5,7 @@ from envs.agent import Agent
 
 
 class Human(Agent):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
 
         self.cur_goal_index = 0

@@ -99,7 +99,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with open(args.config_path) as f:
-        configs = yaml.load(f, Loader=yaml.FullLoader)
+        configs = yaml.load(f, Loader=yaml.FullLoader)   # need to update YAML version > 5.1(pip install -U PyYAML)
 
     rospy.init_node('crowd_node')
 

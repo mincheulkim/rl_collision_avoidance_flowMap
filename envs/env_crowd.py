@@ -2,7 +2,7 @@ import rospy
 import tf
 import numpy as np
 
-from envs.policy import ORCA
+from envs.policy.orca import ORCA
 from envs.human import Human
 
 from geometry_msgs.msg import Twist, Pose
