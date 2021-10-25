@@ -22,12 +22,13 @@ from model.ppo import transform_buffer #test
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
-HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
+#HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
 #HORIZON = 3000    # for city scene
+HORIZON = 2048    # v3
 GAMMA = 0.99
 LAMDA = 0.95
-#BATCH_SIZE = 1024   # is small batch is good? 64?
-BATCH_SIZE = 128   # is small batch is good? 64?
+BATCH_SIZE = 1024   # is small batch is good? 64?
+#BATCH_SIZE = 128   # is small batch is good? 64?
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
@@ -100,7 +101,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if env.index==0:
                 state_robot=[]
                 state_robot.append(state)
-                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)                
+                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
+                #print('diff_2:',state_list[0][1],state_robot[0][1])                
+                #print('diff_3:',state_list[0][2],state_robot[0][2])                
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
 
                 #v_b, a_b, logprob_b, scaled_action_b=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
@@ -182,8 +185,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 terminal_robot = []
                 terminal_robot.append(terminal)
                 buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                memory_size += 1
                 #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                memory_size += 1
 
                 #buff_c.append((state_robot, a_c, r_robot, terminal_robot, logprob_c, v_c))   # state_list, r_list, terminal_list: can we manage
                 #print('#####Round 3######')
@@ -225,10 +228,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                             '################'.format(global_update))
             #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
             #distance = 0
-
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
-            logger_cal.info(ep_reward)
+            if not (step==2 and terminal):
+                logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
+                        (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
+                logger_cal.info(ep_reward)
     
         ###################################################################################################
     rospy.sleep(0.5)
@@ -290,10 +293,10 @@ if __name__ == '__main__':
 
         # Load total model
 
-        #file = policy_path + '/Stage1_100'
-        file = policy_path + '/_____'
-        #file_tot = policy_path + '/stage_____tot'
-        file_tot = policy_path + '/Stage1_5_tot'
+        file = policy_path + '/Stage1_45'
+        #file = policy_path + '/_____'
+        file_tot = policy_path + '/stage_____tot'
+        #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')
             logger.info('############Loading Model###########')
