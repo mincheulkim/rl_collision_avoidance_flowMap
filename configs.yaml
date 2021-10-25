@@ -1,27 +1,50 @@
 Env:
   map:
-    size_x: 20
-    size_y: 20 
+    time_limit = 25
+    size_x: 40
+    size_y: 40 
+    
 
     # goal list (real value)
-    # - goal_list: [[0,1,2,3,4,5,6,7,8,9]]
+    # - goal_list index: [[0,1,2,3,4,5,6,7,8,9]]
     goal_list: [
-      [0,0], # 0
-      [0,0], # 0
-      [0,0], # 0
-      [0,0], # 0
-      [0,0], # 0
-      [0,0], # 0
-      [0,0], # 0
+      [-10,-10], # 1
+      [-8,-6], # 2
+      [-4,0], # 3
+      [4,4], # 4
+      [4,8], # 5
+      [-8,6], # 6
+      [-8,0], # 7
+      [8,6], # 8
+      [3,-7], # 9
     ]
+
+    # Reward
+    progress_reward = 0.1
+    success_reard = 1.0
+    discomfort_penalty = -0.25
+    collision_penalty = -0.25
+    collision_distant = 0.3
+    discomfort_distant = 0.3
+
+    # scenario
+    #train_val_scenario = 
+    #test_scenario = 
+
+    group_num = 1
+    group_lambda = 4
 
   human:
     speed: 1.2
     radius: 0.5
+    randomize_attribute = false
+    policy = orca
+    
     
   robot:
     speed: 1.5
     radius: 0.5
+    policy = none
 
     # laser specs.
     min_range: 0
@@ -34,4 +57,17 @@ Env:
 Policy:
   actor_lr: 0.003
   critic_lr: 0.003
+  rl_optimizer = adam
+  rl_epsilon = 0.00001
+  train_batches = 100
+  train_episodes = 400
+  sample_episodes = 1
+  target_update_interval = 50
+  evaluation_interval = 100
+  # memory pool
+  capacity = 100000
+  epsilon_start = 0.5
+  epsilon_end = 0.1
+  epsilon_deacy = 4000
+  checkpoint_interval = 100
   # etc...
