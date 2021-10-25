@@ -42,12 +42,10 @@ define floorplan model
 
 floorplan
 (
-  name "blank"
-  size [20.000 20.000 0.800]            # floor size
-  #size [40.000 40.000 0.800]            # floor size
+  name "city"
+  size [40.000 40.000 0.800]            # floor size
   pose [0.000 0.000 0.000 0.000]
-  #bitmap "city.png"
-  bitmap "blank.png"
+  bitmap "city.png"
 )
 
 
@@ -77,6 +75,25 @@ window
 )
 
 
+define human position
+(
+  # actual size
+  size [0.25 0.25 1.6]
+
+  localization "gps"
+  # the pioneer's center of rotation is offset from its center of area
+  origin [0 0 0 0]
+
+  # draw a nose on the human so we can see which way it points
+  gui_nose 1
+
+  color "random"
+  drive "diff"		 	# Differential steering model.
+  obstacle_return 1           	# Can hit things.
+  ranger_return 1            	# reflects sonar beams
+  blob_return 1               	# Seen by blobfinders  
+  fiducial_return 1           	# Seen as "1" fiducial finders
+)
 
 
 define agent position
@@ -113,12 +130,12 @@ define agent position
 #agent( pose [-7.00 -8.00 0.00 40.00])
 #agent( pose [-8.00 -7.00 0.00 60.00])
 
-# for fixed pose start
-agent( pose [-8.00 -8.00 0.00 00.00])
-agent( pose [-4.00 -8.00 0.00 00.00])
-agent( pose [0.00 -8.00 0.00 00.00])
-agent( pose [4.00 -8.00 0.00 00.00])
-agent( pose [8.00 -8.00 0.00 00.00])
 
+# for fixed pose start
+human( pose [-8.00 -8.00 0.00 00.00])
+human( pose [-4.00 -8.00 0.00 00.00])
+human( pose [0.00 -8.00 0.00 00.00])
+human( pose [4.00 -8.00 0.00 00.00])
+human( pose [8.00 -8.00 0.00 00.00])
 
 
