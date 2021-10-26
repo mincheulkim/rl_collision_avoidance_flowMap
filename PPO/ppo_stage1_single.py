@@ -24,7 +24,8 @@ LASER_BEAM = 512
 LASER_HIST = 3
 #HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
 #HORIZON = 3000    # for city scene
-HORIZON = 2048    # v3
+#HORIZON = 2048    # v3
+HORIZON = 3072    # v4 static obstacle
 GAMMA = 0.99
 LAMDA = 0.95
 BATCH_SIZE = 1024   # is small batch is good? 64?
@@ -101,11 +102,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if env.index==0:
                 state_robot=[]
                 state_robot.append(state)
-                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
+                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
+                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
+
                 #print('diff_2:',state_list[0][1],state_robot[0][1])                
                 #print('diff_3:',state_list[0][2],state_robot[0][2])                
-                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
-
                 #v_b, a_b, logprob_b, scaled_action_b=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
                 #v_c, a_c, logprob_c, scaled_action_c=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
                 # For debugging
@@ -162,8 +163,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 if env.index ==0:
                     state_next_robot=[]
                     state_next_robot.append(state_next)
-                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
-                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
+                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
                     
                     #last_v_c, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
                     #print('####round 2#####')
@@ -184,8 +185,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 r_robot.append(r)
                 terminal_robot = []
                 terminal_robot.append(terminal)
-                buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                #buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                # TODO check a, r_robot(real plus root), terminal_robot
+                #print('original reward:',r_list,'original_terminal:',terminal_list,'mod reward:',r_robot,'mod terminal:',terminal_robot,'ep_reward:',ep_reward)
                 memory_size += 1
 
                 #buff_c.append((state_robot, a_c, r_robot, terminal_robot, logprob_c, v_c))   # state_list, r_list, terminal_list: can we manage
@@ -293,7 +296,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_45'
+        file = policy_path + '/Stage1_20'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
