@@ -21,6 +21,12 @@ from model.ppo import transform_buffer
 from model.ppo import generate_action_rvo, generate_action_rvo_dense   # 211020
 
 #import model.orca as orcas  # 211020
+from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX/issues/638
+# issue when install tensorboardX==1.0.0 -->< class descriptorBase(metaclass=DescriptorMetaclass):  -> (solve)https://www.icode9.com/content-4-1153066.html
+
+writer = SummaryWriter()
+
+
  
 
 
@@ -52,6 +58,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
 
     if env.index == 0:
+        # 211026. env.index=0 (robot), else: humans
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
 
 
@@ -60,6 +67,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
         env.generate_goal_point()   # generate global goal, local goal
         
+
         terminal = False
         ep_reward = 0
         step = 1  # is used for Time Out(limit 150)
@@ -175,6 +183,21 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
                     #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
 
+                    # 211026. for tensorboardX, network debug
+                    #act_fea_cv1params = policy.state_dict()['act_fea_cv1.weight']
+                    #actor1params =  policy.state_dict()['actor1.weight']
+                    #queryparams = policy.state_dict()['query.bias'][0]
+                    #keyparams = policy.state_dict()['key.bias'][0]
+                    #valueparams = policy.state_dict()['value.bias'][0]
+                    #act_fc3params =  policy.state_dict()['act_fc3.bias']
+                    #writer.add_scalar('query.bias',queryparams,global_step=global_update)
+                    #writer.add_scalar('key.bias', keyparams, global_step=global_update)
+                    #writer.add_scalar('value.bias', valueparams, global_step=global_update)
+                    #writer.add_scalar('act_fea_cv1.weight', act_fea_cv1params[0][0][0], global_step=global_update)
+                    #writer.add_scalar('actor1.weight', actor1params[0][0], global_step=global_update)
+                    #writer.add_scalar('act_fc3.weight', act_fc3params[0], global_step=global_update)
+
+
                     buff = []    # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
 
@@ -199,6 +222,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
         logger_cal.info(ep_reward)
+
+        # 211026, for tensorboardX
+        if env.index ==0:
+            writer.add_scalar('reward of robot 0', ep_reward,global_step=global_update)
 
 
 

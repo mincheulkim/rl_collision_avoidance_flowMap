@@ -45,6 +45,17 @@ python setup.py build
 python setup.py install
 ```
 
+### Installing tensorboardX(for python 2.7)
+
+```
+pip install tensorflow==1.14.0
+pip install tensorboardX==1.0
+pip install protobuf==3.17.3
+
+tensorboard --logdir runs/
+(if you use WSL2, need to install chrome because external access is prohibited, check https://julialang.kr/?p=3181)
+```
+
 
 ## References
 

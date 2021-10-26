@@ -7,7 +7,7 @@ from envs.agent import Agent
 class Human(Agent):
     def __init__(self):
         #super().__init__()              # for python>3.0
-        super(Agent, self).__init__()    # for python=2.7
+        super(Agent, self).__init__()    # for python=2.7    https://stackoverflow.com/questions/38963018/typeerror-super-takes-at-least-1-argument-0-given-error-is-specific-to-any
 
         self.cur_goal_index = 0
         self.goal_list = []
