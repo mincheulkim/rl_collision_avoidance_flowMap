@@ -34,7 +34,7 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
 CLIP_VALUE = 0.2
-NUM_ENV = 1
+NUM_ENV = 6
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -82,8 +82,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         goal_global = np.asarray(env.get_goal_point())
 
         while not terminal and not rospy.is_shutdown():
-        
+            
             state_list = comm.gather(state, root=0)
+            
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             goal_global_list = comm.gather(goal_global, root=0)
 
@@ -91,7 +92,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # Erase me!!
             if env.index==0:
                 state_list_new = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
-            
             
             #print('envindex=',env_index_list)
             
@@ -107,8 +107,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate robot action (at rank==0)
             # ERASE ME!
             if env.index==0:
-                state_robot=[]
-                state_robot.append(state)
 
                 #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
                 #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
@@ -137,7 +135,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 diff = angles - rot
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
                 mod_vel = (length, diff)
-                env.control_vel(mod_vel)   # 211108
+                # Erase me!!
+                #env.control_vel(mod_vel)   # 211108
+                env.control_vel([0,0])   # 211108
+                
 
             # rate.sleep()
             rospy.sleep(0.001)
@@ -172,8 +173,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 if env.index == 0:
                     state_next_list_new = state_next_list[0:1]
                 if env.index ==0:
-                    state_next_robot=[]
-                    state_next_robot.append(state_next)
+
                     #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
                     #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
@@ -196,10 +196,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                 #TODO. if local_map: change buff.append
                 
-                r_robot = []
-                r_robot.append(r)
-                terminal_robot = []
-                terminal_robot.append(terminal)
+                
                 #buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
                 #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
                 #print(len(state_list_new), len(a), len(r_list_new), len(terminal_list_new), len(logprob), len(v))
@@ -229,15 +226,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                     buff = []
                     global_update += 1
-                    print('update ppo:',global_update,' th global steps')
+                    
 
             step += 1
-
+            #print('memory size:',memory_size,'len buffer:',len(buff))
             ###################################################################################################
             state = state_next
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+
 
         
         #####save policy and logger##############################################################################################
@@ -256,7 +254,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 logger_cal.info(ep_reward)
     
         ###################################################################################################
-    rospy.sleep(0.5)
+    
     
 
 if __name__ == '__main__':

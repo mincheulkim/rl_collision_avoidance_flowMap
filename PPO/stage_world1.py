@@ -322,6 +322,11 @@ class StageWorld():
         if self.index == 0:   # for robot
             x = 0
             y = -8
+        # PLZ erase me !!
+        else:
+            x=self.index - 10
+            y=self.index - 10
+        '''
         else:           # For human
             x = np.random.uniform(-8, 8)
             y = np.random.uniform(-8, 8)
@@ -330,6 +335,7 @@ class StageWorld():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
+        '''
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
         if self.index ==0:
