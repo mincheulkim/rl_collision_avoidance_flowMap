@@ -315,7 +315,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_45'
+        file = policy_path + '/Stage1_20'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
