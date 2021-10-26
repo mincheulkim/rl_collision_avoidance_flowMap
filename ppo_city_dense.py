@@ -23,6 +23,8 @@ from model.ppo import generate_action_rvo, generate_action_rvo_dense   # 211020
 #import model.orca as orcas  # 211020
 from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX/issues/638
 # issue when install tensorboardX==1.0.0 -->< class descriptorBase(metaclass=DescriptorMetaclass):  -> (solve)https://www.icode9.com/content-4-1153066.html
+# 1) tensorboard --logdir runs/
+# 2) google-chrome -> http://desktop-26msce9:6006/
 
 writer = SummaryWriter()
 
@@ -62,11 +64,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
 
 
-    for id in range(MAX_EPISODES):    # 5000
+    for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         env.reset_pose()   # reset initial pose(x,y,theta)
 
-        env.generate_goal_point()   # generate global goal, local goal
-        
+        env.generate_goal_point()   # generate global goal & local goal
 
         terminal = False
         ep_reward = 0
@@ -98,15 +99,25 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             state_list = comm.gather(state, root=0)   # incorporate observation state
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             #goals_list = comm.gather(goal, root=0)     # 211019
-            #print('pose_list:',pose_list)   # TODO   send state
+            #print('pose_list:',pose_list)
             #print('goals_list:',goals_list)
             # [array([-6.50951869, -8.42569113]), array([-7.39730693, -8.33040246]), array([-8.64532387, -7.73384512]), array([-8.9156547 , -8.98302644]), array([-8.77155013, -8.20209891])])
             # to rvo2
             # then get action tuples
 
+            # TODO. Create/Update flowMap by robot(agent 0, env.index=0)
+            '''
+            if env.index == 0:
+                if flow_map is None:  # create flowmap
+                    #flow_map = [[0,1,1,0,0,0,1,1,0,0],[1,0,1,0,0,1,0,0],[2,3,2,0,0,2,0],...,[2,4,2,0,0,2,0,2,0]]   # like list. # = count of how many human detected?
+                    flow_map = get_flowmap(robot_curr_pose,humans_pose,update=false)
+                    flow_map = np.array(flow_map)
+                else:                 # update flowmap
+                    flow_map = get_flowmap(robot_curr_pose,humans_pose,update=true)
+            '''
 
             # 1. generate actions at rank==0
-            # TODO human part
+            # human part
             # env: <stage_world1.StageWorld instace at 0x7ff758640050> as manything, state_list=[3 stacked 512 lidar, local_goal, self_speed], policy: 'CNNPolicy(~~, action_boud:[[0,-1],[1,1]]
             #print('policy:',policy)
             #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)   # from ppo
@@ -122,7 +133,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('scaled action:',scaled_action)
 
             # 2. execute actions
-            # TODO human
+            # human part
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             #print('real action:',real_action)
             env.control_vel(real_action)

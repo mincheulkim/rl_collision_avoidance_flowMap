@@ -41,6 +41,8 @@ class StageWorld():
 
         self.init_pose = None
 
+        self.flow_map = None  # 211026
+
 
 
         # for get reward and terminate(Didn't use)
