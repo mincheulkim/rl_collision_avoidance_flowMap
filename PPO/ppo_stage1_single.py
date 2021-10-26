@@ -88,6 +88,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             goal_global_list = comm.gather(goal_global, root=0)
 
             env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
+            # Erase me!!
+            if env.index==0:
+                state_list_new = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
+            
+            
             #print('envindex=',env_index_list)
             
             # TODO add humans action
@@ -95,6 +100,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate humans action_space
             
             human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            # erase me!
+            #human_actions=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
             #print('human actions:',human_actions)
 
             # generate robot action (at rank==0)
@@ -102,8 +109,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             if env.index==0:
                 state_robot=[]
                 state_robot.append(state)
-                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
+
+                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
                 #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
+                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
 
                 #print('diff_2:',state_list[0][1],state_robot[0][1])                
                 #print('diff_3:',state_list[0][2],state_robot[0][2])                
@@ -160,11 +169,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
+                if env.index == 0:
+                    state_next_list_new = state_next_list[0:1]
                 if env.index ==0:
                     state_next_robot=[]
                     state_next_robot.append(state_next)
-                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
+                    #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
                     #last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                     
                     #last_v_c, _, _, _ = generate_action(env=env, state_list=state_next_robot, policy=policy, action_bound=action_bound)
                     #print('####round 2#####')
@@ -175,6 +187,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
+            if env.index ==0:
+                r_list_new = r_list[0:1]
+                terminal_list_new=terminal_list[0:1]
 
             #if env.index == 0:
             if env.index == 0 and not (step == 1 and terminal):
@@ -186,7 +201,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 terminal_robot = []
                 terminal_robot.append(terminal)
                 #buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
+                #print(len(state_list_new), len(a), len(r_list_new), len(terminal_list_new), len(logprob), len(v))
+                buff.append((state_list_new, a, r_list_new, terminal_list_new, logprob, v))   # new
+
+
                 # TODO check a, r_robot(real plus root), terminal_robot
                 #print('original reward:',r_list,'original_terminal:',terminal_list,'mod reward:',r_robot,'mod terminal:',terminal_robot,'ep_reward:',ep_reward)
                 memory_size += 1
@@ -296,7 +315,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_20'
+        file = policy_path + '/Stage1_45'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
