@@ -9,6 +9,7 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import rvo2
 
 
+
 hostname = socket.gethostname()
 if not os.path.exists('./log/' + hostname):
     os.makedirs('./log/' + hostname)
@@ -455,7 +456,7 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         h19v = goal_list_new[19]
 
         #h0s = np.linalg.norm(h0v)   
-        h0s = np.linalg.norm(raw_scaled_action)     # 211027
+        h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
         h1s = np.linalg.norm(h1v)
         h2s = np.linalg.norm(h2v)
         h3s = np.linalg.norm(h3v)
@@ -777,20 +778,40 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             sampled_advs = sampled_advs.view(-1, 1)
             surrogate1 = ratio * sampled_advs
             surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
-            policy_loss = -torch.min(surrogate1, surrogate2).mean()
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()   # same as action loss @ 211027
 
             sampled_targets = sampled_targets.view(-1, 1)
-            value_loss = F.mse_loss(new_value, sampled_targets)
+            value_loss = F.mse_loss(new_value, sampled_targets)       # value loss @ 211027
 
-            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy   # 20 is value_loss_coefficient? maybe?
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
-                                                     float(value_loss.detach().cpu().numpy()), float(
-                                                    dist_entropy.detach().cpu().numpy())
+                                                     float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
             logger_ppo.info('{}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy))
+            
+            # 211027 for logging     # https://www.infoking.site/64
+            #global info_p_losss   
+            #global info_v_losss
+            #global info_entropys
+            #global total_loss
+            global info_p_losss
+            info_p_losss = info_p_loss
+            global info_v_losss
+            info_v_losss = info_v_loss
+            global info_entropys
+            info_entropys = info_entropy
+        
+            
 
     print('update')
 
+info_p_losss = None
+info_v_losss = None
+info_entropys = None
+#total_losss = None
 
+def get_parameters():   # 211027 for logging
+    #return info_p_losss, info_v_losss, info_entropys, total_losss
+    return info_p_losss, info_v_losss, info_entropys

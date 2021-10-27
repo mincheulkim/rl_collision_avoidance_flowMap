@@ -15,6 +15,7 @@ from collections import deque
 from model.net import MLPPolicy, CNNPolicy, RVOPolicy
 from stage_city_dense import StageWorld
 from model.ppo import ppo_update_city, generate_train_data
+from model.ppo import get_parameters
 from model.ppo import generate_action
 from model.ppo import transform_buffer
 
@@ -26,7 +27,7 @@ from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX
 # 1) tensorboard --logdir runs/
 # 2) google-chrome -> http://desktop-26msce9:6006/
 
-writer = SummaryWriter()
+
 
 
  
@@ -62,7 +63,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
     if env.index == 0:
         # 211026. env.index=0 (robot), else: humans
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
-
+        writer = SummaryWriter()
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         env.reset_pose()   # reset initial pose(x,y,theta)
@@ -211,7 +212,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                     # TODO Real training part
                     ppo_update_city(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,  # CNNPolicy, Adam, 1024, above lie about memory
                                             epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,  # 2, 5e-4, 0.1, 128
-                                            num_env=NUM_ENV, frames=LASER_HIST,   # 5, 3
+                                            num_env=NUM_ENV, frames=LASER_HIST,   # 20, 3
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
                     #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
 
@@ -251,7 +252,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
         #print('envgoal:',env.goal_point)
         
-        # 211027 only show env.index=0(robot)
+        # 211027 only show and save env.index=0(robot) log
         if env.index ==0:
             logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
@@ -259,8 +260,19 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
         # 211026, for tensorboardX
         if env.index ==0:
-            writer.add_scalar('reward of robot 0', ep_reward,global_step=global_update)
+            writer.add_scalar('episode reward of robot 0', ep_reward,global_step=global_update)
 
+            info_p_lossss, info_v_lossss, info_entropyss = get_parameters()
+            #info_p_lossss, info_v_lossss, info_entropyss, total_lossss = get_parameters()
+            #print(info_p_lossss,info_v_lossss,info_entropyss)
+            writer.add_scalar('Policy(actor) Loss, vibrate, less then 1', info_p_lossss,global_step=global_update)
+            writer.add_scalar('Value Loss, ???', info_v_lossss,global_step=global_update)
+            writer.add_scalar('Entropy: How stochatic decisions of brain, decrease steady', info_entropyss,global_step=global_update)
+            #writer.add_scalar('Total Loss', total_lossss,global_step=global_update)
+            
+
+
+        # setting tips for ppo: https://github.com/Unity-Technologies/ml-agents/blob/main/docs/localized/KR/docs/Training-PPO.md
 
 
 
@@ -338,3 +350,6 @@ if __name__ == '__main__':
         run(comm=comm, env=env, policy=policy, policy_path=policy_path, action_bound=action_bound, optimizer=opt)   # comm, env.stageworld, 'policy', [[0, -1], [1, 1]], adam
     except KeyboardInterrupt:
         pass
+
+
+writer.close()
