@@ -106,35 +106,30 @@ define agent position
   # acceleration_bounds [-0.5 0.5 0 0 0 0 -90 90.0 ]
   )
 
-# init pose
-#agent( pose [-9.00 -9.00 0.00 45.00])
-#agent( pose [-8.00 -8.00 0.00 46.00])
-#agent( pose [-7.00 -7.00 0.00 50.00])
-#agent( pose [-7.00 -8.00 0.00 40.00])
-#agent( pose [-8.00 -7.00 0.00 60.00])
+# for init fixed pose start
+# For robot(index=0)
+agent( pose [0.00 -8.00 0.00 90.00])
+# For humans(index>0)
+agent( pose [-5.50 -5.50 0.00 45.00])
+agent( pose [-5.50 -6.00 0.00 45.00])
+agent( pose [-6.00 -5.50 0.00 45.00])
+agent( pose [-5.00 -5.00 0.00 45.00])
 
-# for fixed pose start
-agent( pose [-8.00 -8.00 0.00 00.00])
-agent( pose [-7.50 -7.50 0.00 00.00])
-agent( pose [-7.50 -8.00 0.00 00.00])
-agent( pose [-8.00 -7.50 0.00 00.00])
-agent( pose [-7.00 -7.00 0.00 00.00])
+agent( pose [6.00 -6.00 0.00 135.00])
+agent( pose [5.50 -5.50 0.00 135.00])
+agent( pose [5.50 -6.00 0.00 135.00])
+agent( pose [6.00 -5.50 0.00 135.00])
+agent( pose [5.00 -5.00 0.00 135.00])
 
-agent( pose [8.00 -8.00 0.00 00.00])
-agent( pose [7.50 -7.50 0.00 00.00])
-agent( pose [7.50 -8.00 0.00 00.00])
-agent( pose [8.00 -7.50 0.00 00.00])
-agent( pose [7.00 -7.00 0.00 00.00])
+agent( pose [5.00 5.00 0.00 225.00])
+agent( pose [5.50 5.50 0.00 225.00])
+agent( pose [6.50 6.00 0.00 225.00])
+agent( pose [6.00 5.50 0.00 225.00])
+agent( pose [6.00 6.00 0.00 225.00])
 
-agent( pose [7.00 7.00 0.00 00.00])
-agent( pose [7.50 7.50 0.00 00.00])
-agent( pose [7.50 8.00 0.00 00.00])
-agent( pose [8.00 7.50 0.00 00.00])
-agent( pose [8.00 8.00 0.00 00.00])
-
-agent( pose [-8.00 8.00 0.00 00.00])
-agent( pose [-7.50 7.50 0.00 00.00])
-agent( pose [-7.50 8.00 0.00 00.00])
-agent( pose [-8.00 7.50 0.00 00.00])
-agent( pose [-7.00 7.00 0.00 00.00])
+agent( pose [-6.00 6.00 0.00 315.00])
+agent( pose [-5.50 5.50 0.00 315.00])
+agent( pose [-5.50 6.00 0.00 315.00])
+agent( pose [-6.00 5.50 0.00 315.00])
+agent( pose [-5.00 5.00 0.00 315.00])
 

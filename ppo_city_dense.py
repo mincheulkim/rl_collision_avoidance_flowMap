@@ -18,7 +18,7 @@ from model.ppo import ppo_update_city, generate_train_data
 from model.ppo import generate_action
 from model.ppo import transform_buffer
 
-from model.ppo import generate_action_rvo, generate_action_rvo_dense   # 211020
+from model.ppo import generate_action_rvo_dense, generate_action_human   # 211027
 
 #import model.orca as orcas  # 211020
 from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX/issues/638
@@ -114,6 +114,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                     flow_map = np.array(flow_map)
                 else:                 # update flowmap
                     flow_map = get_flowmap(robot_curr_pose,humans_pose,update=true)
+                    # flow_map : 12*12 dig0 matrix. axis=1 means the weights? or direction
             '''
 
             # 1. generate actions at rank==0
@@ -126,11 +127,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
 
-            #v, a, logprob, scaled_action=generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
-            v, a, logprob, scaled_action=generate_action_rvo_dense(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            '''
+                generate_action_rvo_dense(...,+flow_map)
+            '''
             #print('pose list:',pose_list)
             #print('goal list:',goal_list)
             #print('scaled action:',scaled_action)
+
+            # TODO. generate actions for robot(env.index=0)
+            # only robot whose rank(index)==0 has the state_list which contains other's state.
 
             # 2. execute actions
             # human part
@@ -169,8 +175,23 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
             if global_step % HORIZON == 0:   # every 128, estimate future V???
                 state_next_list = comm.gather(state_next, root=0)
+                pose_next_list = comm.gather(pose_next, root=0)   # 211027, for future usage
+                '''
+                if env.index == 0:
+                    if flow_map is None:  # create flowmap
+                        #flow_map = [[0,1,1,0,0,0,1,1,0,0],[1,0,1,0,0,1,0,0],[2,3,2,0,0,2,0],...,[2,4,2,0,0,2,0,2,0]]   # like list. # = count of how many human detected?
+                        flow_map = get_flowmap(robot_curr_pose,humans_pose,update=false)
+                        flow_map = np.array(flow_map)
+                    else:                 # update flowmap
+                        flow_map = get_flowmap(robot_curr_pose,humans_pose,update=true)
+                        # flow_map : 12*12 dig0 matrix. axis=1 means the weights? or direction
+                '''
+
                 #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
-                last_v, _, _, _ = generate_action_rvo(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                '''
+                generate_action_rvo_dense(...,+flow_map)
+                '''
                 
             # 5. add transitons in buff and update policy
             r_list = comm.gather(r, root=0)   # e.g. r_list =  [-0.23433709215698428, 0.24986903841139441, 0.18645341029055684, 0.0, 0.016304648273046674])  # index=5
@@ -221,18 +242,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         # after terminate = True(end step)
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
-                torch.save(policy.state_dict(), policy_path + '/Stage_city_{}'.format(global_update))   # save pth at every 20th model updated
+                torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_{}'.format(global_update))   # save pth at every 20th model updated
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
         
-        #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
-        distance=2
+        distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+        #distance=2   # 211027 revive
 
         #print('envgoal:',env.goal_point)
-
-        logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
-        logger_cal.info(ep_reward)
+        
+        # 211027 only show env.index=0(robot)
+        if env.index ==0:
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
+                        (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
+            logger_cal.info(ep_reward)
 
         # 211026, for tensorboardX
         if env.index ==0:
@@ -293,7 +316,7 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        file = policy_path + '/stage_city_2.pth'   # policy/stage3_2.pth
+        file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         if os.path.exists(file):
