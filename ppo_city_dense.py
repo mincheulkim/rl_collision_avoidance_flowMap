@@ -27,7 +27,7 @@ from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX
 # 1) tensorboard --logdir runs/
 # 2) google-chrome -> http://desktop-26msce9:6006/
 
-
+writer = SummaryWriter()
 
 
  
@@ -63,7 +63,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
     if env.index == 0:
         # 211026. env.index=0 (robot), else: humans
         env.reset_world()    #    # reset stage, self speed, goal, r_cnt, time
-        writer = SummaryWriter()
+
 
     for id in range(MAX_EPISODES):    # 5000   # refresh for a agent
         env.reset_pose()   # reset initial pose(x,y,theta)
@@ -237,7 +237,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             step += 1   # time goes on +1
             state = state_next
             
-            pose = pose_next   # 211020
+            pose = pose_next   # 2l.,j,j,11020
             #print(env.goal_point[0], env.init_pose[0], env.goal_point[1], env.init_pose[1])
 
         # after terminate = True(end step)
@@ -264,7 +264,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
             info_p_lossss, info_v_lossss, info_entropyss = get_parameters()
             #info_p_lossss, info_v_lossss, info_entropyss, total_lossss = get_parameters()
-            #print(info_p_lossss,info_v_lossss,info_entropyss)
+            print(info_p_lossss,info_v_lossss,info_entropyss)
             writer.add_scalar('Policy(actor) Loss, vibrate, less then 1', info_p_lossss,global_step=global_update)
             writer.add_scalar('Value Loss, ???', info_v_lossss,global_step=global_update)
             writer.add_scalar('Entropy: How stochatic decisions of brain, decrease steady', info_entropyss,global_step=global_update)
@@ -328,7 +328,8 @@ if __name__ == '__main__':
         if not os.path.exists(policy_path):   # 'policy'
             os.makedirs(policy_path)
 
-        file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
+        #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
+        file = policy_path + '/Stage_city_dense_160.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         if os.path.exists(file):

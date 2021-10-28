@@ -70,4 +70,9 @@ tensorboard --logdir runs/
 	commit = {7bc682403cb9a327377481be1f110debc16babbd}
 }
 ```
-# rl_collision_avoidance_flowMap
+# TODOList
+```
+1. create flowmap(global/local)
+2. seperate train / test function for ppo --> ppo.py
+3. modify model's pth file name from global step to episodes
+```

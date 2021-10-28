@@ -399,7 +399,10 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         # Get action for robot(RVOPolicy)
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
+        mean = mean.data.cpu().numpy()
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot(for trining)
+        
+        #raw_scaled_action = np.clip(mean[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot(for test)
         
         
         #v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
@@ -528,6 +531,20 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         a = None
         scaled_action = None
         logprob = None
+
+
+    # FOR NO-SAMPLING(TEST)
+    '''
+        _, _, _, mean = policy(s_list, goal_list, speed_list)
+        mean = mean.data.cpu().numpy()
+        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+    else:
+        mean = None
+        scaled_action = None
+    
+    return mean, scaled_action
+    '''
+    
 
     return v, a, logprob, scaled_action
 
@@ -737,7 +754,12 @@ def ppo_update_stage3(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
                                                     dist_entropy.detach().cpu().numpy())
             logger_ppo.info('{}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy))
 
-    print('update')
+    print('update_stage3')
+
+
+info_p_losss = None
+info_v_losss = None
+info_entropys = None
 
 def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolicy, Adam, 1024, above lie about memory, epoch=2
                coeff_entropy=0.02, clip_value=0.2,    #  coeff_entropy= 5e-4, clip_val = 0.1
@@ -805,11 +827,8 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
         
             
 
-    print('update')
+    print('update_city')
 
-info_p_losss = None
-info_v_losss = None
-info_entropys = None
 #total_losss = None
 
 def get_parameters():   # 211027 for logging
