@@ -73,30 +73,35 @@ tensorboard --logdir runs/
 # TODOList
 ```
 - [x] seperate human and robot policy: generate_action_human(), generate_action_robot() or generate_action_robot_localmap()
-- [ ] create flowmap(global/local)
 - [x] seperate train / test function for ppo: argument evaluate=True(test), False(train)
 - [x] modify model's pth file name from global step to episodes
 - [x] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
-- [ ] check whether get_laser_observation need -0.5
-- [ ] enlarge local map(current 4*4)
+- [x] check whether get_laser_observation need -0.5: for normalization [-0.5~0.5]
+- 1. Generate Group human
+- (Group)Leader - Follower model
+-- Leader: Standard RVO velocity
+-- Follower: Standard RVO velocity + To-Leader velocity(maintain cohensity)
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
+- 2. Generate Flow Map
+- [ ] create flowmap(global/local)
+- [ ] enlarge local map(current 4*4)
+- [ ] visualize local occupancy map(OpenCV)  (after 211105 meeting)
+- [ ] use conv2D, rather than FC for occupancy map
+- 3. MISC
 - [ ] visualize LIDAR 1D vector
-```
-- From IJCAI20 work, crowd-steer
-- [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location
-- [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions
+- [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
+- [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
 
 '''
 - 211105, after meeting
-- [ ] visualize local occupancy map(OpenCV)
 - [x] prevent human-human collision: modify RVO
-- [ ] check all states(lidar, rel.goal,vel) is right
+- [x] check all states(lidar, rel.goal,vel) is right
 	- 1. stacked lidar data[sensor, sensor, sensor]. mayby sensor L/R sensor issue has
 	- 2. relative(local) goal position: 2D vector, goal in polar coordinate(distance and angle) with respect to robot's curr position
 	- 3. velocity of robot: current translational and rotational velocity of nonholonomic robot
-- [ ] as toward goal, reward is increase well?
+- [x] as toward goal, reward is increase well?
 - [x] incremental testing: basic scene(0, 1, 2, ... 5): tested scene 0, 5(now)
-- [ ] use conv2D, rather than FC for occupancy map
+
 ```
 # checklist
 ```
