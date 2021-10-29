@@ -322,11 +322,6 @@ class StageWorld():
         if self.index == 0:   # for robot
             x = 0
             y = -8
-        # PLZ erase me !!
-        else:
-            x=self.index - 10
-            y=self.index - 10
-        '''
         else:           # For human
             x = np.random.uniform(-8, 8)
             y = np.random.uniform(-8, 8)
@@ -335,7 +330,13 @@ class StageWorld():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
+        # for test city scene, use below
         '''
+        else:
+            x=self.index - 10
+            y=self.index - 10
+        '''
+        
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
         if self.index ==0:
@@ -399,8 +400,10 @@ class StageWorld():
         #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
         self.init_pose = self.get_self_stateGT()
         if self.index == 0:
-            #self.goal_point = [0, 8]
-            self.goal_point = [-13, 10]
+            # for cross scene
+            self.goal_point = [0, 8]
+            # for city scene
+            #self.goal_point = [-13, 10]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal

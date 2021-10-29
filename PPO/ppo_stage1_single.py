@@ -89,7 +89,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             goal_global_list = comm.gather(goal_global, root=0)
 
             env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
-            # Erase me!!
+            
             if env.index==0:
                 state_list_new = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
             
@@ -134,10 +134,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 angles = np.arctan2(real_action[1], real_action[0])
                 diff = angles - rot
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
-                mod_vel = (length, diff)
+                #mod_vel = (length, diff)
+                mod_vel = (length/2, diff/2)   # make more ease, erase me!
                 # Erase me!!
-                #env.control_vel(mod_vel)   # 211108
-                env.control_vel([0,0])   # 211108
+                env.control_vel(mod_vel)   # 211108
+                #env.control_vel([0,0])   # 211108
                 
 
             # rate.sleep()
@@ -313,7 +314,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_20'
+        file = policy_path + '/Stage1_610'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'

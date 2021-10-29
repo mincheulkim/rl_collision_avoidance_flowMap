@@ -891,7 +891,7 @@ def ppo_update_city_r(policy, optimizer, batch_size, memory, epoch,   # # CNNPol
         obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, occupancy_maps = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
     else:
         obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory   # (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
-
+    print('SSobss.shape:',obss.shape, 'actino shape:',actions.shape, 'rewards shape:',rewards.shape)
     advs = (advs - advs.mean()) / advs.std()   # Advantage normalize?
 
     #print('prev.goals size:',goals.shape)
