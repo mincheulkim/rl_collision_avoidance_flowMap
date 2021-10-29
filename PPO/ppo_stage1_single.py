@@ -15,7 +15,7 @@ from collections import deque #test
 from model.net import MLPPolicy, CNNPolicy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
-from model.ppo import generate_action, generate_action_human
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups
 from model.ppo import transform_buffer #test
 
 
@@ -34,7 +34,7 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
 CLIP_VALUE = 0.2
-NUM_ENV = 6
+NUM_ENV = 7
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -59,7 +59,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #test
         #env.reset_pose()
         #env.generate_goal_point()
-
+        
+        if env.index ==0:    # 211129
+            env.reset_world()
         # use this one!
         env.generate_pose_goal_circle()  # shafeshift above two line
 
@@ -99,7 +101,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             # generate humans action_space
             
-            human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            human_actions=generate_action_human_groups(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             # erase me!
             #human_actions=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
             #print('human actions:',human_actions)
@@ -107,22 +110,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate robot action (at rank==0)
             # ERASE ME!
             if env.index==0:
-
-                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
-                #v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
-
-                #print('diff_2:',state_list[0][1],state_robot[0][1])                
-                #print('diff_3:',state_list[0][2],state_robot[0][2])                
-                #v_b, a_b, logprob_b, scaled_action_b=generate_action(env=env, state_list=state_list, policy=policy, action_bound=action_bound)
-                #v_c, a_c, logprob_c, scaled_action_c=generate_action(env=env, state_list=state_robot, policy=policy, action_bound=action_bound)
-                # For debugging
-                #print('#####round 1#####')
-                #print('original v,a,logprob,scaled_action:',v,a,logprob,scaled_action)
-                #print('original(double) v,a,logprob,scaled_action:',v_b,a_b,logprob_b,scaled_action_b)
-                #print('modified v,a,logprob,scaled_action:',v_c, a_c, logprob_c, scaled_action_c)
-                #print('original state:',state_list)
-                #print('modified state:',state_robot)
 
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
@@ -135,7 +123,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 diff = angles - rot
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
                 #mod_vel = (length, diff)
-                mod_vel = (length/2, diff/2)   # make more ease, erase me!
+                difficulty = 1
+                mod_vel = (length/difficulty, diff/difficulty)   # make more ease, erase me!
                 # Erase me!!
                 env.control_vel(mod_vel)   # 211108
                 #env.control_vel([0,0])   # 211108

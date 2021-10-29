@@ -80,8 +80,9 @@ tensorboard --logdir runs/
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
--- Follower: Standard RVO velocity + To-Leader velocity(maintain cohensity)
+-- Follower: Standard RVO velocity + To-Leader velocity(maintain cohensity) sum vector velocity
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
+- [ ] after reaching the goal, human change their next goal
 - 2. Generate Flow Map
 - [ ] create flowmap(global/local)
 - [ ] enlarge local map(current 4*4)

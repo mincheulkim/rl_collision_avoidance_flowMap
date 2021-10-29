@@ -347,6 +347,39 @@ class StageWorld():
         #    theta = np.pi*0.5
         return [x, y, theta]
 
+    # 211129
+    def generate_group_pose(self):
+        if self.index == 0:   # for robot
+            x = 0
+            y = -8
+        elif self.index in [1,2,3]:
+            x = np.random.uniform(-7.5, -5.5)
+            y = np.random.uniform(-7.5, -5.5)
+        elif self.index in [4,5]:
+            x = np.random.uniform(-7.5, -5.5)
+            y = np.random.uniform(5.5, 7.5)
+        elif self.index in [6]:
+            x = np.random.uniform(6, 7)
+            y = np.random.uniform(6, 7)
+        else:           # For human
+            x = np.random.uniform(-8, 8)
+            y = np.random.uniform(-8, 8)
+            dis = np.sqrt(x ** 2 + y ** 2)
+            while (dis < 7.5 or dis > 8.5) and not rospy.is_shutdown():
+                x = np.random.uniform(-8, 8)
+                y = np.random.uniform(-8, 8)
+                dis = np.sqrt(x ** 2 + y ** 2)
+        
+        #theta = np.random.uniform(0, 0.5 * np.pi)
+        #theta = np
+        if self.index ==0:
+            theta = np.random.uniform(0, 2*np.pi)
+        else:
+            theta = np.arctan2(y, x) + np.pi
+        #if self.index ==0:
+        #    theta = np.pi*0.5
+        return [x, y, theta]
+
     def generate_random_goal(self):
         self.init_pose = self.get_self_stateGT()
         # For robot
@@ -384,7 +417,8 @@ class StageWorld():
 
     def generate_pose_goal_circle(self):
         # reset pose
-        random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        random_pose = self.generate_group_pose()   # 211129. Groups initialize
         rospy.sleep(0.01)
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
@@ -404,6 +438,12 @@ class StageWorld():
             self.goal_point = [0, 8]
             # for city scene
             #self.goal_point = [-13, 10]
+        elif self.index in [1,2,3]:
+            self.goal_point = [8.0, 0.0]
+        elif self.index in [4,5]:
+            self.goal_point = [0.0, -8.0]
+        elif self.index in [6]:
+            self.goal_point = [-8.0, 8.0]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
