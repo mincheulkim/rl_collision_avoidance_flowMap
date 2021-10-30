@@ -144,13 +144,13 @@ class StageWorld():
         sparse_scan_left = []   # left scan
         index = 0.
     
-        for x in xrange(int(sparse_beam_num / 2)):   # routine 256
+        for x in range(int(sparse_beam_num / 2)):   # routine 256
             sparse_scan_left.append(scan[int(index)])
             index += step
 
         sparse_scan_right = []   # right scan
         index = raw_beam_num - 1.
-        for x in xrange(int(sparse_beam_num / 2)):
+        for x in range(int(sparse_beam_num / 2)):
             sparse_scan_right.append(scan[int(index)])
             index -= step
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
