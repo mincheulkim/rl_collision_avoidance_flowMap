@@ -15,7 +15,7 @@ from collections import deque #test
 from model.net import MLPPolicy, CNNPolicy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM
 from model.ppo import transform_buffer #test
 
 
@@ -38,6 +38,8 @@ NUM_ENV = 7
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
+
+local_map = False
 
 
 #policy_path, optimizer 
@@ -110,7 +112,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate robot action (at rank==0)
             # ERASE ME!
             if env.index==0:
-                v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
+                if local_map:
+                    v, a, logprob, scaled_action, local_map =generate_action_LM(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
+                else:
+                    v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
 
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
@@ -303,7 +308,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_610'
+        file = policy_path + '/Stage1_165'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'

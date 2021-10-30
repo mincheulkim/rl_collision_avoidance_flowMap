@@ -89,6 +89,38 @@ def generate_action(env, state_list, policy, action_bound):
 
     return v, a, logprob, scaled_action
 
+def generate_action_LM(env, state_list, policy, action_bound):   # 211130
+    local_map = []
+    if env.index == 0:
+        s_list, goal_list, speed_list = [], [], []
+        for i in state_list:
+            s_list.append(i[0])
+            goal_list.append(i[1])
+            speed_list.append(i[2])
+
+        s_list = np.asarray(s_list)
+        goal_list = np.asarray(goal_list)
+        speed_list = np.asarray(speed_list)
+
+
+        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+
+
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list)
+        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
+        scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        #print('a:',a, 'scaled_action:',scaled_action, 'a[0]:',a[0],'scaled_action_nobar:',np.clip(a, a_min=action_bound[0], a_max=action_bound[1]))
+    else:
+        v = None
+        a = None
+        scaled_action = None
+        logprob = None
+
+    return v, a, logprob, scaled_action, local_map
+
 def generate_action_no_sampling(env, state_list, policy, action_bound):
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []

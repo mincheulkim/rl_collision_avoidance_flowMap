@@ -79,6 +79,10 @@ class StageWorld():
         self.state_GT = None
         self.speed_poly = None  # 211103
 
+        # TODO for lidar collision check 211130
+        self.is_collision = 0
+        self.scan_min = 6.0
+
 
         while self.scan is None or self.speed is None or self.state is None\
                 or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
@@ -153,8 +157,22 @@ class StageWorld():
         #scan_sparse = np.flip(scan_sparse)    # 211115
         scan_sparse = scan_sparse[::-1]    # 211115
         #print('laser scan: ',scan_sparse / 6.0 - 0.5)
-        #return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
-        return scan_sparse / 6.0  # 211102 TODO fliped input
+        return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
+        #return scan_sparse / 6.0  # 211102 TODO fliped input
+
+    def collision_laser_flag(self, r):
+        scan = copy.deepcopy(self.scan)
+        scan[np.isnan(scan)] = 6.0
+        scan[np.isinf(scan)] = 6.0
+
+        scan_min = np.min(scan)
+
+        if scan_min <= r:
+            self.is_collision = 1
+        else:
+            self.is_collision = 0
+
+        self.scan_min = scan_min
 
 
     def get_self_speed(self):
@@ -225,13 +243,24 @@ class StageWorld():
             #reward_c = -30.
             result = 'Crashed'
 
+        # TODO Lidar collsion check 211103
+        '''
+        if self.is_collision == 1:
+            terminate = True
+            reward_c = -15.
+            result = 'Crashed'
+        '''
+
         if np.abs(w) >  1.05:               # rotation penalty
         #if np.abs(w) >  1.25:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
             #reward_w = -0.08 * np.abs(w)
+        
+        '''    # for future lidar collision penalty
+        if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
+            reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
+        '''
 
-        ## TODO ADD must to reward(penalty proportional with rotation)  211102
-        reward_spin = t * 0.01
 
         #if t > 150:  # timeout check
         #if t > 450:  # timeout check  211020 for long-term
@@ -239,7 +268,11 @@ class StageWorld():
             terminate = True
             result = 'Time out'
         reward = reward_g + reward_c + reward_w
-        #reward = reward_g + reward_c + reward_w + reward_spin
+        '''  
+        else:  # TODO time penalty
+            reward_t = -0.1
+        '''
+
 
         return reward, terminate, result   # float, T or F(base), description
 
