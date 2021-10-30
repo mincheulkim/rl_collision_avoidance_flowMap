@@ -39,7 +39,7 @@ OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
-local_map = False
+
 
 
 #policy_path, optimizer 
@@ -52,6 +52,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     global_step = 0
 
     memory_size = 0
+
+    local_map = False
 
 
     if env.index == 0:
@@ -308,7 +310,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_165'
+        file = policy_path + '/Stage1_45'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
