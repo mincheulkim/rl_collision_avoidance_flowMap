@@ -77,6 +77,7 @@ tensorboard --logdir runs/
 - [x] modify model's pth file name from global step to episodes
 - [x] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
 - [x] check whether get_laser_observation need -0.5: for normalization [-0.5~0.5]
+- [ ] collision checking module: current ros crash is not perferct. use min(lidar)<threshold to make collision detection
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
@@ -84,11 +85,17 @@ tensorboard --logdir runs/
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
 - [ ] after reaching the goal, human change their next goal
 - 2. Generate Flow Map
-- [ ] create flowmap(global/local)
-- [ ] enlarge local map(current 4*4)
+- [x] create flowmap(local)    by 211201: ppo.py/generate_action_LM() 6x6 size
+- [ ] create flowmap(global as storage)
+- [x] enlarge local map(current 4*4): 6*6
+- [ ] more high resolution local map(current 1m -> 0.5, 0.1, ...)
+- [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
 - [ ] visualize local occupancy map(OpenCV)  (after 211105 meeting)
 - [ ] use conv2D, rather than FC for occupancy map
-- 3. MISC
+- 3. Make subgroups
+- [ ] gather humans in similar groups
+- [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
+- 4. MISC
 - [ ] visualize LIDAR 1D vector
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)

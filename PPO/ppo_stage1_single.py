@@ -7,6 +7,10 @@ from torch.optim.optimizer import Optimizer #test
 import rospy #test
 import torch #test
 import torch.nn as nn #test
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from mpi4py import MPI #test
 
 from torch.optim import Adam #test
@@ -17,6 +21,8 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM
 from model.ppo import transform_buffer #test
+from drawnow import drawnow
+
 
 
 MAX_EPISODES = 5000
@@ -53,11 +59,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     memory_size = 0
 
-    local_map = False
+    local_map = True                 # select LM policy
+    LM_visualize = False             # visualize local map(but very slow!!)
 
 
     if env.index == 0:
         env.reset_world()
+    plt.ion()
+    fig = plt.figure()
 
     for id in range(MAX_EPISODES):
         #test
@@ -87,22 +96,25 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
         goal_global = np.asarray(env.get_goal_point())
 
+        # for visualize
+        
+
+
         while not terminal and not rospy.is_shutdown():
             
             state_list = comm.gather(state, root=0)
             
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
+            speed_poly_list = comm.gather(speed_poly, root=0)
             goal_global_list = comm.gather(goal_global, root=0)
 
             env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
             
             if env.index==0:
-                state_list_new = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
+                robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
             
             #print('envindex=',env_index_list)
             
-            # TODO add humans action
-
             # generate humans action_space
             
             #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
@@ -115,16 +127,23 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # ERASE ME!
             if env.index==0:
                 if local_map:
-                    v, a, logprob, scaled_action, local_map =generate_action_LM(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
+                                                                        # env, state_list, pose_list, velocity_poly_list, policy, action_bound
                 else:
-                    v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list_new, policy=policy, action_bound=action_bound)
-
+                    v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
+            
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
 
             # distribute actions btwn robot and humans
-            if env.index == 0:
-                env.control_vel(scaled_action)
+            if env.index == 0:    
+                env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
+
+            
+                
+                
+                
+
             else: # pre-RVO vel, humans
                 angles = np.arctan2(real_action[1], real_action[0])
                 diff = angles - rot
@@ -139,6 +158,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             # rate.sleep()
             rospy.sleep(0.001)
+
+            if env.index ==0 and LM_visualize:
+                print('occu map:',LM)
+                plt.imshow(LM, interpolation='nearest')    # https://stackoverflow.com/questions/11874767/how-do-i-plot-in-real-time-in-a-while-loop-using-matplotlib
+                plt.draw()
+                #plt.show()
+                #plt.pause(0.0001)
+                
+                plt.pause(0.001)
+                
 
             # TODO check collision via sanity check
             # get min(lidar) < threshold => collision
@@ -196,8 +225,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 
                 #buff.append((state_list, a, r_list, terminal_list, logprob, v))   # state_list, r_list, terminal_list: can we manage
                 #buff.append((state_robot, a, r_robot, terminal_robot, logprob, v))   # state_list, r_list, terminal_list: can we manage
-                #print(len(state_list_new), len(a), len(r_list_new), len(terminal_list_new), len(logprob), len(v))
-                buff.append((state_list_new, a, r_list_new, terminal_list_new, logprob, v))   # new
+                #print(len(robot_state), len(a), len(r_list_new), len(terminal_list_new), len(logprob), len(v))
+                buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
 
 
                 # TODO check a, r_robot(real plus root), terminal_robot
@@ -310,7 +339,7 @@ if __name__ == '__main__':
 
         # Load total model
 
-        file = policy_path + '/Stage1_45'
+        file = policy_path + '/Stage1_150'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
