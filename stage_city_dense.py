@@ -192,7 +192,6 @@ class StageWorld():
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)
         
-    # TODO: Reward reshape: penalty for circuling around
     def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
@@ -227,7 +226,6 @@ class StageWorld():
             reward_w = -0.1 * np.abs(w)
             #reward_w = -0.08 * np.abs(w)
 
-        ## TODO ADD must to reward(penalty proportional with rotation)  211102
         reward_spin = t * 0.01
 
         #if t > 150:  # timeout check

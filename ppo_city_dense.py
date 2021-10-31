@@ -35,15 +35,15 @@ import matplotlib.pyplot as plt
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
-#HORIZON = 128  # can be 32 ~ 5000                   # TODO increase time horizon?
-HORIZON = 256  # can be 32 ~ 5000                   # TODO increase time horizon?
-#HORIZON = 384  # can be 32 ~ 5000                   # TODO increase time horizon?
-#HORIZON = 512  # can be 32 ~ 5000                   # TODO increase time horizon?
+#HORIZON = 128  # can be 32 ~ 5000                 
+HORIZON = 256  # can be 32 ~ 5000                 
+#HORIZON = 384  # can be 32 ~ 5000                  
+#HORIZON = 512  # can be 32 ~ 5000                
 #HORIZON = 2048  # can be 32 ~ 5000                   # 211119
 GAMMA = 0.99   # can be 0.99(normal), discount factor
 LAMDA = 0.95   # can be 0.9~0.1, Factor for trade-off of bias vs variance of GAE
-#BATCH_SIZE = 256   # can be 4~4096(minibatch?)     # TODO increase batch size?  # How many batches are inputed to model to update PPO. same as index
-BATCH_SIZE = 1024   # can be 4~4096(minibatch?)     # TODO increase batch size?
+#BATCH_SIZE = 256   # can be 4~4096(minibatch?)      # How many batches are inputed to model to update PPO. same as index
+BATCH_SIZE = 1024   # can be 4~4096(minibatch?)     
 #BATCH_SIZE = 512   # can be 4~4096(minibatch?)     # 211119
 #BATCH_SIZE = 4096   # can be 4~4096(minibatch?)     # 211119
 #EPOCH = 2   # can be 3~30(number of epoch when optimizing the surrogate loss)
@@ -148,7 +148,7 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
                         #print('min_ang:',min_lin)
                     print(max_lin, min_lin, max_ang, min_ang)
                     '''
-                else:  # TODO check rvo vel, humans
+                else:  
                     angles = np.arctan2(real_action[1], real_action[0])
                     diff = angles - rot
                     length = np.sqrt([real_action[0]**2+real_action[1]**2])
@@ -209,7 +209,6 @@ def run(comm, env, policy_r, policy_path, action_bound, optimizer):     # comm, 
             # 5. add transitons in buff and update policy
             #if env.index == 0:  # maybe env.index=0 means robot
             if env.index == 0:  # maybe env.index=0 means robot
-                # TODO. state, a, r_list, terminal_list, logprob, v only cares robot[0], num_env = 1
                 if local_map:
                     buff_r.append((state, a_r, r, terminal, logprob_r, v_r, occupancy_maps_r))   # for robot buffer
                 else:

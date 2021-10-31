@@ -72,7 +72,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
 
 
             # 1. generate actions at rank==0
-            # TODO human part
             # env: <stage_world1.StageWorld instace at 0x7ff758640050> as manything, state_list=[3 stacked 512 lidar, local_goal, self_speed], policy: 'CNNPolicy(~~, action_boud:[[0,-1],[1,1]]
             v, a, logprob, scaled_action=generate_action(env=env, state_list=state_list,
                                                          policy=policy, action_bound=action_bound)   # from ppo
@@ -81,7 +80,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
 
             # 2. execute actions
-            # TODO human
             real_action = comm.scatter(scaled_action, root=0)  # discretize scaled action   e.g. array[0.123023, -0.242424]  seperate actions and distribue each env
             #print('real action:',real_action)
             env.control_vel(real_action)
@@ -130,7 +128,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                     t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,  # r_batch, 0.99, v_batch
                                                               last_value=last_v, dones=d_batch, lam=LAMDA)   # last_v(every 128, future v), terminal list, 0.95
                     memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
-                    # TODO Real training part
                     ppo_update_stage3(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,  # CNNPolicy, Adam, 1024, above lie about memory
                                             epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,  # 2, 5e-4, 0.1, 128
                                             num_env=NUM_ENV, frames=LASER_HIST,   # 5, 3
