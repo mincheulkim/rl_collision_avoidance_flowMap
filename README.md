@@ -116,3 +116,12 @@ tensorboard --logdir runs/
 -1. [ppo_city_dense.py]policy_r=RobotPolicy or RobotPolicy_LM
 -2. [ppo_city_desne.py] evaluate=true or false (test/training)
 ```
+
+# Motivation
+'''
+--- Incorporate lidar based and state based
+1. If we use only lidar data, 1) we cannot identify static obstacle and dynamic obstacle 2) loose high quality of intented human's information
+2. If we use only state based, 1) it is unrelistic that we assumed know all state of humans 2) scalability issue
+--- especially, dence scenario, above problem increased
+--- so, we utilize identified information of humans to make rigid-body movement or flow, to see high-level instance
+'''

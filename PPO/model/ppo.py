@@ -105,19 +105,24 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
 
         pose_list = np.asarray(pose_list)
         
-        
-        #local_map = []
-        local_map = np.zeros((6,6))
-        local_map_size = 3
+        cell_size=1*0.1
+        map_size=6
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+        print('=============')
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]
-            #print(diff,': ', pose-pose_list[0])   # calculate diff position vs robot[0]
-            mod_diff_x = np.floor(diff[0] / 0.5 + 6/2)
-            mod_diff_y = np.ceil(diff[1] /0.5 - 6/2)
+            #print(i, diff,': ', pose-pose_list[0])   # calculate diff position vs robot[0]
+            '''
+            mod_diff_x = np.floor(diff[0] / cell_size + map_size/2)
+            mod_diff_y = np.floor(diff[1] / cell_size + map_size/2)
             mod_diff_y = np.abs(mod_diff_y)
-            #print(i,' : ',mod_diff_x,mod_diff_y)
-            if mod_diff_x >=0 and mod_diff_x <6 and mod_diff_y >=0 and mod_diff_y <6 and i is not 0:
-                #print(i,' : ',np.int(mod_diff_x),np.int(mod_diff_y))
+            '''
+            mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
+            mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
+            
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i is not 0:
+                #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
                 local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=i
         
 
