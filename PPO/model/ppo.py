@@ -112,8 +112,8 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]
             #print(diff,': ', pose-pose_list[0])   # calculate diff position vs robot[0]
-            mod_diff_x = np.floor(diff[0] / 1 + 6/2)
-            mod_diff_y = np.ceil(diff[1] /1 - 6/2)
+            mod_diff_x = np.floor(diff[0] / 0.5 + 6/2)
+            mod_diff_y = np.ceil(diff[1] /0.5 - 6/2)
             mod_diff_y = np.abs(mod_diff_y)
             #print(i,' : ',mod_diff_x,mod_diff_y)
             if mod_diff_x >=0 and mod_diff_x <6 and mod_diff_y >=0 and mod_diff_y <6 and i is not 0:

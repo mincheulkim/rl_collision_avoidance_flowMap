@@ -78,6 +78,7 @@ class StageWorld():
         self.speed_GT = None
         self.state_GT = None
         self.speed_poly = None  # 211103
+        self.is_crashed = None
 
         # TODO for lidar collision check 211130
         self.is_collision = 0
@@ -452,7 +453,9 @@ class StageWorld():
         # reset pose
         #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         random_pose = self.generate_group_pose()   # 211129. Groups initialize
-        rospy.sleep(0.01)
+        #rospy.sleep(0.01)
+        rospy.sleep(0.5)   # too laggy
+        #rospy.sleep(1.0)   # too laggy
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
 
@@ -461,7 +464,10 @@ class StageWorld():
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
         
-        rospy.sleep(0.01)
+        #rospy.sleep(0.01)
+        rospy.sleep(0.5)
+        #rospy.sleep(1.0)   # too laggy
+        self.is_crashed=False
 
         # reset goal
         #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10

@@ -11,6 +11,8 @@ import torch.nn as nn #test
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import cv2
+
 from mpi4py import MPI #test
 
 from torch.optim import Adam #test
@@ -60,7 +62,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     memory_size = 0
 
     local_map = True                 # select LM policy
-    LM_visualize = False             # visualize local map(but very slow!!)
+    LM_visualize = True             # visualize local map(but very slow!!)
 
 
     if env.index == 0:
@@ -69,14 +71,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     fig = plt.figure()
 
     for id in range(MAX_EPISODES):
-        #test
-        #env.reset_pose()
-        #env.generate_goal_point()
-        
+        # senario reset option
         if env.index ==0:    # 211129
             env.reset_world()
+
+        #env.reset_pose()
+        #env.generate_goal_point()
         # use this one!
         env.generate_pose_goal_circle()  # shafeshift above two line
+        
+        if env.is_crashed:   # 211201
+            env.generate_pose_goal_circle()
+            env.is_crashed = False
 
 
         terminal = False
@@ -138,12 +144,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # distribute actions btwn robot and humans
             if env.index == 0:    
                 env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
-
-            
-                
-                
-                
-
             else: # pre-RVO vel, humans
                 angles = np.arctan2(real_action[1], real_action[0])
                 diff = angles - rot
@@ -154,19 +154,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 # Erase me!!
                 env.control_vel(mod_vel)   # 211108
                 #env.control_vel([0,0])   # 211108
-                
-
             # rate.sleep()
             rospy.sleep(0.001)
 
             if env.index ==0 and LM_visualize:
-                print('occu map:',LM)
-                plt.imshow(LM, interpolation='nearest')    # https://stackoverflow.com/questions/11874767/how-do-i-plot-in-real-time-in-a-while-loop-using-matplotlib
-                plt.draw()
-                #plt.show()
-                #plt.pause(0.0001)
-                
-                plt.pause(0.001)
+                dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+                cv2.imshow("Local flow map", dist)
+                cv2.waitKey(1)
                 
 
             # TODO check collision via sanity check
