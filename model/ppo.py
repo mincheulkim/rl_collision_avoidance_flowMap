@@ -399,13 +399,13 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
         # Get action for robot(RVOPolicy)
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
+
+        '''
+        # 211028 For NO-SAMPLING(TEST)
         mean = mean.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot(for trining)
-        
-        #raw_scaled_action = np.clip(mean[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot(for test)
-        
-        
-        #v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+        '''
         
         # Get action for humans(RVO)
         #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
@@ -811,7 +811,7 @@ def ppo_update_city(policy, optimizer, batch_size, memory, epoch,   # # CNNPolic
             optimizer.step()
             info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
                                                      float(value_loss.detach().cpu().numpy()), float(dist_entropy.detach().cpu().numpy())
-            logger_ppo.info('{}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy))
+            logger_ppo.info('p_loss: {}, v_loss: {}, entropy: {}'.format(info_p_loss, info_v_loss, info_entropy))
             
             # 211027 for logging     # https://www.infoking.site/64
             #global info_p_losss   
