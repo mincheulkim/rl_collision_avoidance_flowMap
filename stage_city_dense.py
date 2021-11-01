@@ -219,6 +219,8 @@ class StageWorld():
         if np.abs(w) >  1.05:   # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
+        ## ADD propositional reward
+
         #if t > 150:  # timeout check
         if t > 450:  # timeout check  211020 for long-term
             terminate = True

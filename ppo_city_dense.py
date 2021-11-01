@@ -189,7 +189,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                 '''
 
                 #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
-                last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                #last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+                last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
                 '''
                 generate_action_rvo_dense(...,+flow_map)
                 '''
@@ -216,21 +217,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 512, 2
                     #print('policy:',policy, 'opt:',optimizer, 'memory:',memory, )
 
-                    # 211026. for tensorboardX, network debug
-                    #act_fea_cv1params = policy.state_dict()['act_fea_cv1.weight']
-                    #actor1params =  policy.state_dict()['actor1.weight']
-                    #queryparams = policy.state_dict()['query.bias'][0]
-                    #keyparams = policy.state_dict()['key.bias'][0]
-                    #valueparams = policy.state_dict()['value.bias'][0]
-                    #act_fc3params =  policy.state_dict()['act_fc3.bias']
-                    #writer.add_scalar('query.bias',queryparams,global_step=global_update)
-                    #writer.add_scalar('key.bias', keyparams, global_step=global_update)
-                    #writer.add_scalar('value.bias', valueparams, global_step=global_update)
-                    #writer.add_scalar('act_fea_cv1.weight', act_fea_cv1params[0][0][0], global_step=global_update)
-                    #writer.add_scalar('actor1.weight', actor1params[0][0], global_step=global_update)
-                    #writer.add_scalar('act_fc3.weight', act_fc3params[0], global_step=global_update)
-
-
                     buff = []    # clean buffer
                     global_update += 1   # counting how many buffer transition and cleaned(how many time model updated)
 
@@ -243,9 +229,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         # after terminate = True(end step)
         if env.index == 0:
             if global_update != 0 and global_update % 20 == 0:
-                torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_{}'.format(global_update))   # save pth at every 20th model updated
-                logger.info('########################## model saved when update {} times#########'
-                            '################'.format(global_update))
+                torch.save(policy.state_dict(), policy_path + '/Stage_city_dense_glb:{}_step:{}'.format(global_update, step))   # save pth at every 20th model updated
+                logger.info('########################## model saved when update {}global times and {} steps#########'
+                            '################'.format(global_update, step))
         
         distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         #distance=2   # 211027 revive
@@ -254,17 +240,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
         
         # 211027 only show and save env.index=0(robot) log
         if env.index ==0:
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode(id) %05d, stepp %03d, Reward %-5.1f, Distance %05.1f, %s' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, distance, result))
             logger_cal.info(ep_reward)
 
         # 211026, for tensorboardX
         if env.index ==0:
             writer.add_scalar('episode reward of robot 0', ep_reward,global_step=global_update)
+            # TODO: no save timestamp as global update, change as episode time like A, V, entropy
 
             info_p_lossss, info_v_lossss, info_entropyss = get_parameters()
             #info_p_lossss, info_v_lossss, info_entropyss, total_lossss = get_parameters()
-            print(info_p_lossss,info_v_lossss,info_entropyss)
+            #print(info_p_lossss,info_v_lossss,info_entropyss)  # for sanity check
             writer.add_scalar('Policy(actor) Loss, vibrate, less then 1', info_p_lossss,global_step=global_update)
             writer.add_scalar('Value Loss, ???', info_v_lossss,global_step=global_update)
             writer.add_scalar('Entropy: How stochatic decisions of brain, decrease steady', info_entropyss,global_step=global_update)
@@ -329,12 +316,13 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
-        file = policy_path + '/Stage_city_dense_160.pth'   # policy/stage3_2.pth
+        file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         if os.path.exists(file):
             logger.info('####################################')
             logger.info('############Loading Model###########')
+            logger.info(file)   # which file is loaded
             logger.info('####################################')
             state_dict = torch.load(file)
             policy.load_state_dict(state_dict)
