@@ -129,6 +129,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
 
             v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
+            # TODO 1. generate_action_human with local_flowmap
+            # TODO 2. generate_action_human with global_flowmap
             '''
                 generate_action_rvo_dense(...,+flow_map)
             '''
@@ -136,7 +138,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
             #print('goal list:',goal_list)
             #print('scaled action:',scaled_action)
 
-            # TODO. generate actions for robot(env.index=0)
             # only robot whose rank(index)==0 has the state_list which contains other's state.
 
             # 2. execute actions
@@ -191,6 +192,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):     # comm, en
                 #last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
                 #last_v, _, _, _ = generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
                 last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
+                # TODO 1. generate_action_human with local_flowmap
+                # TODO 2. generate_action_human with global_flowmap
                 '''
                 generate_action_rvo_dense(...,+flow_map)
                 '''
