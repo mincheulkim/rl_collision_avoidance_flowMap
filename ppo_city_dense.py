@@ -76,8 +76,8 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
         #print('laser scan: ',len(obs))
         obs_stack = deque([obs, obs, obs])
         goal = np.asarray(env.get_local_goal())   # local goal: perspective of robot coordinate
-        if env.index ==0:
-            print('init goal:',goal)
+        #if env.index ==0:
+            #print('init goal:',goal)
         speed = np.asarray(env.get_self_speed())
     
         pose_ori = env.get_self_stateGT()   # 211019

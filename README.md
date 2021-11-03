@@ -72,7 +72,8 @@ tensorboard --logdir runs/
 ```
 # TODOList
 ```
-1. create flowmap(global/local)
-2. seperate train / test function for ppo --> ppo.py
-3. modify model's pth file name from global step to episodes
+-[x] seperate human and robot policy
+-[ ] create flowmap(global/local)
+-[ ] seperate train / test function for ppo --> ppo.py
+-[ ] modify model's pth file name from global step to episodes
 ```
