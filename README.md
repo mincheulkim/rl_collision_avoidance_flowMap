@@ -76,4 +76,5 @@ tensorboard --logdir runs/
 -[ ] create flowmap(global/local)
 -[ ] seperate train / test function for ppo --> ppo.py
 -[ ] modify model's pth file name from global step to episodes
+-[ ] change RVO's output velocity(linear) to polinomial as (x,w) -> (x,y)
 ```

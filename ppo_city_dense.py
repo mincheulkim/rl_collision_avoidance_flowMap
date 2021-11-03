@@ -20,7 +20,7 @@ from model.ppo import get_parameters
 from model.ppo import generate_action
 from model.ppo import transform_buffer, transform_buffer_r
 
-from model.ppo import generate_action_rvo_dense, generate_action_human, generate_action_robot   # 211027
+from model.ppo import generate_action_rvo_dense, generate_action_human, generate_action_robot, generate_action_robot_localmap   # 211027
 
 #import model.orca as orcas  # 211020
 from tensorboardX import SummaryWriter   # https://github.com/lanpa/tensorboardX/issues/638
@@ -128,30 +128,27 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
             # v: array[[-0.112323],[0.2323],[0.123123],[-1.2323],[-0.023232]] like dummy_vec, a: array({[[0.123,0.23],[0.23,0.23],..,[0.232,0.2323]]})  total 5 like dummy_vec, log_prob:[[-2],...,[-2]] as dummy_vec 5, scaled_action: array([[0.232, 0.2323], [0.2323, 0.2323], ..., [0.2323, 0.2323]]) as 5 agent's action
             #print('env:',env, 'state_list:',state_list, 'policy:',policy, 'action_Bound:',action_bound)
             
-            # 20 [], 20[,], 20[-], 20(,)
+            
             #if env.index ==0:
                 #print('================')
                 #print(state_list, pose_list)
                 #print('state:', state, 'pose:', pose)
             
+            # for human 211002
             v, a, logprob, scaled_action=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # from orca, 211020
-            #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
+            
 
             # for robot  211101
-            #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound)
-            v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
+            #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for training
             #v_r, a_r, logprob_r, scaled_action_r=generate_action_robot(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, evaluate=False)  # for test
 
 
             #print('v:',v, 'A:',a, 'logprob:',logprob, 'scaled_action:',scaled_action)
             # TODO 1. generate_action_human with local_flowmap
+            v_r, a_r, logprob_r, scaled_action_r=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, evaluate=False)  # for training
+
             # TODO 2. generate_action_human with global_flowmap
-            '''
-                generate_action_rvo_dense(...,+flow_map)
-            '''
-            #print('pose list:',pose_list)
-            #print('goal list:',goal_list)
-            #print('scaled action:',scaled_action)
+
 
             # only robot whose rank(index)==0 has the state_list which contains other's state.
 
@@ -165,6 +162,13 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 env.control_vel(real_action)
             # rate.sleep()
             rospy.sleep(0.001)
+            vel1 = env.get_self_speed()
+            vel2 = env.get_self_speed_poly()
+            vel3 = env.get_self_speedGT()
+            if env.index == 0:
+                print('1:',vel1)
+                print('2:',vel2)
+                print('3:',vel3)
 
             # 3. get informtion after action(reward, info)
             r, terminal, result = env.get_reward_and_terminate(step)   # for each agents(run like dummy_vec). # float, T or F, description(o is base)
@@ -218,15 +222,16 @@ def run(comm, env, policy, policy_r, policy_path, action_bound, optimizer):     
                 '''
                 last_v, _, _, _ = generate_action_human(env=env, state_list=state_next_list, pose_list=pose_next_list, policy=policy, action_bound=action_bound)   # from orca, 211101 seperate humans and robot
                 '''
-                #v, a, logprob, scaled_action=generate_action_human_localmap(env=env, state_list=state_list, pose_list=pose_list, policy=policy, action_bound=action_bound)   # 211001
                 #print('last_v:',last_v)
                 # For Robot 211001
-                #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound)
-                last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
+                
+                #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=False)  # training
                 #last_v_r, _, _, _=generate_action_robot(env=env, state=state_next, pose=pose_next, policy=policy_r, action_bound=action_bound, evaluate=True)  # test
                 
                 
                 # TODO 2. generate_action_human with global_flowmap
+                last_v_r, _, _, _=generate_action_robot_localmap(env=env, state=state, pose=pose, policy=policy_r, action_bound=action_bound, state_list=state_list, pose_list=pose_list, evaluate=False)  # for training
+
 
                 '''
                 generate_action_rvo_dense(...,+flow_map)
@@ -378,7 +383,7 @@ if __name__ == '__main__':
 
         #file = policy_path + '/stage_city_dense_340.pth'   # policy/stage3_2.pth
         #file = policy_path + '/Stage_city_dense_280.pth'   # policy/stage3_2.pth
-        file_r = policy_path + '/final.pth'
+        file_r = policy_path + '/Robot_Stage_city_dense_global120_step266.pth'
         #file = policy_path + '/Stage3_300.pth'   # policy/stage3_2.pth
         #print('file nave:',file)
         #if os.path.exists(file):

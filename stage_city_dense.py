@@ -80,8 +80,9 @@ class StageWorld():
         self.state = None
         self.speed_GT = None
         self.state_GT = None
+        self.speed_poly = None  # 211103
         while self.scan is None or self.speed is None or self.state is None\
-                or self.speed_GT is None or self.state_GT is None:
+                or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
             pass
 
         rospy.sleep(1.)
@@ -97,6 +98,9 @@ class StageWorld():
         v_y = GT_odometry.twist.twist.linear.y
         v = np.sqrt(v_x**2 + v_y**2)
         self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
+        #self.speed_poly = [v_x, v_y]
+        self.speed_poly = GT_odometry.header.frame_id
+        #print(GT_odometry.child_frame_id)
 
     def laser_scan_callback(self, scan):
         self.scan_param = [scan.angle_min, scan.angle_max, scan.angle_increment, scan.time_increment,
@@ -122,6 +126,9 @@ class StageWorld():
 
     def get_self_speedGT(self):
         return self.speed_GT
+
+    def get_self_speed_poly(self):
+        return self.speed_poly
 
     def get_laser_observation(self):
         scan = copy.deepcopy(self.scan)  # from laser_scan_callback   # self.scan = np.array(scan.ranges)

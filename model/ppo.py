@@ -619,7 +619,6 @@ def generate_action_human(env, state_list, pose_list, policy, action_bound):   #
     #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
-#def generate_action_robot(env, state, pose, policy, action_bound):   # policy = RobotPolicy
 def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   # policy = RobotPolicy
     if env.index == 0:
         s_list, goal_list, speed_list, p_list = [], [], [], []
@@ -694,180 +693,62 @@ def generate_action_robot(env, state, pose, policy, action_bound, evaluate):   #
     #print(v, a, logprob, scaled_action)
     return v, a, logprob, scaled_action
 
-def generate_action_human_localmap(env, state_list, pose_list, policy, action_bound):   # 211001 for local mapping
+def generate_action_robot_localmap(env, state, pose, policy, action_bound, state_list, pose_list, evaluate):   # 211001 for local mapping
     if env.index == 0:
-        s_list, goal_list, speed_list = [], [], []
-        for i in state_list:
-            s_list.append(i[0])      # lidar state
-            goal_list.append(i[1])   # local goal
-            speed_list.append(i[2])  # veloclity
-
+        s_list, goal_list, speed_list, p_list = [], [], [], []
         
+        s_list = state[0]
+        goal_list = state[1]
+        speed_list = state[2]
+        p_list = pose
+
         s_list = np.asarray(s_list)
         goal_list = np.asarray(goal_list)
-        goal_list_new = goal_list  # 211021   nparray style, not torch as below
         speed_list = np.asarray(speed_list)
-
-        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
-        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
-        # 211020 pose_list create        
-        p_list = []
-        for i in pose_list:
-            p_list.append(i)
+        speed_ori = speed_list
         p_list = np.asarray(p_list)
 
-        occupancy_map = build_occupancy_maps(p_list, speed_list)   # just for one robot
+        s_list = Variable(torch.from_numpy(s_list).unsqueeze(dim=0)).float().cuda()   # (3, 512)   -> make (1, 3, 512)   # 1: num of agent(gather)
+        goal_list = Variable(torch.from_numpy(goal_list).unsqueeze(dim=0)).float().cuda()
+        speed_list = Variable(torch.from_numpy(speed_list).unsqueeze(dim=0)).float().cuda()   # erase cuda()
 
-        # Get action for robot(RVOPolicy_LM)  
-        # TODO. Check policy is RVOPolicy_LM!!
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list, occupancy_map)     # with occupancy map
-        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot
 
-        '''
-        # 211028 For NO-SAMPLING(TEST)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-        '''
+        # TODO build occupancy map
+        # get humans state
+        speed_list_human, pose_list_human = [], []  # n-1
         
-        # Get action for humans(RVO)
-        #sim = rvo2.PyRVOSimulator(1/60., 1, 5, 1.5, 1.5, 0.4, 1)
-        sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.4, 1)
-        a0=sim.addAgent(tuple(p_list[0]))  # like robot exists
-        a1=sim.addAgent(tuple(p_list[1]))
-        a2=sim.addAgent(tuple(p_list[2]))
-        a3=sim.addAgent(tuple(p_list[3]))
-        a4=sim.addAgent(tuple(p_list[4]))
-        a5=sim.addAgent(tuple(p_list[5]))
-        a6=sim.addAgent(tuple(p_list[6]))
-        a7=sim.addAgent(tuple(p_list[7]))
-        a8=sim.addAgent(tuple(p_list[8]))
-        a9=sim.addAgent(tuple(p_list[9]))
-        a10=sim.addAgent(tuple(p_list[10]))
-        a11=sim.addAgent(tuple(p_list[11]))
-        a12=sim.addAgent(tuple(p_list[12]))
-        a13=sim.addAgent(tuple(p_list[13]))
-        a14=sim.addAgent(tuple(p_list[14]))
-        a15=sim.addAgent(tuple(p_list[15]))
-        a16=sim.addAgent(tuple(p_list[16]))
-        a17=sim.addAgent(tuple(p_list[17]))
-        a18=sim.addAgent(tuple(p_list[18]))
-        a19=sim.addAgent(tuple(p_list[19]))
+        for i in state_list:  # total # number of human's state
+            speed_list_human.append(i[2])    # veloclity
+        for i in pose_list:  # total # number of human's state
+            pose_list_human.append(i)    # veloclity
+        speed_list_human = np.asarray(speed_list_human)
+        pose_list_human = np.asarray(pose_list_human)
+        '''
+        print('state:',p_list)
+        print('ve:', speed_list)
+        print('speed:',speed_list_human)
+        print('pose:', pose_list_human)
+        '''
 
-        # Obstacles are also supported # 211022   https://gamma.cs.unc.edu/RVO2/documentation/2.0/class_r_v_o_1_1_r_v_o_simulator.html#a0f4a896c78fc09240083faf2962a69f2
-        #o1 = sim.addObstacle([(2.0, 2.0), (-2.0, 2.0), (-2.0, -2.0), (2.0, -2.0)])
-        #sim.processObstacles()
-        # TODO concern about local obstacle
+        occupancy_map = build_occupancy_maps(state=p_list, velocity=speed_ori, human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
+        #print(occupancy_map)
 
-        h0v = goal_list_new[0]   # TODO because goal's here is local goal, there is no need to minus current position
-        h1v = goal_list_new[1]
-        h2v = goal_list_new[2]
-        h3v = goal_list_new[3]
-        h4v = goal_list_new[4]
-        h5v = goal_list_new[5]  
-        h6v = goal_list_new[6]
-        h7v = goal_list_new[7]
-        h8v = goal_list_new[8]
-        h9v = goal_list_new[9]
-        h10v = goal_list_new[10] 
-        h11v = goal_list_new[11]
-        h12v = goal_list_new[12]
-        h13v = goal_list_new[13]
-        h14v = goal_list_new[14]
-        h15v = goal_list_new[15]  
-        h16v = goal_list_new[16]
-        h17v = goal_list_new[17]
-        h18v = goal_list_new[18]
-        h19v = goal_list_new[19]
+        v, a, logprob, mean = policy(s_list, goal_list, speed_list, p_list)     # now create action from rvo(net.py.forward())
+        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        raw_scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])  # for Robot      # [0,-1], [1, 1]    # a = a[0], only 1 item
 
-        #h0s = np.linalg.norm(h0v)   
-        h0s = np.linalg.norm(raw_scaled_action)     # 211027   get raw_scaled action from learned policy
-        h1s = np.linalg.norm(h1v)
-        h2s = np.linalg.norm(h2v)
-        h3s = np.linalg.norm(h3v)
-        h4s = np.linalg.norm(h4v)
-        h5s = np.linalg.norm(h5v)     
-        h6s = np.linalg.norm(h6v)
-        h7s = np.linalg.norm(h7v)
-        h8s = np.linalg.norm(h8v)
-        h9s = np.linalg.norm(h9v)
-        h10s = np.linalg.norm(h10v)         
-        h11s = np.linalg.norm(h11v)
-        h12s = np.linalg.norm(h12v)
-        h13s = np.linalg.norm(h13v)
-        h14s = np.linalg.norm(h14v)
-        h15s = np.linalg.norm(h15v)       
-        h16s = np.linalg.norm(h16v)
-        h17s = np.linalg.norm(h17v)
-        h18s = np.linalg.norm(h18v)
-        h19s = np.linalg.norm(h19v)
-
-        prefv0=h0v/h0s if h0s >1 else h0v
-        prefv1=h1v/h1s if h1s >1 else h1v
-        prefv2=h2v/h2s if h2s >1 else h2v
-        prefv3=h3v/h3s if h3s >1 else h3v
-        prefv4=h4v/h4s if h4s >1 else h4v
-        prefv5=h5v/h5s if h5s >1 else h5v
-        prefv6=h6v/h6s if h6s >1 else h6v
-        prefv7=h7v/h7s if h7s >1 else h7v
-        prefv8=h8v/h8s if h8s >1 else h8v
-        prefv9=h9v/h9s if h9s >1 else h9v
-        prefv10=h10v/h10s if h10s >1 else h10v
-        prefv11=h11v/h11s if h11s >1 else h11v
-        prefv12=h12v/h12s if h12s >1 else h12v
-        prefv13=h13v/h13s if h13s >1 else h13v
-        prefv14=h14v/h14s if h14s >1 else h14v
-        prefv15=h15v/h15s if h15s >1 else h15v
-        prefv16=h16v/h16s if h16s >1 else h16v
-        prefv17=h17v/h17s if h17s >1 else h17v
-        prefv18=h18v/h18s if h18s >1 else h18v
-        prefv19=h19v/h19s if h19s >1 else h19v
-
-        sim.setAgentPrefVelocity(a0, tuple(prefv0))
-        sim.setAgentPrefVelocity(a1, tuple(prefv1))
-        sim.setAgentPrefVelocity(a2, tuple(prefv2))
-        sim.setAgentPrefVelocity(a3, tuple(prefv3))
-        sim.setAgentPrefVelocity(a4, tuple(prefv4))
-        sim.setAgentPrefVelocity(a5, tuple(prefv5))
-        sim.setAgentPrefVelocity(a6, tuple(prefv6))
-        sim.setAgentPrefVelocity(a7, tuple(prefv7))
-        sim.setAgentPrefVelocity(a8, tuple(prefv8))
-        sim.setAgentPrefVelocity(a9, tuple(prefv9))
-        sim.setAgentPrefVelocity(a10, tuple(prefv10))
-        sim.setAgentPrefVelocity(a11, tuple(prefv11))
-        sim.setAgentPrefVelocity(a12, tuple(prefv12))
-        sim.setAgentPrefVelocity(a13, tuple(prefv13))
-        sim.setAgentPrefVelocity(a14, tuple(prefv14))
-        sim.setAgentPrefVelocity(a15, tuple(prefv15))
-        sim.setAgentPrefVelocity(a16, tuple(prefv16))
-        sim.setAgentPrefVelocity(a17, tuple(prefv17))
-        sim.setAgentPrefVelocity(a18, tuple(prefv18))
-        sim.setAgentPrefVelocity(a19, tuple(prefv19))
-
-        sim.doStep()
-
-        scaled_action = raw_scaled_action, sim.getAgentVelocity(1), sim.getAgentVelocity(2), sim.getAgentVelocity(3), sim.getAgentVelocity(4),sim.getAgentVelocity(5), sim.getAgentVelocity(6), sim.getAgentVelocity(7), sim.getAgentVelocity(8), sim.getAgentVelocity(9), sim.getAgentVelocity(10), sim.getAgentVelocity(11), sim.getAgentVelocity(12), sim.getAgentVelocity(13), sim.getAgentVelocity(14),sim.getAgentVelocity(15), sim.getAgentVelocity(16), sim.getAgentVelocity(17), sim.getAgentVelocity(18), sim.getAgentVelocity(19)
+        if evaluate:
+            mean = mean.data.cpu().numpy()
+            scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
+            
+        scaled_action = raw_scaled_action
+        
         
     else:  # env.index =! 0
         v = None
         a = None
         scaled_action = None
         logprob = None
-
-
-    # FOR NO-SAMPLING(TEST)
-    '''
-        _, _, _, mean = policy(s_list, goal_list, speed_list)
-        mean = mean.data.cpu().numpy()
-        scaled_action = np.clip(mean, a_min=action_bound[0], a_max=action_bound[1])
-    else:
-        mean = None
-        scaled_action = None
-    
-    return mean, scaled_action
-    '''
 
     return v, a, logprob, scaled_action
 
@@ -1253,54 +1134,79 @@ def get_parameters():   # 211027 for logging
     #return info_p_losss, info_v_losss, info_entropys, total_losss
     return info_p_losss, info_v_losss, info_entropys
 
-def build_occupancy_maps(self, human_states, human_velocities):
+def build_occupancy_maps(state, velocity, human_states, human_velocities):
     '''
     param human_states:
     return: tensor of shape
     '''
     occupancy_maps = []
+    #print(state, velocity, human_states, human_velocities)
 
-    other_humans_pose = np.concatenate([np.array([(other_human.px, other_human.py)]) for other_human in human_states[1:]], axis=0)   # except robot self
-    other_humans_vel = np.concatenate([np.array([(other_human.vx, other_human.vy)]) for other_human in human_velocities[1:]], axis=0)   # except robot self
+    #other_humans_pose = np.concatenate([np.array([(other_human.px, other_human.py)]) for other_human in human_states[1:]], axis=0)   # except robot self
+    #other_humans_vel = np.concatenate([np.array([(other_human.vx, other_human.vy)]) for other_human in human_velocities[1:]], axis=0)   # except robot self
+    other_humans_pose = human_states[1:]
+    other_humans_vel = human_velocities[1:]
     other_px = other_humans_pose[:,0] - human_states[0][0]
     other_py = other_humans_pose[:,1] - human_states[0][1]
+        #print('1st:',other_px, other_py)
     # new x-axis is in the direction of robot's velocity
     robot_velocity_angle = np.arctan2(human_velocities[0][1], human_velocities[0][0])
     other_human_orientation = np.arctan2(other_py, other_px)
     rotation = other_human_orientation - robot_velocity_angle
     distance = np.linalg.norm([other_px, other_py], axis=0)
+        #print('other_human_orien:',other_human_orientation)
+        #print('robot_velocity_angle:',robot_velocity_angle)
+        #print('rotation:',rotation)
+        #print('distance:',distance)
     other_px = np.cos(rotation) * distance
-    other_py = np.cos(rotation) * distance
+    other_py = np.sin(rotation) * distance
+        #print('2nd:',other_px, other_py)
 
     # compute indicies of humans in the grid
-    self.cell_size = 1
-    self.cell_num = 4
-    self.om_channel_size = 3
-    other_x_index = np.floor(other_px / self.cell_size + self.cell_num / 2)   # other_px / 1 + 2
-    other_y_index - np.floor(other_py / self.cell_size + self.cell_num / 2)
+    cell_size = 1
+    cell_num = 4
+    om_channel_size = 1
+    other_x_index = np.floor(other_px / cell_size + cell_num / 2)   # other_px / 1 + 2
+    other_y_index = np.floor(other_py / cell_size + cell_num / 2)
+        #print('other_x_index=',other_x_index,other_y_index)
     other_x_index[other_x_index < 0] = float('-inf')
-    other_x_index[other_x_index >= self.cell_num] = float('-inf')
+    other_x_index[other_x_index >= cell_num] = float('-inf')   # -inf [0,1,2,3] -inf
     other_y_index[other_y_index < 0] = float('-inf')
-    other_y_index[other_y_index >= self.cell_num] = float('-inf')
-    grid_indices = self.cell_num * other_y_index + other_x_index
-    occupancy_map = np.isin(range(self.cell_num ** 2), grid_indices)
+    other_y_index[other_y_index >= cell_num] = float('-inf')   # -inf [0,1,2,3] -inf
+        #print('refined index=',other_x_index, other_y_index)
+    grid_indices = cell_num * other_y_index + other_x_index    # y_index is y-axis, x_index is x-axis
+        #print('grid_indicies:',grid_indices)    # each human's indiv. call num. 0(SW) ~ 15(NE), if |x|>2 or |y|>2, then -inf
+    occupancy_map = np.isin(range(cell_num ** 2), grid_indices)   # [0,1,2,...,15] range, is there grid_indicies?  T or F
+        #print('occupancy_map:',occupancy_map)
 
-    if self.om_channel_size == 1:   # just only consider position data
+    #OM shape: center is robot
+    '''
+    # Grid Indicies
+    [11 12 13 14
+      8  9 10 11
+      4  5  6  7
+      0  1  2  3]
+    '''
+
+    if om_channel_size == 1:   # just only consider position data
         occupancy_maps.append([occupancy_map.astype(int)])
     else:
         # calculate relative velocity for other agents
-        other_human_velocity_angles = np.arctan2(other_humans_vel[:, 3], other_humans_vel[:, 2])   # vy, vx
-        rotation = other_human_velocity_angles - robot_velocity_angle
-        speed = np.linalg.norm(other_humans_vel, axis=0)
-        other_vx = np.cos(rotation) * speed
-        other_vy = np.sin(rotation) * speed
-        dm = [list() for _ in range(self.cell_num ** 2 * self.om_channel_size)]    # 4**2 * 3 = 16*3 = 48 (each channel has 16 cells)
+        #other_human_velocity_angles = np.arctan2(other_humans_vel[:, 3], other_humans_vel[:, 2])   # vy, vx
+        #rotation = other_human_velocity_angles - robot_velocity_angle
+        #speed = np.linalg.norm(other_humans_vel, axis=0)
+        #other_vx = np.cos(rotation) * speed
+        #other_vy = np.sin(rotation) * speed
+        other_vx = other_humans_vel[:,0] - human_velocities[0][0]
+        other_vy = other_humans_vel[:,1] - human_velocities[0][1]
+        #print(other_vx, other_vy)
+        dm = [list() for _ in range(cell_num ** 2 * om_channel_size)]    # 4**2 * 3 = 16*3 = 48 (each channel has 16 cells)
         for i, index in np.ndenumerate(grid_indices):
-            if index in range(self.cell_num ** 2):   # range 16
-                if self.om_channel_size == 2:
+            if index in range(cell_num ** 2):   # range 16
+                if om_channel_size == 2:
                     dm[2 * int(index)].append(other_vx[i])
                     dm[2 * int(index) + 1].append(other_vy[i])
-                elif self.om_channel_size == 3:      # maybe pose, vx, and vy??
+                elif om_channel_size == 3:      # maybe pose, vx, and vy??
                     dm[3 * int(index)].append(1)
                     dm[3 * int(index) + 1].append(other_vx[i])
                     dm[3 * int(index) + 2].append(other_vy[i])
@@ -1310,6 +1216,10 @@ def build_occupancy_maps(self, human_states, human_velocities):
             dm[i] = sum(dm[i]) / len(dm[i]) if len(dm[i]) != 0 else 0
         occupancy_maps.append([dm])
 
-    print('occupancy map:', occupancy_map)
+
+    px_list, py_list, vx_list, vy_list = [],[],[],[]
+
+
+    #print('occupancy map:', occupancy_maps)
     return occupancy_map
     # return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()
