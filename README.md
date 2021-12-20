@@ -72,13 +72,15 @@ tensorboard --logdir runs/
 ```
 # TODOList
 "MOST PRIOR TASK"
+```
 1. LIDAR t-10, t-5, t
 2. visualise LIDAR as 3*512 2D MAP
 3. model humans behavior by social force
 4. robot only use 1 single mpiexec: human behavior(con_vel) is controlled by other python file, not implementing mpiexecs
    because base human agent already created by groups.world.
 5. validate buffer saver
-6
+```
+
 
 ```
 - [x] seperate human and robot policy: generate_action_human(), generate_action_robot() or generate_action_robot_localmap()
@@ -90,15 +92,19 @@ tensorboard --logdir runs/
 - [ ] enhance collision checking module: make 360degree lidar for collision detection
 - [x] Fix segmentation fault issue: in stage_world1.py, there is rospy.sleep() in reset_pose() and reset_world(). make sleep last for a longer, try: set 1.0
 - [x] save buffer for next loading: buffer and last_r_v
+```
 - 1. Generate Group human
 - (Group)Leader - Follower model
 -- Leader: Standard RVO velocity
 -- Follower: Standard RVO velocity + To-Leader velocity(maintain cohensity) sum vector velocity
+```
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
 - [ ] after reaching the goal, human change their next goal
 - [ ] using social force, create behavior of humans and groups
 - [ ] On/Off for visible/invisible robot for human
+```
 - 2. Generate Flow Map
+```
 - [x] create flowmap(local)    by 211201: ppo.py/generate_action_LM() 6x6 size
 - [ ] create flowmap(global as storage)
 - [x] enlarge local map(current 4*4): 6*6
@@ -106,24 +112,34 @@ tensorboard --logdir runs/
 - [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
 - [x] visualize local occupancy map(OpenCV)  (after 211105 meeting)
 - [x] use conv2D, rather than FC for occupancy map: 2 Conv2D, 2 MaxPool2D
+```
 - 3. Make subgroups
+```
 - [x] gather humans in similar groups
 - [ ] DBSCAN or KNN utilize (on-time real group algorithm)
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
+```
 - 4. Reward shaping (after 211217 meeting)
+```
 - [ ] future lidar collision penalty linearly(proximity)
+```
 - 5. Evaluation Metric
+```
 - [ ] most closest(minest) distance with human
 - [ ] # of intrusion of personal space
+```
 - 6. MISC
+```
 - [X] visualize LIDAR map(OpenCV)  (after 211105 meeting)  done 211220
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
 - [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t
 - [X] change python 3 environment (for social force): done 211220
+```
 
-'''
+
 - 211105, after meeting
+```
 - [x] prevent human-human collision: modify RVO
 - [x] check all states(lidar, rel.goal,vel) is right
 	- 1. stacked lidar data[sensor, sensor, sensor]. mayby sensor L/R sensor issue has
@@ -131,8 +147,9 @@ tensorboard --logdir runs/
 	- 3. velocity of robot: current translational and rotational velocity of nonholonomic robot
 - [x] as toward goal, reward is increase well?
 - [x] incremental testing: basic scene(0, 1, 2, ... 5): tested scene 0, 5(now)
-
 ```
+
+
 # checklist
 ```
 -1. [ppo_city_dense.py]policy_r=RobotPolicy or RobotPolicy_LM
@@ -140,10 +157,8 @@ tensorboard --logdir runs/
 ```
 
 # Motivation
-'''
 --- Incorporate lidar based and state based
 1. If we use only lidar data, 1) we cannot identify static obstacle and dynamic obstacle 2) loose high quality of intented human's information
 2. If we use only state based, 1) it is unrelistic that we assumed know all state of humans 2) scalability issue
 --- especially, dence scenario, above problem increased
 --- so, we utilize identified information of humans to make rigid-body movement or flow, to see high-level instance
-'''
