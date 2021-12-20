@@ -120,7 +120,7 @@ tensorboard --logdir runs/
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
 - [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t
-- [ ] change python 3 environment (for social force)
+- [X] change python 3 environment (for social force): done 211220
 
 '''
 - 211105, after meeting
