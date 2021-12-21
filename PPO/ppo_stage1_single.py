@@ -20,7 +20,7 @@ from collections import deque #test
 from model.net import MLPPolicy, CNNPolicy, stacked_LM_Policy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_LM, generate_action_stacked_LM
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 
 
@@ -71,8 +71,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     for id in range(MAX_EPISODES):
         # senario reset option
-        if env.index ==0:    # 211129
-            env.reset_world()   # TODO maybe this part be problem
+        #if env.index ==0:    # 211129
+        #    env.reset_world()   # TODO maybe this part be problem
 
         #env.reset_pose()
         #env.generate_goal_point()
@@ -115,8 +115,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
 
             # generate humans action_space
-            #human_actions=generate_action_human(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            human_actions=generate_action_human_groups(env=env, state_list=state_list, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            #human_actions=generate_action_human(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            #human_actions=generate_action_human_groups(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
+            human_actions=generate_action_human_sf(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)
+            
 
             # generate robot action (at rank==0)
             if env.index==0:
@@ -139,10 +141,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 diff = angles - rot
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
                 #mod_vel = (length, diff)
-                difficulty = 1
+                difficulty = 2
                 mod_vel = (length/difficulty, diff/difficulty)   # make more ease, erase me!
                 env.control_vel(mod_vel)   # 211108
-                #env.control_vel([0,0])   # 211108
+                
             # rate.sleep()
             rospy.sleep(0.001)
 

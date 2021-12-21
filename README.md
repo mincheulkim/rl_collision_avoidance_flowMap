@@ -75,8 +75,7 @@ tensorboard --logdir runs/
 ```
 1. LIDAR t-10, t-5, t
 3. model humans behavior by social force
-4. robot only use 1 single mpiexec: human behavior(con_vel) is controlled by other python file, not implementing mpiexecs
-   because base human agent already created by groups.world.
+
 5. validate buffer saver
 ```
 
@@ -161,3 +160,8 @@ tensorboard --logdir runs/
 2. If we use only state based, 1) it is unrelistic that we assumed know all state of humans 2) scalability issue
 --- especially, dence scenario, above problem increased
 --- so, we utilize identified information of humans to make rigid-body movement or flow, to see high-level instance
+
+# Deprecated
+4. robot only use 1 single mpiexec: human behavior(con_vel) is controlled by other python file, not implementing mpiexecs
+   because base human agent already created by groups.world.
+   -> anyway, already agents are built by ros, it is useless. also, to load subscriber is very hard to do

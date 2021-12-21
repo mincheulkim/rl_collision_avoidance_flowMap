@@ -8,6 +8,8 @@ import numpy as np
 import socket
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import rvo2
+import pysocialforce as psf
+
 
 hostname = socket.gethostname()
 if not os.path.exists('./log/' + hostname):
@@ -161,7 +163,7 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
             mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
             
             
-            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i is not 0:
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                 #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
                 local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
             #print('i:',mod_diff_y, mod_diff_x, i)
@@ -224,7 +226,7 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
                 mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
                 
                 
-                if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i is not 0:
+                if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                     #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
                     if (j==0 and i in [1, 2, 3]) or (j==1 and i in [4, 5]) or (j==2 and i in [6]):  # FIXME. assign humans to groups
                         #print('done j,i set:', j, i)
@@ -297,25 +299,8 @@ def generate_action_no_sampling(env, state_list, policy, action_bound):
 
     return mean, scaled_action
 
-def generate_action_human(env, state_list, pose_list, goal_global_list, num_env):   # pose_list added
+def generate_action_human(env, pose_list, goal_global_list, num_env):   # pose_list added
     if env.index == 0:
-        
-        s_list, goal_list, speed_list = [], [], []
-        for i in state_list:
-            s_list.append(i[0])      # lidar state
-            goal_list.append(i[1])   # local goal
-            speed_list.append(i[2])  # veloclity
-
-        
-        s_list = np.asarray(s_list)
-        goal_list = np.asarray(goal_list)
-        goal_list_new = goal_list  # 211021   nparray style, not torch as below
-        speed_list = np.asarray(speed_list)
-
-        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
-        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
         # 211020 pose_list create        
         p_list = []
         for i in pose_list:
@@ -326,7 +311,6 @@ def generate_action_human(env, state_list, pose_list, goal_global_list, num_env)
         #sim = rvo2.PyRVOSimulator(1/60., num_env, 5, 3, 3, 0.4, 1)
         
         sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
-        #callback
 
         for i in range(num_env):  # i=0, 1,2,3,4
             if i >= 1:
@@ -362,24 +346,8 @@ def generate_action_human(env, state_list, pose_list, goal_global_list, num_env)
     return scaled_action
 
 # 211129
-def generate_action_human_groups(env, state_list, pose_list, goal_global_list, num_env):
+def generate_action_human_groups(env, pose_list, goal_global_list, num_env):
     if env.index == 0:
-
-        s_list, goal_list, speed_list = [], [], []
-        for i in state_list:
-            s_list.append(i[0])      # lidar state
-            goal_list.append(i[1])   # local goal
-            speed_list.append(i[2])  # veloclity
-
-        s_list = np.asarray(s_list)
-        goal_list = np.asarray(goal_list)
-        goal_list_new = goal_list  # 211021   nparray style, not torch as below
-        speed_list = np.asarray(speed_list)
-
-        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
-        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
         # 211020 pose_list create        
         p_list = []
         for i in pose_list:
@@ -456,16 +424,71 @@ def generate_action_human_groups(env, state_list, pose_list, goal_global_list, n
                 togo_diff_norm = np.linalg.norm(togo_diff)     # 211027   get raw_scaled action from learned policy
                 togo_diff_prefv=togo_diff/togo_diff_norm if togo_diff_norm >1 else togo_diff
                 scaled_action[i] += togo_diff_prefv*tendency
-                
-
+            
             elif i in [5]:   # 4 with 5
                 togo_diff = pose_list[4] - pose_list[i]
                 togo_diff_norm = np.linalg.norm(togo_diff)     # 211027   get raw_scaled action from learned policy
                 togo_diff_prefv=togo_diff/togo_diff_norm if togo_diff_norm >1 else togo_diff
                 scaled_action[i] += togo_diff_prefv*tendency
-                
+    else:  # env.index =! 0
+        scaled_action = None
+    
+    return scaled_action
 
+def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211221
+    if env.index == 0:
+
+        human_max_speed = 1.0
+        p_list = []
+        scaled_action = []
         
+        for i in pose_list:
+            p_list.append(i)
+        p_list = np.asarray(p_list)
+
+        # 1. initial states
+        initial_state = np.zeros((num_env, 6))
+
+        for i in range(num_env):  # i=0, 1,2,3,4            
+            hv = goal_global_list[i] - p_list[i] 
+            hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+            prefv=hv/hs if hs >human_max_speed else hv
+            initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
+
+        # 2. group #################################
+        groups = []
+        groups.append([])  # 0 grp as robot
+        groups.append([])  # 1 grp 3 human
+        groups.append([])  # 2 groups 2 human
+        groups.append([])  # 3 groups 1 human
+
+        # assign humans to groups
+        groups[0].append(0)
+        groups[1].append(1)
+        groups[1].append(2)
+        groups[1].append(3)
+        groups[2].append(4)
+        groups[2].append(5)
+        groups[3].append(6)
+
+        # 3. assign obstacles
+        #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
+        
+        # 4. initiate simulator
+        psf_sim = psf.Simulator(
+                #initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/default.toml"
+                initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
+            )
+        # do 1 updates
+        psf_sim.step(n=1)
+        ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
+
+        # 5. visualize
+        #with psf.plot.SceneVisualizer(psf_sim, "output_image_sf") as sv:
+        #    sv.animate()
+        
+        for i in range(num_env):
+            scaled_action.append([ped_states[1][i][2],ped_states[1][i][3]])
         
     else:  # env.index =! 0
         scaled_action = None
