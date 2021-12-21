@@ -74,7 +74,6 @@ tensorboard --logdir runs/
 "MOST PRIOR TASK"
 ```
 1. LIDAR t-10, t-5, t
-2. visualise LIDAR as 3*512 2D MAP
 3. model humans behavior by social force
 4. robot only use 1 single mpiexec: human behavior(con_vel) is controlled by other python file, not implementing mpiexecs
    because base human agent already created by groups.world.
