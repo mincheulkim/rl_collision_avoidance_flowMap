@@ -46,7 +46,7 @@ LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
 blind_human = True
 
 
@@ -71,8 +71,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     for id in range(MAX_EPISODES):
         # senario reset option
-        #if env.index ==0:    # 211129
-        #    env.reset_world()   # TODO maybe this part be problem
+        if env.index ==0:    # 211129
+            env.reset_world()   # TODO maybe this part be problem
 
         #env.reset_pose()
         #env.generate_goal_point()
@@ -132,18 +132,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
-
+            
             # distribute actions btwn robot and humans
             if env.index == 0:
+                #print('0-0-------')
                 env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
+                #print('index 0 action:',scaled_action)
             else: # pre-RVO vel, humans
                 angles = np.arctan2(real_action[1], real_action[0])
                 diff = angles - rot
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
-                #mod_vel = (length, diff)
+                
                 difficulty = 2
-                mod_vel = (length/difficulty, diff/difficulty)   # make more ease, erase me!
-                env.control_vel(mod_vel)   # 211108
+                scaled_action = (length/difficulty, diff/difficulty)   # make more ease, erase me!
+                env.control_vel(scaled_action)   # 211108
                 
             # rate.sleep()
             rospy.sleep(0.001)
@@ -178,7 +180,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 cv2.waitKey(1)
 
             # get informtion
-            r, terminal, result = env.get_reward_and_terminate(step)
+            
+            #r, terminal, result = env.get_reward_and_terminate(step)
+            r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty
             ep_reward += r
             global_step += 1
 

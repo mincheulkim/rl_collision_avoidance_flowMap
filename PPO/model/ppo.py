@@ -134,7 +134,6 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
     
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []
-        s_total_list, goal_total_list, speed_total_list = [], [], []
         for i in state_list:
             s_list.append(i[0])
             goal_list.append(i[1])
@@ -189,7 +188,9 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         
         v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        #scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        scaled_action = a[0]   # 211221 no scailing
+        
     else:
         v = None
         a = None
@@ -265,7 +266,10 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
 
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+        #scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        scaled_action = a[0]   # 211221 no scailing
+        
     else:
         v = None
         a = None

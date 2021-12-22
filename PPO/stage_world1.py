@@ -213,11 +213,12 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
 
     # TODO: Reward reshape: penalty for circuling around
-    def get_reward_and_terminate(self, t):   # t is increased 1, but initializezd 1 when terminate=True
+    def get_reward_and_terminate(self, t, scaled_action):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state
         [v, w] = self.get_self_speedGT()            # updated current velocity
+
         self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
         # Propotional Reward
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
@@ -252,19 +253,38 @@ class StageWorld():
             reward_c = -15.
             result = 'Crashed'
 
+        
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
-
-        '''    # for future lidar collision penalty
-        if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
-            reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
+            #reward_w = -0.45 * np.abs(w) **2
         '''
+        if np.abs(scaled_action[1])>1.05:
+            reward_w = -0.45 * np.abs(scaled_action[1])**2    # 211221 from DSRNN
+        '''
+
+        # 211221 add a penalty for going backwoards
+        if scaled_action[0]<0:
+            r_back = -0.45 * np.abs(scaled_action[0])
+        else:
+            r_back = 0
+        #if self.index==0:
+        #        print('v:',scaled_action[0],'w:',scaled_action[1],'rot_penalty:',reward_w,'r_back:',r_back)
 
         #if t > 150:  # timeout check
         if t > 1000:  # timeout check  211020 for long-term
             terminate = True
             result = 'Time out'
+        
+        '''    # for future lidar collision penalty
+        if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
+            reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
+        '''            
+        
+        # 211221 for unicycle model, backward penalty
         reward = reward_g + reward_c + reward_w
+        #reward = reward_g + reward_c + reward_w + r_back # 211221
+        #if self.index==0:
+        #    print(reward, 'reward_g:',reward_g, 'reward_b:',r_back)
         '''
         else:  # TODO time penalty
             reward_t = -0.1
