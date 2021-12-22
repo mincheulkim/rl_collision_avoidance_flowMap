@@ -1,0 +1,138 @@
+show_clock 0
+show_clock_interval 10000
+resolution 0.2
+threads 16
+#speedup 1
+# -1: for maximum run time
+#speedup -1.000
+#speedup 20
+speedup 5
+#speedup -1
+
+
+define sicklaser ranger
+(
+  sensor(
+    pose [ 0 0 0.1 0 ]    # laser position?
+    fov 180
+    range [ 0.0 6.0 ]     # min, max range
+    samples 512
+  )
+  color "random"
+  block( 
+    points 4
+    point[0] [0 0]
+    point[1] [0 1]
+    point[2] [1 1]
+    point[3] [1 0]
+    z [0 0.21]
+    # z [0 1]  # try it!  
+  )
+)
+
+
+define floorplan model
+(
+  color "gray30"
+  #boundary 1
+  # 211110
+  boundary 1   
+
+  gui_nose 0
+  gui_grid 0
+  gui_move 1
+  gui_outline 0
+  gripper_return 0
+  fiducial_return 0
+  ranger_return 1.000
+  obstacle_return 1
+)
+
+floorplan
+(
+  name "Group Circle"
+  size [20.000 20.000 0.800]            # floor size
+  pose [0.000 0.000 0.000 0.000]
+  bitmap "rink.png"
+)
+
+window
+(
+  size [799 800]         # (important) total window size
+  
+# Camera options 
+  scale 35.000          
+  #center [-2.661  -1.640]
+  center [ 0.000  0.000]
+  #rotate [ 0.000  -32.000 ]
+  rotate [ 0.000  0.000 ]
+
+
+# GUI options
+  show_data 1
+  show_flags 1
+  show_blocks 1
+  show_clock 1
+  show_footprints 1
+  show_grid 1
+  show_trailarrows 0
+  show_trailrise 0
+  show_trailfast 0
+  show_occupancy 0
+
+)
+
+
+
+
+define agent position
+(
+  # actual size
+  #size [0.440 0.380 0.220] # sizes from MobileRobots' web site
+  size [0.380 0.380 0.220] # sizes from MobileRobots' web site
+
+  localization "gps"
+  # the pioneer's center of rotation is offset from its center of area
+  origin [0.000 0.000 0.000 0.000]
+
+  # draw a nose on the robot so we can see which way it points
+  gui_nose 1
+
+  color "random"
+  drive "diff"		 	# Differential steering model.
+  obstacle_return 1           	# Can hit things.
+  ranger_return 0.500            	# reflects sonar beams
+  blob_return 1               	# Seen by blobfinders  
+  fiducial_return 1           	# Seen as "1" fiducial finders
+  sicklaser(
+	pose [ 0.000 0.000 0.000 0.000 ] 
+  )
+  
+  # [ xmin xmax ymin ymax zmin zmax amin amax ]				
+  # velocity_bounds [-0.5 0.5 0 0 0 0 -90.0 90.0 ]					
+  # acceleration_bounds [-0.5 0.5 0 0 0 0 -90 90.0 ]
+  )
+
+# for init fixed pose start
+# For robot(index=0)
+agent( pose [0.00 -8.00 0.00 90.00] name "robot" color "red")
+
+# Total 10 humans
+# Total 3 Groups
+# ref. Don't be Rude! Learning Group-aware Policies for Robot Navigation
+# Group 1: 5 humans
+agent( pose [-5.00 -5.00 0.00 45.00])   # human1, Leader
+agent( pose [-6.00 -5.00 0.00 45.00])  # human2
+agent( pose [-5.00 -6.00 0.00 45.00])  # human3
+agent( pose [-6.00 -6.00 0.00 45.00])  # human4
+agent( pose [-5.50 -5.50 0.00 45.00])  # human5
+
+# Group 2: 3 humans
+agent( pose [-5.00 5.00 0.00 315.00])    # human6, Leader
+agent( pose [-6.00 5.00 0.00 315.00])    # human7
+agent( pose [-5.00 6.00 0.00 315.00])    # human8
+
+
+# Group 3: 2 humans
+agent( pose [7.00 0.00 0.00 225.00])     # human9
+agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10

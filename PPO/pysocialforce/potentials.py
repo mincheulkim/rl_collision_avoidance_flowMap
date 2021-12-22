@@ -25,7 +25,10 @@ class PedPedPotential(object):
         """
         speeds_b = np.expand_dims(speeds, axis=0)
         speeds_b_abc = np.expand_dims(speeds_b, axis=2)  # abc = alpha, beta, coordinates
-        e_b = np.expand_dims(desired_directions, axis=0)
+        #print('desired_directions:',desired_directions)
+        #print('expanded_deisred_directions:',np.expand_dims(desired_directions[0],axis=0))
+        #e_b = np.expand_dims(desired_directions, axis=0)   # original
+        e_b = np.expand_dims(desired_directions[0], axis=0)   # maybe fixed?  by 211222
 
         in_sqrt = (
             np.linalg.norm(r_ab, axis=-1)

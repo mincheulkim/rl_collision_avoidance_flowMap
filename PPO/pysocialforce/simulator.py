@@ -41,6 +41,7 @@ class Simulator:
         self.config = DefaultConfig()
         if config_file:
             self.config.load_config(config_file)
+            
         # TODO: load obstacles from config
         self.scene_config = self.config.sub_config("scene")
         # initiate obstacles
@@ -58,8 +59,8 @@ class Simulator:
             forces.DesiredForce(),
             forces.SocialForce(),
             forces.ObstacleForce(),
-            # forces.PedRepulsiveForce(),
-            # forces.SpaceRepulsiveForce(),
+            forces.PedRepulsiveForce(),
+            forces.SpaceRepulsiveForce(),   # validate 211222
         ]
         group_forces = [
             forces.GroupCoherenceForceAlt(),

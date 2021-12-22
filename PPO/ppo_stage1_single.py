@@ -39,14 +39,15 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
 CLIP_VALUE = 0.2
-NUM_ENV = 7
+#NUM_ENV = 7
+NUM_ENV = 11 # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
+policy_list = ''      # select policy. [LM, stacked_LM, '']
 blind_human = True
 
 
@@ -71,17 +72,35 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     for id in range(MAX_EPISODES):
         # senario reset option
+        init_poses = None
+        init_goals = None
+        
         if env.index ==0:    # 211129
             env.reset_world()   # TODO maybe this part be problem
+            #TODO reset initial start pose for robot and humans
+            # TODO reset goal pose for robot and humans
+            # calculate whole init poses and init goals from main
+            
+            init_poses, init_goals = env.initialize_pose_robot_humans()   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
+        print('init_pose:',init_poses)
+        #print('init_goal:',init_goals)
+            
+        init_pose = comm.scatter(init_poses, root=0)
+        init_goal = comm.scatter(init_goals, root=0)
+        env.set_init_pose(init_pose)
+        env.set_init_goal(init_goal)
+
+            
+            
 
         #env.reset_pose()
         #env.generate_goal_point()
         # use this one!
-        env.generate_pose_goal_circle()  # shafeshift above two line
+        #env.generate_pose_goal_circle()  # shafeshift above two line
 
-        if env.is_crashed:   # 211201
-            env.generate_pose_goal_circle()
-            env.is_crashed = False
+        #if env.is_crashed:   # 211201
+        #    env.generate_pose_goal_circle()
+        #    env.is_crashed = False
 
         terminal = False
         ep_reward = 0
@@ -100,12 +119,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
         goal_global = np.asarray(env.get_goal_point())
 
-
         while not terminal and not rospy.is_shutdown():
-
+            
             state_list = comm.gather(state, root=0)
-
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
+            #print(pose_list)
             speed_poly_list = comm.gather(speed_poly, root=0)
             goal_global_list = comm.gather(goal_global, root=0)
 
@@ -117,9 +135,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate humans action_space
             #human_actions=generate_action_human(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             #human_actions=generate_action_human_groups(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            human_actions=generate_action_human_sf(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)
             
-
+            
             # generate robot action (at rank==0)
             if env.index==0:
                 if policy_list=='LM':  # LM: 60x60
@@ -133,18 +151,24 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # execute actions
             real_action = comm.scatter(human_actions, root=0)
             
+            
             # distribute actions btwn robot and humans
             if env.index == 0:
-                #print('0-0-------')
                 env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
-                #print('index 0 action:',scaled_action)
             else: # pre-RVO vel, humans
                 angles = np.arctan2(real_action[1], real_action[0])
                 diff = angles - rot
-                length = np.sqrt([real_action[0]**2+real_action[1]**2])
                 
-                difficulty = 2
-                scaled_action = (length/difficulty, diff/difficulty)   # make more ease, erase me!
+                # fix SF rotational issus 211222
+                if diff<=-np.pi:
+                        #diff = np.pi+(angles-np.pi)-rot
+                        diff = (2*np.pi)+diff
+                elif diff>np.pi:
+                        #diff = -np.pi-(np.pi+angles)-rot
+                        diff = diff - (2*np.pi)
+                
+                length = np.sqrt([real_action[0]**2+real_action[1]**2])
+                scaled_action = (length, diff)   
                 env.control_vel(scaled_action)   # 211108
                 
             # rate.sleep()
@@ -183,6 +207,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             #r, terminal, result = env.get_reward_and_terminate(step)
             r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty
+            if env.index != 0:
+                terminal = False
             ep_reward += r
             global_step += 1
 
@@ -288,6 +314,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+            #if env.index ==0:
+            #    print('termina:',terminal)
+            
 
 
         #####save policy and logger##############################################################################################
@@ -300,12 +329,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 torch.save(policy, policy_path + '/Stage1_tot')
                 logger.info('########################## model saved when update {} times#########'
                             '################'.format(global_update))
+            
+            
             #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
             #distance = 0
             if not (step==2 and terminal):
                 logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
                         (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
                 logger_cal.info(ep_reward)
+                
 
         ###################################################################################################
 

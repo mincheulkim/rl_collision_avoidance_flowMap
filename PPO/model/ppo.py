@@ -445,6 +445,7 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         human_max_speed = 1.0
         p_list = []
         scaled_action = []
+        scaled_position = []
         
         for i in pose_list:
             p_list.append(i)
@@ -480,8 +481,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         
         # 4. initiate simulator
         psf_sim = psf.Simulator(
-                #initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/default.toml"
                 initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
+                # TOML doesn't work. modify directly pysocialforce/scene.py
             )
         # do 1 updates
         psf_sim.step(n=1)
@@ -492,12 +493,20 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         #    sv.animate()
         
         for i in range(num_env):
-            scaled_action.append([ped_states[1][i][2],ped_states[1][i][3]])
+            #print(i,':',ped_states[1][i][0],ped_states[1][i][1],'vel:',ped_states[1][i][2],ped_states[1][i][3])
+            vx = ped_states[1][i][2]
+            vy = ped_states[1][i][3]
+            vx = vx/1
+            vy=vy/1
+            scaled_action.append([vx,vy])
+            scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
+            
         
     else:  # env.index =! 0
         scaled_action = None
+        scaled_position = None
 
-    return scaled_action
+    return scaled_action, scaled_position
 
 
 def calculate_returns(rewards, dones, last_value, values, gamma=0.99):

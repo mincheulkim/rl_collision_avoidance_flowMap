@@ -246,9 +246,9 @@ class StageWorld():
 
         # TODO Lidar collsion check 211215
         self.collision_laser_flag(r=0.4)
-        #if self.index == 0:
+        if self.index == 0 and self.is_collision==1:
             #print(self.index, 'is_collision : ',self.is_collision, 'min_dist_LIDAR:',self.scan_min)
-        if self.is_collision == 1:
+        #if self.is_collision == 1:
             terminate = True
             reward_c = -15.
             result = 'Crashed'
@@ -313,6 +313,16 @@ class StageWorld():
         move_cmd.angular.x = 0.
         move_cmd.angular.y = 0.
         move_cmd.angular.z = action[1]
+        self.cmd_vel.publish(move_cmd)
+        
+    def control_vel_poly(self, action,diff):   # real action as array[0.123023, -0.242424]. from
+        move_cmd = Twist()
+        move_cmd.linear.x = action[0]
+        move_cmd.linear.y = action[1]
+        move_cmd.linear.z = 0.
+        move_cmd.angular.x = 0.
+        move_cmd.angular.y = 0.
+        move_cmd.angular.z = diff
         self.cmd_vel.publish(move_cmd)
 
     def control_pose(self, pose):    # pose = [x, y, theta]
@@ -495,6 +505,78 @@ class StageWorld():
             self.goal_point = [-8.0, 8.0]
         else:
             self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
+        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
+
+        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
+        self.distance = copy.deepcopy(self.pre_distance)
+        
+        
+    def initialize_pose_robot_humans(self):   # 211222
+        # reset pose
+        #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
+        '''
+        random_pose = self.generate_group_pose()   # 211129. Groups initialize
+        #rospy.sleep(0.01)
+        rospy.sleep(1.0)   # too laggy
+        self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
+        [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
+
+        # start_time = time.time()
+        while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
+            [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
+            self.control_pose(random_pose)
+
+        #rospy.sleep(0.01)
+        rospy.sleep(1.0)   # too laggy
+        self.is_crashed=False
+
+        # reset goal
+        #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
+        self.init_pose = self.get_self_stateGT()
+        if self.index == 0:
+            # for cross scene
+            self.goal_point = [0, 8]
+            # for city scene
+            #self.goal_point = [-13, 10]
+        elif self.index in [1,2,3]:
+            self.goal_point = [8.0, 0.0]
+        elif self.index in [4,5]:
+            self.goal_point = [0.0, -8.0]
+        elif self.index in [6]:
+            self.goal_point = [-8.0, 8.0]
+        else:
+            self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
+        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
+
+        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
+        self.distance = copy.deepcopy(self.pre_distance)
+        '''
+        
+        
+        return [[0,-8,0.785],
+                [-5,-5,0.785],[-6,-6,0.785],[-6,-5,0.785],[-5,-6,0.785],[-7,-6,0.785],
+                [-5,5,0.785],[-5,6,0.785],[-6,5,0.785],
+                [7,1,0.785*4],[7,2,0.785*4]],[
+                    [0,8],
+                    [5,5],[6,6],[6,5],[5,6],[7,6],
+                    [5,-5],[5,-6],[6,-5],
+                    [-7,-1],[-7,-2]]
+        '''
+        return [[-2,-8,0.785],
+                [-7,-0,0.785],[-6,-0,0.785],[-5,-0,0.785],[-4,-0,0.785],[-3,-0,0.785],
+                [-2,0,0.785],[-1,0,0.785],[-0,0,0.785],
+                [1,0,0.785],[2,0,0.785]],[[0,8],[6,6],[7,7],[7,6],[6,7],[7,7],[6,-6],[6,-7],[7,-6],[-8,0],[-7,0]]
+        '''
+        
+        
+    def set_init_pose(self, init_pose):
+        self.control_pose(init_pose)   # create pose(Euler or quartanion) for ROS
+        [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
+        rospy.sleep(0.01)
+        
+    
+    def set_init_goal(self, init_goal):
+        self.goal_point = [init_goal[0],init_goal[1]]                 
         [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal

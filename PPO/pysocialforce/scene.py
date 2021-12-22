@@ -11,9 +11,12 @@ class PedState:
 
     def __init__(self, state, groups, config):
         self.default_tau = config("tau", 0.5)
-        self.step_width = config("step_width", 0.4)
-        self.agent_radius = config("agent_radius", 0.35)
-        self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
+        self.step_width = config("step_width", 0.4)  # How long it will see?
+        #self.step_width = config("step_width", 1.0)
+        #self.agent_radius = config("agent_radius", 0.35)
+        self.agent_radius = config("agent_radius", 1.0)
+        #self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
+        self.max_speed_multiplier = config("max_speed_multiplier", 0.8)   # control Max speed
 
         self.max_speeds = None
         self.initial_speeds = None
