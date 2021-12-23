@@ -22,6 +22,7 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
+#from test import Test
 
 
 MAX_EPISODES = 5000
@@ -40,7 +41,7 @@ COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
 CLIP_VALUE = 0.2
 #NUM_ENV = 7
-NUM_ENV = 11 # worlds/Group_circle.world
+NUM_ENV = 1 # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
@@ -91,15 +92,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i, init_pose in enumerate(init_poses):
                 env.control_pose_specific(init_pose, i)
                    
-        init_pose = comm.scatter(init_poses, root=0)
-        init_goal = comm.scatter(init_goals, root=0)
+        #init_pose = comm.scatter(init_poses, root=0)
+        #init_goal = comm.scatter(init_goals, root=0)
         #print('id:',env.index, 'termina:',terminal)
-        env.set_init_pose(init_pose)
-        env.set_init_goal(init_goal)
+        #env.set_init_pose(init_pose)
+        env.set_init_goal(init_goals[0])
         
-        rospy.sleep(1)
+        #rospy.sleep(1)
+        #print(';;;;;;;;;;;;;;;;;;;;;')
+        #print('original pose:',init_poses)
+        #print('init_goal:',init_goals)
         
-        
+        #test=Test()
         
             
             
@@ -127,14 +131,15 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         rot = np.asarray(pose_ori[2])
 
         goal_global = np.asarray(env.get_goal_point())
+        
 
         while not terminal and not rospy.is_shutdown():
             
             state_list = comm.gather(state, root=0)
-            pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
+            #pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             
             speed_poly_list = comm.gather(speed_poly, root=0)
-            goal_global_list = comm.gather(goal_global, root=0)
+            #goal_global_list = comm.gather(goal_global, root=0)
 
             env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
 
@@ -144,28 +149,70 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # generate humans action_space
             #human_actions=generate_action_human(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
             #human_actions=generate_action_human_groups(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)
+            
+            
+            #print('pose_list:',pose_list)
+            #print('goal_global_list:',goal_global_list)
+            
+            pose_list = env.pose_list
+            goal_global_list = init_goals
+            pose_list = np.array(pose_list)
+            #print('1st:',pose_list)
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=11)
+            #print('human actions:',human_actions[2])
             
             
             # generate robot action (at rank==0)
             if env.index==0:
                 if policy_list=='LM':  # LM: 60x60
-                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                                                                         # env, state_list, pose_list, velocity_poly_list, policy, action_bound
                 elif policy_list=='stacked_LM':
-                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
 
             # execute actions
-            real_action = comm.scatter(human_actions, root=0)
+            
+            for i in range(11):
+                if i==0:
+                    env.control_vel_specific(scaled_action, i)
+                else:
+                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])
+                    
+                    #diff = angles - rot
+                    diff = angles - pose_list[i,2]
+                    #if i==2:
+                    #    print('angle:',angles,'rot:',rot,'diff:',diff)
+                    
+                    # fix SF rotational issus 211222
+                    if diff<=-np.pi:
+                            #diff = np.pi+(angles-np.pi)-rot
+                            diff = (2*np.pi)+diff
+                    elif diff>np.pi:
+                            #diff = -np.pi-(np.pi+angles)-rot
+                            diff = diff - (2*np.pi)
+                    
+                    length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
+                    scaled_action = (length, diff)   
+                    
+                    #if env.index == 5:
+                    #    print('pose:',env.get_self_stateGT(),'goal:',env.goal_point, 'action:',real_action, 'angles:',angles, 'rot:',rot, 'ori_diff:',angles-rot, 'mod_diff:',diff)
+                    env.control_vel_specific(scaled_action, i)
+            
+            
+            
+            #real_action = comm.scatter(human_actions, root=0)
             
             
             # distribute actions btwn robot and humans
+            '''
             if env.index == 0:
                 env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
+                #print('--------------------')
+                #print(env.pose_list)
             else: # pre-RVO vel, humans
-                angles = np.arctan2(real_action[1], real_action[0])
+                angles = np.arctan2(human_actions[1], human_actions[0])
                 diff = angles - rot
                 
                 # fix SF rotational issus 211222
@@ -176,15 +223,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         #diff = -np.pi-(np.pi+angles)-rot
                         diff = diff - (2*np.pi)
                 
-                length = np.sqrt([real_action[0]**2+real_action[1]**2])
+                length = np.sqrt([human_actions[0]**2+human_actions[1]**2])
                 scaled_action = (length, diff)   
                 
                 #if env.index == 5:
                 #    print('pose:',env.get_self_stateGT(),'goal:',env.goal_point, 'action:',real_action, 'angles:',angles, 'rot:',rot, 'ori_diff:',angles-rot, 'mod_diff:',diff)
                 env.control_vel(scaled_action)   # 211108
-                
+            '''
             # rate.sleep()
             rospy.sleep(0.001)
+            
 
             if env.index ==0 and LM_visualize:
                 # if using _LM, delete [0]
@@ -241,15 +289,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             ############training#######################################################################################
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)
-                pose_next_list = comm.gather(pose_next, root=0)     # 211019. 5 states for each human
+                #pose_next_list = comm.gather(pose_next, root=0)     # 211019. 5 states for each human
                 speed_poly_next_list = comm.gather(speed_next_poly, root=0)
-
+                
+                pose_next_list = env.pose_list
+                pose_next_list = np.array(pose_next_list)
+                #print('2nd:',pose_next_list)
                 if env.index == 0:   # get last_v_r
                     state_next_list_new = state_next_list[0:1]   # for robot
                     if policy_list=='LM':  # LM: 60x60    # 211214
-                        last_v_r, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
+                        last_v_r, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
                     elif policy_list=='stacked_LM':
-                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
+                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
                     else:
                         last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 else:

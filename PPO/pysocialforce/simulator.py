@@ -39,8 +39,8 @@ class Simulator:
 
     def __init__(self, state, groups=None, obstacles=None, config_file=None):
         self.config = DefaultConfig()
-        if config_file:
-            self.config.load_config(config_file)
+        #if config_file:
+        #    self.config.load_config(config_file)
             
         # TODO: load obstacles from config
         self.scene_config = self.config.sub_config("scene")

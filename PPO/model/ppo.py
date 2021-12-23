@@ -454,7 +454,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         # 1. initial states
         initial_state = np.zeros((num_env, 6))
 
-        for i in range(num_env):  # i=0, 1,2,3,4            
+        for i in range(num_env):  # i=0, 1,2,3,4
+            #print(num_env, i, goal_global_list[i], p_list[i])            
             hv = goal_global_list[i] - p_list[i] 
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
             prefv=hv/hs if hs >human_max_speed else hv
@@ -821,78 +822,3 @@ def build_occupancy_maps(human_states, human_velocities):  # velocity: nonholono
     return occupancy_maps
     # return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()
 
-def build_simple_LM(tot_pose, tot_vel):  # velocity: nonholonomic_robot, human_velocities=holonomic robot
-    '''
-    param human_states:
-    return: tensor of shape
-    '''
-    
-
-    #other_humans_pose = np.concatenate([np.array([(other_human.px, other_human.py)]) for other_human in human_states[1:]], axis=0)   # except robot self
-    #other_humans_vel = np.concatenate([np.array([(other_human.vx, other_human.vy)]) for other_human in human_velocities[1:]], axis=0)   # except robot self
-    other_humans_pose = tot_pose[1:]
-    other_humans_vel = tot_vel[1:]
-    other_px = other_humans_pose[:,0] - tot_pose[0][0]
-    other_py = other_humans_pose[:,1] - tot_pose[0][1]
-    print('1st:',other_px, other_py)
-    # new x-axis is in the direction of robot's velocity
-    
-        #print('2nd:',other_px, other_py)
-
-    # compute indicies of humans in the grid
-    cell_size = 1
-    cell_num = 6
-    om_channel_size = 1
-
-    occupancy_maps = np.zeros((6, 6))
-    other_x_index = np.floor(other_px / cell_size + cell_num / 2)   # other_px / 1 + 2
-    other_y_index = np.ceil(other_py / cell_size - cell_num / 2)
-    other_y_index = np.abs(other_y_index)
-        #print('other_x_index=',other_x_index,other_y_index)
-    print('ox:',other_x_index,'oy:',other_y_index)
-    other_x_index[other_x_index < 0] = 999
-    other_x_index[other_x_index >= cell_num] = 999
-    other_y_index[other_y_index < 0] = 999
-    other_y_index[other_y_index >= cell_num] = 999
-    print('refined index=',other_x_index, other_y_index)
-
-    #OM shape: center is robot
-    if om_channel_size == 1:   # just only consider position data
-        print('damm')
-        
-        
-    else:
-        # calculate relative velocity for other agents
-        other_human_velocity_angles = np.arctan2(other_humans_vel[:, 1], other_humans_vel[:, 0])   # vy, vx
-        rotation = other_human_velocity_angles - robot_velocity_angle
-        other_vx = other_humans_vel[:,0] - human_velocities[0][0]
-        other_vy = other_humans_vel[:,1] - human_velocities[0][1]
-        speed = np.linalg.norm([other_vx, other_vy], axis=0)
-
-        other_vx = np.cos(rotation) * speed
-        other_vy = np.sin(rotation) * speed
-        
-        #print(other_vx, other_vy)
-        dm = [list() for _ in range(cell_num ** 2 * om_channel_size)]    # 4**2 * 3 = 16*3 = 48 (each channel has 16 cells)
-        for i, index in np.ndenumerate(grid_indices):
-            if index in range(cell_num ** 2):   # range 16
-                if om_channel_size == 2:
-                    dm[2 * int(index)].append(other_vx[i])
-                    dm[2 * int(index) + 1].append(other_vy[i])
-                elif om_channel_size == 3:      # maybe pose, vx, and vy??
-                    dm[3 * int(index)].append(1)
-                    dm[3 * int(index) + 1].append(other_vx[i])
-                    dm[3 * int(index) + 2].append(other_vy[i])
-                else:
-                    raise NotImplementedError
-        for i, cell in enumerate(dm):
-            dm[i] = sum(dm[i]) / len(dm[i]) if len(dm[i]) != 0 else 0
-        occupancy_maps.append([dm])
-
-
-    px_list, py_list, vx_list, vy_list = [],[],[],[]
-
-
-    #print('occupancy map:', occupancy_maps)
-    return occupancy_maps
-    # return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()

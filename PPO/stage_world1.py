@@ -13,12 +13,34 @@ from std_msgs.msg import Int8
 import message_filters
 
 
+
+
 class StageWorld():
     def __init__(self, beam_num, index, num_env):    # called from ppo_stage3.py,   # 512, index, 5
         self.index = index
         self.num_env = num_env   # 5 agents
         node_name = 'StageEnv_' + str(index)   # stageEnv_0?
         rospy.init_node(node_name, anonymous=None)
+        
+        
+
+        # Define Subscriber
+
+        sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
+        for i in range(11):
+            sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
+            sub_list.append(sub)
+        #print('sub_list=',sub_list)
+
+        queue_size = 10
+        fps = 1000.
+        delay = 1 / fps * 0.5
+
+        #mf = message_filters.ApproximateTimeSynchronizer([sub1, sub2], queue_size, delay)
+        mf = message_filters.ApproximateTimeSynchronizer(sub_list, queue_size, delay)
+        mf.registerCallback(self.callback)
+
+        self.pose_list = []
 
         self.beam_mum = beam_num   # 512
         self.laser_cb_num = 0
@@ -69,6 +91,8 @@ class StageWorld():
 
         # -----------Service-------------------
         self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
+        
+
 
 
 
@@ -92,7 +116,29 @@ class StageWorld():
         # # What function to call when you ctrl + c
         # rospy.on_shutdown(self.shutdown)
 
-
+    def callback(self, *msgs):
+        pose_list = []
+        
+        #self.pose_list=[]
+        
+        for msg in msgs:
+            #msg_list.append(i)
+            Quaternious = msg.pose.pose.orientation
+            Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
+            #self.state_GT = [msg.pose.pose.position.x, msg.pose.pose.position.y, Euler[2]]
+            x,y=msg.pose.pose.position.x, msg.pose.pose.position.y
+            pose_list.append([x,y, Euler[2]])
+            #self.pose_list.append([x,y, Euler[2]])
+        self.pose_list = pose_list
+        
+        
+  
+        #self.post_list = post_lists
+        #for i in range(len(msg_list)):
+        #    x,y=msg_list[i].pose.pose.position.x, msg_list[i].pose.pose.position.y
+        #    pose_list.append([x,y])
+        #print('pose_list:',pose_list)
+        
     def ground_truth_callback(self, GT_odometry):   # topic: robot_0_base_pose_ground topic callback F
         Quaternious = GT_odometry.pose.pose.orientation
         Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
@@ -128,6 +174,9 @@ class StageWorld():
 
     def get_self_speedGT(self):
         return self.speed_GT
+    
+    def get_env_pose(self):
+        return self.pose_list
 
     def get_self_speed_poly(self):
         return self.speed_poly
@@ -602,7 +651,7 @@ class StageWorld():
         print(total_list)
         
         '''
-        return [[-0,-8,np.pi/2],
+        return [[0,-8,np.pi/2],
                     [-7,-0,np.pi/2],[-6,-0,np.pi/2],[-5,-0,np.pi/2],[-4,-0,np.pi/2],[-3,-0,np.pi/2],
                     [-2,0,np.pi*3/2],[-1,0,np.pi*3/2],[-0,0,np.pi*3/2],
                     [1,0,np.pi*3/2],[2,0,np.pi*3/2]],[
