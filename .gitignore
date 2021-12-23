@@ -26,3 +26,6 @@ etc/
 Python-RVO2/
 
 other refer codes/
+PPO/hostfile
+PPO/file.log
+PPO/last_v_r.pickle

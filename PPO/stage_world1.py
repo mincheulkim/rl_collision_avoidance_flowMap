@@ -602,8 +602,6 @@ class StageWorld():
         print(total_list)
         
         '''
-        
-        
         return [[-0,-8,np.pi/2],
                     [-7,-0,np.pi/2],[-6,-0,np.pi/2],[-5,-0,np.pi/2],[-4,-0,np.pi/2],[-3,-0,np.pi/2],
                     [-2,0,np.pi*3/2],[-1,0,np.pi*3/2],[-0,0,np.pi*3/2],
@@ -613,16 +611,6 @@ class StageWorld():
                     [-2,-7],[-1,-7],[-0,-7],
                     [1,-7],[2,-7]]
         
-        
-    def callback10(self, GT_odometry):   # topic: robot_0_base_pose_ground topic callback F
-        Quaternious = GT_odometry.pose.pose.orientation
-        Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
-        self.state_GT = [GT_odometry.pose.pose.position.x, GT_odometry.pose.pose.position.y, Euler[2]]
-        v_x = GT_odometry.twist.twist.linear.x
-        v_y = GT_odometry.twist.twist.linear.y
-        v = np.sqrt(v_x**2 + v_y**2)
-        self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
-        self.speed_poly = [v_x, v_y]    
         
     def set_init_pose(self, init_pose):
         self.control_pose(init_pose)   # create pose(Euler or quartanion) for ROS
