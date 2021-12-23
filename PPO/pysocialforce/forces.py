@@ -234,7 +234,8 @@ class DesiredForce(Force):
 
     def _get_force(self):
         relexation_time = self.config("relaxation_time", 0.5)
-        goal_threshold = self.config("goal_threshold", 0.1)
+        #goal_threshold = self.config("goal_threshold", 0.1)
+        goal_threshold = self.config("goal_threshold", 0.5)
         pos = self.peds.pos()
         vel = self.peds.vel()
         goal = self.peds.goal()

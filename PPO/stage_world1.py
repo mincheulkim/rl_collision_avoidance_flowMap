@@ -10,6 +10,7 @@ from sensor_msgs.msg import LaserScan
 from rosgraph_msgs.msg import Clock
 from std_srvs.srv import Empty
 from std_msgs.msg import Int8
+import message_filters
 
 
 class StageWorld():
@@ -272,7 +273,7 @@ class StageWorld():
 
         #if t > 150:  # timeout check
         if t > 1000:  # timeout check  211020 for long-term
-            terminate = True
+            terminate = True      
             result = 'Time out'
         
         '''    # for future lidar collision penalty
@@ -315,6 +316,18 @@ class StageWorld():
         move_cmd.angular.z = action[1]
         self.cmd_vel.publish(move_cmd)
         
+    def control_vel_specific(self, action, index):   # real action as array[0.123023, -0.242424]. from
+        move_cmd = Twist()
+        move_cmd.linear.x = action[0]
+        move_cmd.linear.y = 0.
+        move_cmd.linear.z = 0.
+        move_cmd.angular.x = 0.
+        move_cmd.angular.y = 0.
+        move_cmd.angular.z = action[1]
+        cmd_vel_topic = 'robot_' + str(index) + '/cmd_vel'
+        cmd_vel = rospy.Publisher(cmd_vel_topic, Twist, queue_size=10)
+        cmd_vel.publish(move_cmd)
+        
     def control_vel_poly(self, action,diff):   # real action as array[0.123023, -0.242424]. from
         move_cmd = Twist()
         move_cmd.linear.x = action[0]
@@ -338,6 +351,23 @@ class StageWorld():
         pose_cmd.orientation.z = qtn[2]
         pose_cmd.orientation.w = qtn[3]
         self.cmd_pose.publish(pose_cmd)
+        
+    def control_pose_specific(self, pose, index):    # pose = [x, y, theta]
+        pose_cmd = Pose()
+        assert len(pose)==3
+        pose_cmd.position.x = pose[0]   # x
+        pose_cmd.position.y = pose[1]   # y
+        pose_cmd.position.z = 0         # 0(don't care rot cause pose?)
+
+        qtn = tf.transformations.quaternion_from_euler(0, 0, pose[2], 'rxyz')
+        pose_cmd.orientation.x = qtn[0]
+        pose_cmd.orientation.y = qtn[1]
+        pose_cmd.orientation.z = qtn[2]
+        pose_cmd.orientation.w = qtn[3]
+        cmd_pose_topic = 'robot_' + str(index) + '/cmd_pose'
+        cmd_pose = rospy.Publisher(cmd_pose_topic, Pose, queue_size=2)
+        
+        cmd_pose.publish(pose_cmd)
 
     def generate_random_pose(self):
         #x = np.random.uniform(-9, 9)
@@ -552,7 +582,7 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
         '''
         
-        
+        '''
         return [[0,-8,0.785],
                 [-5,-5,0.785],[-6,-6,0.785],[-6,-5,0.785],[-5,-6,0.785],[-7,-6,0.785],
                 [-5,5,0.785],[-5,6,0.785],[-6,5,0.785],
@@ -562,12 +592,37 @@ class StageWorld():
                     [5,-5],[5,-6],[6,-5],
                     [-7,-1],[-7,-2]]
         '''
-        return [[-2,-8,0.785],
-                [-7,-0,0.785],[-6,-0,0.785],[-5,-0,0.785],[-4,-0,0.785],[-3,-0,0.785],
-                [-2,0,0.785],[-1,0,0.785],[-0,0,0.785],
-                [1,0,0.785],[2,0,0.785]],[[0,8],[6,6],[7,7],[7,6],[6,7],[7,7],[6,-6],[6,-7],[7,-6],[-8,0],[-7,0]]
+        total_list = []
+        '''
+        for index in range(11):
+            object_state_topic = 'robot_' + str(index) + '/base_pose_ground_truth'
+            self.object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)    # input stage(argument), dataType, called function
+            total_list.append(self.state_GT)
+        
+        print(total_list)
+        
         '''
         
+        
+        return [[-0,-8,np.pi/2],
+                    [-7,-0,np.pi/2],[-6,-0,np.pi/2],[-5,-0,np.pi/2],[-4,-0,np.pi/2],[-3,-0,np.pi/2],
+                    [-2,0,np.pi*3/2],[-1,0,np.pi*3/2],[-0,0,np.pi*3/2],
+                    [1,0,np.pi*3/2],[2,0,np.pi*3/2]],[
+                [0,8],
+                    [-2,7],[-1,7],[-0,7],[1,7],[4,7],
+                    [-2,-7],[-1,-7],[-0,-7],
+                    [1,-7],[2,-7]]
+        
+        
+    def callback10(self, GT_odometry):   # topic: robot_0_base_pose_ground topic callback F
+        Quaternious = GT_odometry.pose.pose.orientation
+        Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
+        self.state_GT = [GT_odometry.pose.pose.position.x, GT_odometry.pose.pose.position.y, Euler[2]]
+        v_x = GT_odometry.twist.twist.linear.x
+        v_y = GT_odometry.twist.twist.linear.y
+        v = np.sqrt(v_x**2 + v_y**2)
+        self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
+        self.speed_poly = [v_x, v_y]    
         
     def set_init_pose(self, init_pose):
         self.control_pose(init_pose)   # create pose(Euler or quartanion) for ROS

@@ -11,8 +11,8 @@ class FieldOfView(object):
     """
 
     def __init__(self, phi=None, out_of_view_factor=None):
-        #phi = phi or 100.0
-        phi = phi or 360.0
+        phi = phi or 100.0
+        #phi = phi or 360.0
         out_of_view_factor = out_of_view_factor or 0.5
         self.cosphi = np.cos(phi / 180.0 * np.pi)
         self.out_of_view_factor = out_of_view_factor

@@ -465,19 +465,24 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         groups.append([])  # 0 grp as robot
         groups.append([])  # 1 grp 3 human
         groups.append([])  # 2 groups 2 human
-        groups.append([])  # 3 groups 1 human
+        
 
         # assign humans to groups
         groups[0].append(0)
         groups[1].append(1)
         groups[1].append(2)
         groups[1].append(3)
-        groups[2].append(4)
-        groups[2].append(5)
-        groups[3].append(6)
+        groups[1].append(4)
+        groups[1].append(5)
+        groups[2].append(6)
+        groups[2].append(7)
+        groups[2].append(8)
+        groups[2].append(9)
+        groups[2].append(10)
 
         # 3. assign obstacles
         #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
+        psf_sim = None
         
         # 4. initiate simulator
         psf_sim = psf.Simulator(

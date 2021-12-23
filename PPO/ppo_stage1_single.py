@@ -71,25 +71,36 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         env.reset_world()
 
     for id in range(MAX_EPISODES):
+        terminal = False
+        ep_reward = 0
+        step = 1
         # senario reset option
         init_poses = None
         init_goals = None
         
-        if env.index ==0:    # 211129
-            env.reset_world()   # TODO maybe this part be problem
+        
+        #if env.index ==0:    # 211129
+        #    env.reset_world()   # TODO maybe this part be problem
             #TODO reset initial start pose for robot and humans
             # TODO reset goal pose for robot and humans
             # calculate whole init poses and init goals from main
             
+        
+        if env.index==0:
             init_poses, init_goals = env.initialize_pose_robot_humans()   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
-        print('init_pose:',init_poses)
-        #print('init_goal:',init_goals)
-            
+            for i, init_pose in enumerate(init_poses):
+                env.control_pose_specific(init_pose, i)
+                   
         init_pose = comm.scatter(init_poses, root=0)
         init_goal = comm.scatter(init_goals, root=0)
+        #print('id:',env.index, 'termina:',terminal)
         env.set_init_pose(init_pose)
         env.set_init_goal(init_goal)
-
+        
+        rospy.sleep(1)
+        
+        
+        
             
             
 
@@ -102,9 +113,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #    env.generate_pose_goal_circle()
         #    env.is_crashed = False
 
-        terminal = False
-        ep_reward = 0
-        step = 1
+
 
         obs = env.get_laser_observation()
         obs_stack = deque([obs, obs, obs])
@@ -123,7 +132,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             state_list = comm.gather(state, root=0)
             pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
-            #print(pose_list)
+            
             speed_poly_list = comm.gather(speed_poly, root=0)
             goal_global_list = comm.gather(goal_global, root=0)
 
@@ -169,6 +178,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 
                 length = np.sqrt([real_action[0]**2+real_action[1]**2])
                 scaled_action = (length, diff)   
+                
+                #if env.index == 5:
+                #    print('pose:',env.get_self_stateGT(),'goal:',env.goal_point, 'action:',real_action, 'angles:',angles, 'rot:',rot, 'ori_diff:',angles-rot, 'mod_diff:',diff)
                 env.control_vel(scaled_action)   # 211108
                 
             # rate.sleep()
@@ -208,7 +220,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #r, terminal, result = env.get_reward_and_terminate(step)
             r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty
             if env.index != 0:
-                terminal = False
+                terminal = False    
             ep_reward += r
             global_step += 1
 
@@ -305,7 +317,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         #    pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
 
                         buff = []
-                        global_update += 1
+                        global_update += 1     
 
 
             step += 1
