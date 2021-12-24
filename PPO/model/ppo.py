@@ -229,7 +229,7 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
                 
                 if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                     #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
-                    if (j==0 and i in [1, 2, 3]) or (j==1 and i in [4, 5]) or (j==2 and i in [6]):  # FIXME. assign humans to groups
+                    if (j==0 and i in [1, 2, 3, 4, 5]) or (j==1 and i in [6, 7, 8]) or (j==2 and i in [9, 10]):  # FIXME. assign humans to groups
                         #print('done j,i set:', j, i)
                         local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
                 #print('i:',mod_diff_y, mod_diff_x, i)
@@ -267,8 +267,8 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
         v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
         
-        #scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-        scaled_action = a[0]   # 211221 no scailing
+        scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+        #scaled_action = a[0]   # 211221 no scailing
         
     else:
         v = None
@@ -464,8 +464,9 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         # 2. group #################################
         groups = []
         groups.append([])  # 0 grp as robot
-        groups.append([])  # 1 grp 3 human
-        groups.append([])  # 2 groups 2 human
+        groups.append([])  # 1 grp 5 human
+        groups.append([])  # 2 groups 3 human
+        groups.append([])  # 3 groups 2 human
         
 
         # assign humans to groups
@@ -478,8 +479,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         groups[2].append(6)
         groups[2].append(7)
         groups[2].append(8)
-        groups[2].append(9)
-        groups[2].append(10)
+        groups[3].append(9)
+        groups[3].append(10)
 
         # 3. assign obstacles
         #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]

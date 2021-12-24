@@ -590,7 +590,7 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
         
         
-    def initialize_pose_robot_humans(self):   # 211222
+    def initialize_pose_robot_humans(self, rule):   # 211222
         # reset pose
         #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         '''
@@ -641,24 +641,79 @@ class StageWorld():
                     [5,-5],[5,-6],[6,-5],
                     [-7,-1],[-7,-2]]
         '''
-        total_list = []
-        '''
-        for index in range(11):
-            object_state_topic = 'robot_' + str(index) + '/base_pose_ground_truth'
-            self.object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)    # input stage(argument), dataType, called function
-            total_list.append(self.state_GT)
         
-        print(total_list)
-        
-        '''
-        return [[0,-8,np.pi/2],
+        init_pose_list = [[0,-8,np.pi/2],
                     [-7,-0,np.pi/2],[-6,-0,np.pi/2],[-5,-0,np.pi/2],[-4,-0,np.pi/2],[-3,-0,np.pi/2],
                     [-2,0,np.pi*3/2],[-1,0,np.pi*3/2],[-0,0,np.pi*3/2],
-                    [1,0,np.pi*3/2],[2,0,np.pi*3/2]],[
-                [0,8],
+                    [1,0,np.pi*3/2],[2,0,np.pi*3/2]]
+        init_goal_list = [[0,8],
                     [-2,7],[-1,7],[-0,7],[1,7],[4,7],
                     [-2,-7],[-1,-7],[-0,-7],
                     [1,-7],[2,-7]]
+        groups = None
+        if rule=='group_circle_crossing':   #         Rule circle_crossing: generate start position on a circle, goal position is at the opposite side
+            print('scenario:',rule)
+            init_pose_list=[]
+            init_goal_list=[]
+            circle_radius = 8.
+            groups = [0, 1, 2, 3]
+            groups_pose = []
+            groups_goal = []
+            for i in groups:
+                while True:            
+                    angle = np.random.random() * np.pi * 2
+                    px = circle_radius * np.cos(angle)
+                    py = circle_radius * np.sin(angle)
+                    gx = -px
+                    gy = -py
+                    collide = False
+                    for grp_pose, grp_goal in zip(groups_pose, groups_goal):
+                        min_dist = 1
+                        if np.linalg.norm((px-grp_pose[0],py-grp_goal[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
+                            collide=True
+                            break
+                    if not collide:
+                        break
+                groups_pose.append([px,py])
+                groups_goal.append([gx,gy])
+                
+            human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
+            
+            for grp_index, group in enumerate(human_list):
+                for i in group:                   
+                    while True:
+                        angle = np.random.random()* np.pi * 2
+                        noise = np.random.normal(scale=0.5)
+                        #print('group:',index,'i:',i)
+                        #print('group pose:',groups_pose)
+                        px = groups_pose[grp_index][0]+noise*np.cos(angle)
+                        py = groups_pose[grp_index][1]+noise*np.sin(angle)
+                        gx=-px
+                        gy=-py
+                        collide=False
+                        
+                        for pose, goal in zip(init_pose_list, init_goal_list):
+                            min_dist = 1
+                            if np.linalg.norm((px-pose[0],py-pose[1])) < min_dist or np.linalg.norm((gx-goal[0],gy-goal[1])) < min_dist:
+                                collide = True
+                                break
+                        if not collide:
+                            break
+                    theta = np.arctan2(gy, gx)
+                    init_pose_list.append([px,py,theta])
+                    init_goal_list.append([gx,gy])
+                    #print('pose_list:',init_pose_list)
+                
+            # 1. create the groups
+            # 2. assinge humans properly
+            pass
+        elif rule == 'square_crossing':   #         Rule square_crossing: generate start/goal position at two sides of y-axis
+            pass
+        elif 'circle_crossing':
+            pass
+        
+        
+        return init_pose_list, init_goal_list
         
         
     def set_init_pose(self, init_pose):

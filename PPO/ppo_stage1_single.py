@@ -48,7 +48,7 @@ LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '']
+policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 blind_human = True
 
 
@@ -88,7 +88,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
         
         if env.index==0:
-            init_poses, init_goals = env.initialize_pose_robot_humans()   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
+            rule = 'group_circle_crossing'  # crossing
+            init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
             for i, init_pose in enumerate(init_poses):
                 env.control_pose_specific(init_pose, i)
                    
@@ -158,7 +159,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             goal_global_list = init_goals
             pose_list = np.array(pose_list)
             #print('1st:',pose_list)
-            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=11)
+            num_human = 11
+            
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
             #print('human actions:',human_actions[2])
             
             
