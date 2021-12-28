@@ -118,9 +118,6 @@ class StageWorld():
 
     def callback(self, *msgs):
         pose_list = []
-        
-        #self.pose_list=[]
-        
         for msg in msgs:
             #msg_list.append(i)
             Quaternious = msg.pose.pose.orientation
@@ -131,8 +128,6 @@ class StageWorld():
             #self.pose_list.append([x,y, Euler[2]])
         self.pose_list = pose_list
         
-        
-  
         #self.post_list = post_lists
         #for i in range(len(msg_list)):
         #    x,y=msg_list[i].pose.pose.position.x, msg_list[i].pose.pose.position.y
@@ -421,12 +416,10 @@ class StageWorld():
     def generate_random_pose(self):
         #x = np.random.uniform(-9, 9)
         #y = np.random.uniform(-9, 9)
-        # for robot(agent0)
-        if self.index == 0:
+        if self.index == 0:  # For robot
             x = 0
             y = -8
-        # For human
-        elif self.index == 1:
+        elif self.index == 1:    # For human
             x=-6
             y=-6
         elif self.index == 2:
@@ -465,12 +458,6 @@ class StageWorld():
                 x = np.random.uniform(-8, 8)
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
-        # for test city scene, use below
-        '''
-        else:
-            x=self.index - 10
-            y=self.index - 10
-        '''
 
         #theta = np.random.uniform(0, 0.5 * np.pi)
         #theta = np
@@ -478,8 +465,6 @@ class StageWorld():
             theta = np.random.uniform(0, 2*np.pi)
         else:
             theta = np.arctan2(y, x) + np.pi
-        #if self.index ==0:
-        #    theta = np.pi*0.5
         return [x, y, theta]
 
     # 211129
@@ -505,14 +490,10 @@ class StageWorld():
                 y = np.random.uniform(-8, 8)
                 dis = np.sqrt(x ** 2 + y ** 2)
 
-        #theta = np.random.uniform(0, 0.5 * np.pi)
-        #theta = np
         if self.index ==0:
             theta = np.random.uniform(0, 2*np.pi)
         else:
             theta = np.arctan2(y, x) + np.pi
-        #if self.index ==0:
-        #    theta = np.pi*0.5
         return [x, y, theta]
 
     def generate_random_goal(self):
@@ -711,7 +692,6 @@ class StageWorld():
             pass
         elif 'circle_crossing':
             pass
-        
         
         return init_pose_list, init_goal_list
         

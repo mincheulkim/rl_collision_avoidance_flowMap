@@ -22,7 +22,7 @@ from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
-#from test import Test
+from dbscan.dbscan import DBSCAN
 
 
 MAX_EPISODES = 5000
@@ -45,10 +45,11 @@ NUM_ENV = 1 # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
+num_human = 11
 
 LM_visualize = False    # True or False         # visualize local map(s)
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+policy_list = ''      # select policy. [LM, stacked_LM, '']
 blind_human = True
 
 
@@ -133,6 +134,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
         goal_global = np.asarray(env.get_goal_point())
         
+        # 211228 DBSCAN clustering
+        grp_cluster = None
+        noise_cluster = None
+        
 
         while not terminal and not rospy.is_shutdown():
             
@@ -158,11 +163,29 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose_list = env.pose_list
             goal_global_list = init_goals
             pose_list = np.array(pose_list)
-            #print('1st:',pose_list)
-            num_human = 11
+            #print('1st:',pose_list[1:])
+            
             
             human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
             #print('human actions:',human_actions[2])
+            
+            # 211228  DBSCAN group clustering
+            # Initialize DBSCAN
+            #dbscan = DBSCAN(x,1.5,4)   # init papameters
+            pose_list_dbscan = pose_list[1:, :-1]
+            #print('포즈리스트:',pose_list_dbscan)
+            dbscan = DBSCAN(pose_list_dbscan,1.5,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
+            # Run DBSCAN(CLUSTERING)
+            idx,noise = dbscan.run()    # run DBSCAN
+            # Result SORTING
+            g_cluster,n_cluster = dbscan.sort()
+            # Visualization results
+            print('idx:',idx,'noise:',noise)
+            #print('g_cluster:',g_cluster,'noise_cluster:',n_cluster)
+            #dbscan.plot()
+            
+            
+            
             
             
             # generate robot action (at rank==0)
@@ -176,18 +199,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
 
             # execute actions
-            
-            for i in range(11):
+            for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(scaled_action, i)
                 else:
-                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])
-                    
-                    #diff = angles - rot
+                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])                  
+                    #diff = angles - rot   # problem
                     diff = angles - pose_list[i,2]
-                    #if i==2:
-                    #    print('angle:',angles,'rot:',rot,'diff:',diff)
-                    
                     # fix SF rotational issus 211222
                     if diff<=-np.pi:
                             #diff = np.pi+(angles-np.pi)-rot
@@ -199,40 +217,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
                     scaled_action = (length, diff)   
                     
-                    #if env.index == 5:
-                    #    print('pose:',env.get_self_stateGT(),'goal:',env.goal_point, 'action:',real_action, 'angles:',angles, 'rot:',rot, 'ori_diff:',angles-rot, 'mod_diff:',diff)
                     env.control_vel_specific(scaled_action, i)
-            
-            
-            
-            #real_action = comm.scatter(human_actions, root=0)
-            
-            
+                     
             # distribute actions btwn robot and humans
-            '''
-            if env.index == 0:
-                env.control_vel(scaled_action)    # https://stackoverflow.com/questions/16492830/colorplot-of-2d-array-matplotlib/16492880
-                #print('--------------------')
-                #print(env.pose_list)
-            else: # pre-RVO vel, humans
-                angles = np.arctan2(human_actions[1], human_actions[0])
-                diff = angles - rot
-                
-                # fix SF rotational issus 211222
-                if diff<=-np.pi:
-                        #diff = np.pi+(angles-np.pi)-rot
-                        diff = (2*np.pi)+diff
-                elif diff>np.pi:
-                        #diff = -np.pi-(np.pi+angles)-rot
-                        diff = diff - (2*np.pi)
-                
-                length = np.sqrt([human_actions[0]**2+human_actions[1]**2])
-                scaled_action = (length, diff)   
-                
-                #if env.index == 5:
-                #    print('pose:',env.get_self_stateGT(),'goal:',env.goal_point, 'action:',real_action, 'angles:',angles, 'rot:',rot, 'ori_diff:',angles-rot, 'mod_diff:',diff)
-                env.control_vel(scaled_action)   # 211108
-            '''
+
             # rate.sleep()
             rospy.sleep(0.001)
             

@@ -73,10 +73,13 @@ tensorboard --logdir runs/
 # TODOList
 "MOST PRIOR TASK"
 ```
-1. LIDAR t-10, t-5, t
-3. model humans behavior by social force
+1. 각 사람을 자동으로 그룹에 assign 하는 알고리즘
+2. t=0 state에 관측된 velocity를 넣어서 t+1의 occupancy map(flowmap) 생성
+3. sub group flowmap 간 attention
+4. attention score 곱한 subgroup끼리 elementwise sum
+5. 이후 sum된 결과는 동일하게 conv2 거쳐서 네트워크로
 
-5. validate buffer saver
+
 ```
 
 
@@ -98,7 +101,7 @@ tensorboard --logdir runs/
 ```
 - [ ] RVO:make gaussian noise to disable mutation-lock btwn humans  211115
 - [ ] after reaching the goal, human change their next goal
-- [ ] using social force, create behavior of humans and groups
+- [x] using social force, create behavior of humans and groups
 - [ ] On/Off for visible/invisible robot for human
 ```
 - 2. Generate Flow Map
@@ -131,7 +134,7 @@ tensorboard --logdir runs/
 - [X] visualize LIDAR map(OpenCV)  (after 211105 meeting)  done 211220
 - [ ] [Sim-2-real gap manage] Add Gaussian noise N(0,0.2) to the lidar sensor and goal location  (From IJCAI20 work, crowd-steer)
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
-- [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t
+- [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t or t-4, t-3, t-2, t-1, t(5 timesteps or 10 timesteps)
 - [X] change python 3 environment (for social force): done 211220
 ```
 
