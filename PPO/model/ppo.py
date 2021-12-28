@@ -180,11 +180,6 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         s_list = Variable(torch.from_numpy(s_list)).float().cuda()
         goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
         speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
-        # Build occupancy maps
-        #occupancy_maps = build_occupancy_maps(human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
-        #local_maps = build_simple_LM(tot_pose=pose_list_human, tot_vel=speed_list_human)
-        #print(occupancy_maps)
         
         v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()

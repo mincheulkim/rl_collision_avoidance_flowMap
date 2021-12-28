@@ -165,28 +165,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose_list = np.array(pose_list)
             #print('1st:',pose_list[1:])
             
-            
             human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
-            #print('human actions:',human_actions[2])
             
             # 211228  DBSCAN group clustering
-            # Initialize DBSCAN
-            #dbscan = DBSCAN(x,1.5,4)   # init papameters
             pose_list_dbscan = pose_list[1:, :-1]
-            #print('포즈리스트:',pose_list_dbscan)
-            dbscan = DBSCAN(pose_list_dbscan,1.5,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
-            # Run DBSCAN(CLUSTERING)
-            idx,noise = dbscan.run()    # run DBSCAN
-            # Result SORTING
-            g_cluster,n_cluster = dbscan.sort()
-            # Visualization results
-            print('idx:',idx,'noise:',noise)
-            #print('g_cluster:',g_cluster,'noise_cluster:',n_cluster)
-            #dbscan.plot()
-            
-            
-            
-            
+            dbscan = DBSCAN(pose_list_dbscan,2,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
+            idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
+            g_cluster,n_cluster = dbscan.sort()     # Result SORTING
+            #dbscan.plot()          # Visualization results
             
             # generate robot action (at rank==0)
             if env.index==0:
@@ -198,7 +184,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
 
-            # execute actions
+            # distribute and execute actions robot and humans
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(scaled_action, i)
@@ -219,10 +205,24 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                      
-            # distribute actions btwn robot and humans
-
             # rate.sleep()
             rospy.sleep(0.001)
+            
+            
+            # 211228 Visualize DBSCAN subgroups
+            DBSCAN_visualize=True
+            if DBSCAN_visualize:
+                img = np.zeros([20,20,3])  # 20 x 20 
+                for i, idx in enumerate(idx):    
+                    img[10-int(pose_list_dbscan[i,1]),int(pose_list_dbscan[i,0]+10),0]=idx*50 /255.0
+                    img[10-int(pose_list_dbscan[i,1]),int(pose_list_dbscan[i,0]+10),1]=100 /255.0
+                    img[10-int(pose_list_dbscan[i,1]),int(pose_list_dbscan[i,0]+10),2]=100 /255.0
+                    # cyan color: noise(i==0)
+
+                hsv = cv2.cvtColor(np.float32(img), cv2.COLOR_RGB2HSV)
+                hsv=cv2.resize(hsv, dsize=(240,240), interpolation=cv2.INTER_NEAREST)
+                cv2.imshow('image',hsv)
+                cv2.waitKey(1)
             
 
             if env.index ==0 and LM_visualize:
@@ -254,8 +254,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 cv2.imshow("Local flow map", lidar)
                 cv2.waitKey(1)
 
-            # get informtion
             
+            # get informtion
             #r, terminal, result = env.get_reward_and_terminate(step)
             r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty
             if env.index != 0:
