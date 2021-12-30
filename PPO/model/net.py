@@ -106,11 +106,11 @@ class stacked_LM_Policy(nn.Module):
         self.critic = nn.Linear(256, 1)
 
         # For Local maps  if kernel_size=3, padding =1: output is same as input size
-        self.act_fea_LM_cv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)   # kernel size = filter size()
+        self.act_fea_LM_cv1 = nn.Conv2d(in_channels=5, out_channels=32, kernel_size=3, padding=1)   # kernel size = filter size()
         self.act_fea_LM_cv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
         self.act_LM_fc1 = nn.Linear(15*15*32, 256)
         # Maxpool 2D
-        self.crt_fea_LM_cv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
+        self.crt_fea_LM_cv1 = nn.Conv2d(in_channels=5, out_channels=32, kernel_size=3, padding=1)
         self.crt_fea_LM_cv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
         self.crt_LM_fc1 = nn.Linear(15*15*32, 256)
         # Maxpool 2D

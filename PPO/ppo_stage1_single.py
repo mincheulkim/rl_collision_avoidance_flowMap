@@ -215,10 +215,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    #dist4 = cv2.resize(LM[0][3], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    #dist5 = cv2.resize(LM[0][4], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     cv2.imshow("Local flow map", dist)
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
+                    #cv2.imshow("Local flow map4", dist4)
+                    #cv2.imshow("Local flow map5", dist5)
                 cv2.waitKey(1)
+
+            #env.control_pose_specific([0,0,0],0)
 
             # LIDAR visualize, 3 * 512 2D LIDAR history map  # 211220
             if env.index ==0 and LIDAR_visualize:
@@ -272,7 +278,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     if policy_list=='LM':  # LM: 60x60    # 211214
                         last_v_r, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
                     elif policy_list=='stacked_LM':
-                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
+                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx)
                     else:
                         last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 else:

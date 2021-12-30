@@ -217,11 +217,13 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     local_maps = []
     
     local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
-    index_max = max(index)   # in case 3
+    index_max = max(index)   # in case 3    # index_max = 3, index=[1 1 1 1 1 2 2 2 3 3]
+    #print(index_max, index)
     
     # TODO index_map만큼 돌리고, local_maps=[[],[],[]](3개) 또는 [[],[],[],[]](4개) 형태로 나오게 함
     
-    for j in range(3):   # FIXME: this part and 'number 3' is Daechung.
+    #for j in range(3):   # FIXME: this part and 'number 3' is Daechung.
+    for j in list(range(1,index_max+1)):   # index_max = 3 => grp0, grp1, grp2
         #print('j:',j)
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]
@@ -229,10 +231,11 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
             mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
             
             
-            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+            #if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0 and index[i-1]==j:
                 #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
-                if (j==0 and i in [1, 2, 3, 4, 5]) or (j==1 and i in [6, 7, 8]) or (j==2 and i in [9, 10]):  # FIXME. assign humans to groups
-                    #print('done j,i set:', j, i)
+                #if (j==0 and i in [1, 2, 3, 4, 5]) or (j==1 and i in [6, 7, 8]) or (j==2 and i in [9, 10]):  # FIXME. assign humans to groups
+                
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
             #print('i:',mod_diff_y, mod_diff_x, i)
         local_maps.append(local_map.tolist())
@@ -251,21 +254,26 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
         pose_list_human.append(i)    # veloclity
     speed_list_human = np.asarray(speed_list_human)
     pose_list_human = np.asarray(pose_list_human)
-
-    # Build occupancy maps
-    #occupancy_maps = build_occupancy_maps(human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
-    #local_maps = build_simple_LM(tot_pose=pose_list_human, tot_vel=speed_list_human)
-    #print(occupancy_maps)
     '''
+    
+    # 211230 fit max channel size
+    #print(local_maps.shape, local_maps.shape[1], index, index_max)
+    fit_channel_num = 5
+    source = np.zeros((1, 1, 60, 60))
+    if local_maps.shape[1] != fit_channel_num:
+        for i in range(fit_channel_num-local_maps.shape[1]):
+            local_maps = np.append(local_maps, source, axis=1)
+            #print('run',-1-i)
+    #print('after:',local_maps.shape)
+    print('index:',index, index_max)
 
     s_list = Variable(torch.from_numpy(s_list)).float().cuda()
     goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
     speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
     local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()
+
     
     #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
-
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
     
@@ -601,7 +609,7 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
 
 def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,    # 211214
                coeff_entropy=0.02, clip_value=0.2,
-               num_step=2048, num_env=12, frames=1, obs_size=24, act_size=4):     # num_step = 1000, batch_size=1024
+               num_step=2048, num_env=1, frames=3, obs_size=512, act_size=2):     # num_step = 1000, batch_size=1024
     #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
     obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, local_mapss = memory
 
@@ -617,7 +625,8 @@ def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,  
     targets = targets.reshape(num_step*num_env, 1)
 
     local_map_width = 60   # 211214
-    local_mapss = local_mapss.reshape((num_step*num_env, 3, local_map_width, local_map_width))
+    fix_group_num = 5   # 211230
+    local_mapss = local_mapss.reshape((num_step*num_env, fix_group_num, local_map_width, local_map_width))
 
     for update in range(epoch):
         sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,   # from 0~999, pick 1024 nums
