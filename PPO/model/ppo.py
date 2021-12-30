@@ -183,85 +183,6 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         
         v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        #scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-        scaled_action = a[0]   # 211221 no scailing
-        
-    else:
-        v = None
-        a = None
-        scaled_action = None
-        logprob = None
-    return v, a, logprob, scaled_action, local_map   # local_map = np.ndarray type, shape=(60,60)
-
-def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy, action_bound):   # 211213
-    if env.index == 0:
-        s_list, goal_list, speed_list = [], [], []
-        s_total_list, goal_total_list, speed_total_list = [], [], []
-        for i in state_list:
-            s_list.append(i[0])
-            goal_list.append(i[1])
-            speed_list.append(i[2])            
-
-        s_list = np.asarray(s_list)
-        goal_list = np.asarray(goal_list)
-        speed_list = np.asarray(speed_list)
-        pose_list = np.asarray(pose_list)
-        
-        # Build occupancy map
-        cell_size=1*0.1
-        map_size=6
-        local_maps = []
-        
-        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
-        #print('-------------')
-        for j in range(3):   # FIXME: this part and 'number 3' is Daechung.
-            #print('j:',j)
-            for i, pose in enumerate(pose_list):
-                diff = pose-pose_list[0]
-                mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
-                mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
-                
-                
-                if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-                    #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
-                    if (j==0 and i in [1, 2, 3, 4, 5]) or (j==1 and i in [6, 7, 8]) or (j==2 and i in [9, 10]):  # FIXME. assign humans to groups
-                        #print('done j,i set:', j, i)
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
-                #print('i:',mod_diff_y, mod_diff_x, i)
-            local_maps.append(local_map.tolist())
-            local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
-        #print(local_map.tolist())   # 211213. [[60],[60],...,[60]]  # https://appia.tistory.com/175
-        
-        local_maps = [local_maps]   # 211214 to match shape of robot_state (3072, 1, 3, 512) and local_map(30712, 1, 3, 60, 60)
-        local_maps = np.array(local_maps)
-
-        speed_list_human, pose_list_human = [], []  # n-1
-        
-        '''
-        for i in velocity_list:  # total # number of human's state
-            speed_list_human.append(i)    # veloclity
-        for i in pose_list:  # total # number of human's state
-            pose_list_human.append(i)    # veloclity
-        speed_list_human = np.asarray(speed_list_human)
-        pose_list_human = np.asarray(pose_list_human)
-
-        # Build occupancy maps
-        #occupancy_maps = build_occupancy_maps(human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
-        #local_maps = build_simple_LM(tot_pose=pose_list_human, tot_vel=speed_list_human)
-        #print(occupancy_maps)
-        '''
-
-        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
-        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-
-        local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()
-        
-        #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
-
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
-        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        
         scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
         #scaled_action = a[0]   # 211221 no scailing
         
@@ -270,7 +191,87 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
         a = None
         scaled_action = None
         logprob = None
-    #print(local_map.shape)
+    return v, a, logprob, scaled_action, local_map   # local_map = np.ndarray type, shape=(60,60)
+
+
+
+
+def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy, action_bound, index):   # 211213
+    s_list, goal_list, speed_list = [], [], []
+    s_total_list, goal_total_list, speed_total_list = [], [], []
+    #print('grp index:', index)
+    
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])            
+
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+    pose_list = np.asarray(pose_list)
+    
+    # Build occupancy map
+    cell_size=1*0.1
+    map_size=6
+    local_maps = []
+    
+    local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+    index_max = max(index)   # in case 3
+    
+    # TODO index_map만큼 돌리고, local_maps=[[],[],[]](3개) 또는 [[],[],[],[]](4개) 형태로 나오게 함
+    
+    for j in range(3):   # FIXME: this part and 'number 3' is Daechung.
+        #print('j:',j)
+        for i, pose in enumerate(pose_list):
+            diff = pose-pose_list[0]
+            mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
+            mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
+            
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
+                if (j==0 and i in [1, 2, 3, 4, 5]) or (j==1 and i in [6, 7, 8]) or (j==2 and i in [9, 10]):  # FIXME. assign humans to groups
+                    #print('done j,i set:', j, i)
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
+            #print('i:',mod_diff_y, mod_diff_x, i)
+        local_maps.append(local_map.tolist())
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+    #print(local_map.tolist())   # 211213. [[60],[60],...,[60]]  # https://appia.tistory.com/175
+    
+    local_maps = [local_maps]   # 211214 to match shape of robot_state (3072, 1, 3, 512) and local_map(30712, 1, 3, 60, 60)
+    local_maps = np.array(local_maps)
+
+    speed_list_human, pose_list_human = [], []  # n-1
+    
+    '''
+    for i in velocity_list:  # total # number of human's state
+        speed_list_human.append(i)    # veloclity
+    for i in pose_list:  # total # number of human's state
+        pose_list_human.append(i)    # veloclity
+    speed_list_human = np.asarray(speed_list_human)
+    pose_list_human = np.asarray(pose_list_human)
+
+    # Build occupancy maps
+    #occupancy_maps = build_occupancy_maps(human_states=pose_list_human, human_velocities=speed_list_human)   # just for one robot
+    #local_maps = build_simple_LM(tot_pose=pose_list_human, tot_vel=speed_list_human)
+    #print(occupancy_maps)
+    '''
+
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+
+    local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()
+    
+    #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
+
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+    
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    #scaled_action = a[0]   # 211221 no scailing
+        
     return v, a, logprob, scaled_action, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
 def generate_action_no_sampling(env, state_list, policy, action_bound):

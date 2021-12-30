@@ -1,3 +1,6 @@
+
+
+
 import os #test
 import logging
 import sys
@@ -48,9 +51,21 @@ LEARNING_RATE = 5e-5
 num_human = 11
 
 LM_visualize = False    # True or False         # visualize local map(s)
+DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '']
+policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
 blind_human = True
+
+
+# For fixed Randomization  211230
+import random
+SEED = 1234
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+torch.backends.cudnn.deterministic = True
+
 
 
 #def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):   # buffer loader
@@ -78,15 +93,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         step = 1
         # senario reset option
         init_poses = None
-        init_goals = None
-        
-        
-        #if env.index ==0:    # 211129
-        #    env.reset_world()   # TODO maybe this part be problem
-            #TODO reset initial start pose for robot and humans
-            # TODO reset goal pose for robot and humans
-            # calculate whole init poses and init goals from main
-            
+        init_goals = None         
         
         if env.index==0:
             rule = 'group_circle_crossing'  # crossing
@@ -94,32 +101,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i, init_pose in enumerate(init_poses):
                 env.control_pose_specific(init_pose, i)
                    
-        #init_pose = comm.scatter(init_poses, root=0)
-        #init_goal = comm.scatter(init_goals, root=0)
-        #print('id:',env.index, 'termina:',terminal)
         #env.set_init_pose(init_pose)
         env.set_init_goal(init_goals[0])
         
         #rospy.sleep(1)
-        #print(';;;;;;;;;;;;;;;;;;;;;')
-        #print('original pose:',init_poses)
-        #print('init_goal:',init_goals)
-        
-        #test=Test()
-        
-            
-            
-
-        #env.reset_pose()
-        #env.generate_goal_point()
-        # use this one!
-        #env.generate_pose_goal_circle()  # shafeshift above two line
-
-        #if env.is_crashed:   # 211201
-        #    env.generate_pose_goal_circle()
-        #    env.is_crashed = False
-
-
 
         obs = env.get_laser_observation()
         obs_stack = deque([obs, obs, obs])
@@ -137,7 +122,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         # 211228 DBSCAN clustering
         grp_cluster = None
         noise_cluster = None
-        
 
         while not terminal and not rospy.is_shutdown():
             
@@ -147,25 +131,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly_list = comm.gather(speed_poly, root=0)
             #goal_global_list = comm.gather(goal_global, root=0)
 
-            env_index_list = comm.gather(env.index, root=0)    # 0,1,2,3,4,5
-
             if env.index==0:
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
 
-            # generate humans action_space
-            #human_actions=generate_action_human(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            #human_actions=generate_action_human_groups(env=env, pose_list=pose_list, goal_global_list=goal_global_list, num_env=NUM_ENV)   # from orca, 21102
-            
-            
-            #print('pose_list:',pose_list)
-            #print('goal_global_list:',goal_global_list)
             
             pose_list = env.pose_list
             goal_global_list = init_goals
             pose_list = np.array(pose_list)
             #print('1st:',pose_list[1:])
             
+            # generate humans action
             human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
+            
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -174,13 +151,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             g_cluster,n_cluster = dbscan.sort()     # Result SORTING
             #dbscan.plot()          # Visualization results
             
+            #print('idx:',idx,'noise:',noise)
+            #print('grp_cluster:',g_cluster,'noise_cluster:',n_cluster)
+            
+            
+            
             # generate robot action (at rank==0)
             if env.index==0:
                 if policy_list=='LM':  # LM: 60x60
                     v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
                                                                         # env, state_list, pose_list, velocity_poly_list, policy, action_bound
                 elif policy_list=='stacked_LM':
-                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx)
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
 
@@ -210,7 +192,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # 211228 Visualize DBSCAN subgroups
-            DBSCAN_visualize=True
             if DBSCAN_visualize:
                 img = np.zeros([20,20,3])  # 20 x 20 
                 for i, idx in enumerate(idx):    
