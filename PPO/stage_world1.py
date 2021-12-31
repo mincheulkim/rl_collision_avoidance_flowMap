@@ -280,8 +280,8 @@ class StageWorld():
 
         if self.distance < self.goal_size:  # success reward
             terminate = True
-            #reward_g = 15
-            reward_g = 35
+            reward_g = 15
+            #reward_g = 35
             result = 'Reach Goal'
 
         if self.index==0:
@@ -350,19 +350,19 @@ class StageWorld():
                     dists.append(self.point_to_segment_dist(vert_pos[i][0],vert_pos[i][1],vert_pos[i+1][0],vert_pos[i+1][1], x, y))
                 dist_to_grp[j] = min(dists)
         #print(dist_to_grp)
+        collision_dist = 0.5
+        coll_grp = np.array([1 if (dist_to_grp[j] < collision_dist) else 0 for j in range(len(g_cluster))])
+        #print(coll_grp, coll_grp.sum())
+        reward_grp = -0.25 * coll_grp.sum()   # 0,1,2,~ max grp num
             
-    
-        
-        # 211221 for unicycle model, backward penalty
-        reward = reward_g + reward_c + reward_w
+        reward = reward_g + reward_c + reward_w  # original
+        reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added
+        #print(reward_g, reward_c, reward_w, reward_grp)
         #reward = reward_g + reward_c + reward_w + r_back # 211221
-        #if self.index==0:
-        #    print(reward, 'reward_g:',reward_g, 'reward_b:',r_back)
         '''
         else:  # TODO time penalty
             reward_t = -0.1
         '''
-
         return reward, terminate, result   # float, T or F(base), description
 
     def reset_pose(self):
