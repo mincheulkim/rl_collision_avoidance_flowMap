@@ -30,3 +30,12 @@ PPO/hostfile
 PPO/file.log
 PPO/last_v_r.pickle
 file.log
+PPO/envs/utils.py
+PPO/envs/human.py
+PPO/envs/env_crowd.py
+PPO/envs/agent.py
+.gitignore
+PPO/dbscan/sample/result.png
+PPO/dbscan/README.md
+PPO/dbscan/dbscan_sklean.py
+PPO/dbscan/sample/sample.mat

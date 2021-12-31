@@ -9,6 +9,7 @@ import socket
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import rvo2
 import pysocialforce as psf
+import cv2
 
 
 hostname = socket.gethostname()
@@ -265,7 +266,7 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
             local_maps = np.append(local_maps, source, axis=1)
             #print('run',-1-i)
     #print('after:',local_maps.shape)
-    print('index:',index, index_max)
+    #print('index:',index, index_max)
 
     s_list = Variable(torch.from_numpy(s_list)).float().cuda()
     goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
@@ -274,6 +275,12 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
 
     
     #print(s_list.shape, local_maps_torch.shape) # (1, 3, 512), (1, 3, 60, 60)  # 211213
+    '''
+    test = local_maps_torch.cpu().numpy()
+    print(test[0][0])
+    cv2.imshow('map11',cv2.resize(local_maps[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR))
+    cv2.waitKey(1)
+    '''
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
     

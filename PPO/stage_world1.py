@@ -12,6 +12,8 @@ from std_srvs.srv import Empty
 from std_msgs.msg import Int8
 import message_filters
 
+from scipy.spatial import ConvexHull
+
 
 
 
@@ -258,7 +260,7 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
 
     # TODO: Reward reshape: penalty for circuling around
-    def get_reward_and_terminate(self, t, scaled_action):   # t is increased 1, but initializezd 1 when terminate=True
+    def get_reward_and_terminate(self, t, scaled_action, idx, g_cluster):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state
@@ -324,6 +326,32 @@ class StageWorld():
         if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
             reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
         '''            
+        
+        #print(idx, g_cluster[0], g_cluster)
+        # 211231 compute distance from robot to convex hull of groups
+        dist_to_grp = np.zeros(len(g_cluster))
+        for j in range(len(g_cluster)):
+            #print(g_cluster[j], len(g_cluster[j][0]))
+            if len(g_cluster[j][0])==0 or len(g_cluster[j][0])==1:
+                print('zero or soely!')
+            elif len(g_cluster[j][0])==2:  # 2 humans
+                
+                dist_to_grp[j] = self.point_to_segment_dist(g_cluster[j][0][0][0],g_cluster[j][0][0][1],g_cluster[j][0][1][0],g_cluster[j][0][1][1], x, y)
+                #print(dist_to_grp)
+                #print('robot_pose:',x,y)
+            else:       # more than 3
+                hull = ConvexHull(g_cluster[j][0])
+                dists = []
+                #print(j, hull.vertices)
+                vert_pos = g_cluster[j][0][hull.vertices]
+                #print(vert_pos)
+                for i in range(len(vert_pos)-1):
+                    #print(j, vert_pos[i][0],vert_pos[i][1])
+                    dists.append(self.point_to_segment_dist(vert_pos[i][0],vert_pos[i][1],vert_pos[i+1][0],vert_pos[i+1][1], x, y))
+                dist_to_grp[j] = min(dists)
+        #print(dist_to_grp)
+            
+    
         
         # 211221 for unicycle model, backward penalty
         reward = reward_g + reward_c + reward_w
@@ -708,3 +736,29 @@ class StageWorld():
 
         self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
         self.distance = copy.deepcopy(self.pre_distance)
+        
+    def point_to_segment_dist(self, x1, y1, x2, y2, x3, y3):
+        """
+    Calculate the closest distance between point(x3, y3) and a line segment with two endpoints (x1, y1), (x2, y2)
+    """
+        px = x2 - x1
+        py = y2 - y1
+
+        if px == 0 and py == 0:
+            return np.linalg.norm((x3-x1, y3-y1))
+
+        u = ((x3 - x1) * px + (y3 - y1) * py) / (px * px + py * py)
+
+        if u > 1:
+            u = 1
+        elif u < 0:
+            u = 0
+
+        # (x, y) is the closest point to (x3, y3) on the line segment
+        x = x1 + u * px
+        y = y1 + u * py
+
+        return np.linalg.norm((x - x3, y-y3))
+
+    def dist(x1, y1, x2, y2):
+        return np.sqrt( (x2 - x1)**2 + (y2 - y1)**2 )

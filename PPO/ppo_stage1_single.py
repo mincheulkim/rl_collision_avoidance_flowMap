@@ -53,7 +53,7 @@ num_human = 11
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+policy_list = ''      # select policy. [LM, stacked_LM, '']
 blind_human = True
 
 
@@ -154,6 +154,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #print('idx:',idx,'noise:',noise)
             #print('grp_cluster:',g_cluster,'noise_cluster:',n_cluster)
             
+            #print(g_cluster[0],g_cluster[1],g_cluster[2])
+            
             
             
             # generate robot action (at rank==0)
@@ -206,7 +208,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 cv2.waitKey(1)
             
 
-            if env.index ==0 and LM_visualize:
+            if LM_visualize:
                 # if using _LM, delete [0]
                 if policy_list == 'LM':
                     dist = cv2.resize(LM, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
@@ -242,9 +244,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 cv2.waitKey(1)
 
             
+            #print('idx:',idx,'noise:',noise)
+            #print('grp_cluster:',g_cluster,'noise_cluster:',n_cluster)
+            
+            #print(g_cluster[0],g_cluster[1],g_cluster[2])
+            
+            
+            
             # get informtion
             #r, terminal, result = env.get_reward_and_terminate(step)
-            r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty
+            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, idx, g_cluster)   # 211221 for backward penalty
             if env.index != 0:
                 terminal = False    
             ep_reward += r
