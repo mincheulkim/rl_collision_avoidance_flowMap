@@ -117,7 +117,8 @@ tensorboard --logdir runs/
 - 3. Make subgroups
 ```
 - [x] gather humans in similar groups
-- [ ] DBSCAN or KNN utilize (on-time real group algorithm)
+- [X] DBSCAN or KNN utilize (on-time real group algorithm): DBSCAN
+- [ ] DBSCAN 할때 세개의 카테고리로 세분화: position, heading, magnitude: 참고 RA-L20 Group Split and Merge Prediction ... 논문
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
 ```
 - 4. Reward shaping (after 211217 meeting)

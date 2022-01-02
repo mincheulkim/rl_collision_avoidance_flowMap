@@ -29,7 +29,8 @@ class StageWorld():
         # Define Subscriber
 
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
-        for i in range(11):
+        #for i in range(11):
+        for i in range(21):   # 220102
             sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
             sub_list.append(sub)
         #print('sub_list=',sub_list)
@@ -665,7 +666,8 @@ class StageWorld():
             init_pose_list=[]
             init_goal_list=[]
             circle_radius = 8.
-            groups = [0, 1, 2, 3]
+            #groups = [0, 1, 2, 3]
+            groups = [0, 1, 2, 3, 4, 5]   # 220102
             groups_pose = []
             groups_goal = []
             for i in groups:
@@ -686,7 +688,8 @@ class StageWorld():
                 groups_pose.append([px,py])
                 groups_goal.append([gx,gy])
                 
-            human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
+            #human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
+            human_list=[[0],[1,2,3,4,5,6,7],[8,9,10,11,12],[13,14,15,16],[17,18],[19,20]]   # 220102
             
             for grp_index, group in enumerate(human_list):
                 for i in group:                   

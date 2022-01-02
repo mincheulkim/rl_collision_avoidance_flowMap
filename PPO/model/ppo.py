@@ -464,9 +464,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
 
         # 1. initial states
         initial_state = np.zeros((num_env, 6))
-
-        for i in range(num_env):  # i=0, 1,2,3,4
-            #print(num_env, i, goal_global_list[i], p_list[i])            
+        #print(num_env, 'goal:',goal_global_list, 'plist;',p_list)
+        for i in range(num_env):  # i=0, 1,2,3,4        
             hv = goal_global_list[i] - p_list[i] 
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
             prefv=hv/hs if hs >human_max_speed else hv
@@ -478,9 +477,12 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         groups.append([])  # 1 grp 5 human
         groups.append([])  # 2 groups 3 human
         groups.append([])  # 3 groups 2 human
+        groups.append([])  # 4
+        groups.append([])  # 5
         
 
         # assign humans to groups
+        '''
         groups[0].append(0)
         groups[1].append(1)
         groups[1].append(2)
@@ -492,6 +494,31 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         groups[2].append(8)
         groups[3].append(9)
         groups[3].append(10)
+        
+        '''
+        #7 5 4 2 2 
+        groups[0].append(0)
+        groups[1].append(1)
+        groups[1].append(2)
+        groups[1].append(3)
+        groups[1].append(4)
+        groups[1].append(5)
+        groups[1].append(6)
+        groups[1].append(7)
+        groups[2].append(8)
+        groups[2].append(9)
+        groups[2].append(10)
+        groups[2].append(11)
+        groups[2].append(12)
+        groups[3].append(13)
+        groups[3].append(14)
+        groups[3].append(15)
+        groups[3].append(16)
+        groups[4].append(17)
+        groups[4].append(18)
+        groups[5].append(19)
+        groups[5].append(20)
+        
 
         # 3. assign obstacles
         #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]

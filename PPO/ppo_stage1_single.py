@@ -48,7 +48,8 @@ NUM_ENV = 1 # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
-num_human = 11
+#num_human = 11
+num_human = 21    # 210102 5grp 20 human
 
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
