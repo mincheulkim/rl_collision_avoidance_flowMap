@@ -43,24 +43,26 @@ EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
 CLIP_VALUE = 0.2
-#NUM_ENV = 7
-NUM_ENV = 1 # worlds/Group_circle.world
+NUM_ENV = 1     # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
-#num_human = 11
-num_human = 21    # 210102 5grp 20 human
+num_human = 11
+#num_human = 21    # 210102 5grp 20 human
+# ROLLBACK
 
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '']
-blind_human = True
+policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+#blind_human = True
+test_policy=False
 
 
 # For fixed Randomization  211230
 import random
-SEED = 1234
+#SEED = 1234
+SEED = 4321 # for test
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -84,7 +86,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     global_step = 0
     memory_size = 0
 
-
     if env.index == 0:
         env.reset_world()
 
@@ -104,8 +105,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                    
         #env.set_init_pose(init_pose)
         env.set_init_goal(init_goals[0])
-        
-        #rospy.sleep(1)
 
         obs = env.get_laser_observation()
         obs_stack = deque([obs, obs, obs])
@@ -151,23 +150,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
             g_cluster,n_cluster = dbscan.sort()     # Result SORTING
             #dbscan.plot()          # Visualization results
-            
-            #print('idx:',idx,'noise:',noise)
-            #print('grp_cluster:',g_cluster,'noise_cluster:',n_cluster)
-            
-            #print(g_cluster[0],g_cluster[1],g_cluster[2])
-            
-            
+
             
             # generate robot action (at rank==0)
             if env.index==0:
                 if policy_list=='LM':  # LM: 60x60
-                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, mode=test_policy)
                                                                         # env, state_list, pose_list, velocity_poly_list, policy, action_bound
                 elif policy_list=='stacked_LM':
-                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx)
+                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
                 else:
-                    v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound)
+                    v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
 
             # distribute and execute actions robot and humans
             for i in range(num_human):
@@ -218,13 +211,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
-                    #dist4 = cv2.resize(LM[0][3], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
-                    #dist5 = cv2.resize(LM[0][4], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     cv2.imshow("Local flow map", dist)
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
-                    #cv2.imshow("Local flow map4", dist4)
-                    #cv2.imshow("Local flow map5", dist5)
                 cv2.waitKey(1)
 
             #env.control_pose_specific([0,0,0],0)
@@ -242,18 +231,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     lidar = cv2.applyColorMap(255-lidar, cv2.COLORMAP_JET)
                 lidar = cv2.resize(lidar, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
                 cv2.imshow("Local flow map", lidar)
-                cv2.waitKey(1)
-
-            
-            #print('idx:',idx,'noise:',noise)
-            #print('grp_cluster:',g_cluster,'noise_cluster:',n_cluster)
-            
-            #print(g_cluster[0],g_cluster[1],g_cluster[2])
-            
+                cv2.waitKey(1)          
             
             
             # get informtion
-            #r, terminal, result = env.get_reward_and_terminate(step)
             r, terminal, result = env.get_reward_and_terminate(step, scaled_action, idx, g_cluster)   # 211221 for backward penalty
             if env.index != 0:
                 terminal = False    

@@ -98,7 +98,7 @@ def transform_buffer_stacked_LM(buff):   # 211214
     return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch
 
 
-def generate_action(env, state_list, policy, action_bound):
+def generate_action(env, state_list, policy, action_bound, mode=False):
     #print(state_list)
     #print('hey!!')
     if env.index == 0:
@@ -120,18 +120,21 @@ def generate_action(env, state_list, policy, action_bound):
 
         v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        #scaled_action = np.clip(a, a_min=action_bound[0], a_max=action_bound[1])
+
+        mean_v = mean.data.cpu().numpy()
         scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-        #print('a:',a, 'scaled_action:',scaled_action, 'a[0]:',a[0],'scaled_action_nobar:',np.clip(a, a_min=action_bound[0], a_max=action_bound[1]))
+        if mode==True:
+            scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+
     else:
         v = None
         a = None
         scaled_action = None
         logprob = None
-
+    
     return v, a, logprob, scaled_action
 
-def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound):   # 211130
+def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound, mode=False):   # 211130
     
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []
@@ -184,8 +187,11 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
         
         v, a, logprob, mean = policy(s_list, goal_list, speed_list)
         v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+        mean_v = mean.data.cpu().numpy()
+        
         scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-        #scaled_action = a[0]   # 211221 no scailing
+        if mode==True:
+            scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
         
     else:
         v = None
@@ -197,7 +203,7 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
 
 
 
-def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy, action_bound, index):   # 211213
+def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy, action_bound, index, mode=False):   # 211213
     s_list, goal_list, speed_list = [], [], []
     s_total_list, goal_total_list, speed_total_list = [], [], []
     #print('grp index:', index)
@@ -283,9 +289,13 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     '''
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-    
+
+    mean_v = mean.data.cpu().numpy()
+        
     scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-    #scaled_action = a[0]   # 211221 no scailing
+    
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])    
         
     return v, a, logprob, scaled_action, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
@@ -470,19 +480,19 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
             prefv=hv/hs if hs >human_max_speed else hv
             initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
-
+        # ROLLBACK
         # 2. group #################################
         groups = []
         groups.append([])  # 0 grp as robot
         groups.append([])  # 1 grp 5 human
         groups.append([])  # 2 groups 3 human
         groups.append([])  # 3 groups 2 human
-        groups.append([])  # 4
-        groups.append([])  # 5
+        #groups.append([])  # 4
+        #groups.append([])  # 5
         
 
         # assign humans to groups
-        '''
+        
         groups[0].append(0)
         groups[1].append(1)
         groups[1].append(2)
@@ -518,7 +528,7 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211
         groups[4].append(18)
         groups[5].append(19)
         groups[5].append(20)
-        
+        '''
 
         # 3. assign obstacles
         #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
