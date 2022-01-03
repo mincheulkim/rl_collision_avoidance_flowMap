@@ -23,25 +23,6 @@ class StageWorld():
         self.num_env = num_env   # 5 agents
         node_name = 'StageEnv_' + str(index)   # stageEnv_0?
         rospy.init_node(node_name, anonymous=None)
-        
-        
-
-        # Define Subscriber
-        # ROLLBACK
-        sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
-        for i in range(11):
-        #for i in range(21):   # 220102
-            sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
-            sub_list.append(sub)
-        #print('sub_list=',sub_list)
-
-        queue_size = 10
-        fps = 1000.
-        delay = 1 / fps * 0.5
-
-        #mf = message_filters.ApproximateTimeSynchronizer([sub1, sub2], queue_size, delay)
-        mf = message_filters.ApproximateTimeSynchronizer(sub_list, queue_size, delay)
-        mf.registerCallback(self.callback)
 
         self.pose_list = []
 
@@ -63,11 +44,33 @@ class StageWorld():
         # self.reset_pose = None
 
         self.init_pose = None
-
         self.flow_map = None  # 211026
+        
+        # Initialize Groups and Humans  # 220103
+        self.num_human = 11
+        #self.num_human = 14
+        #self.num_human = 21
+        self.groups = [0, 1, 2, 3]
+        #self.groups = [0, 1, 2, 3, 4]
+        #self.groups = [0, 1, 2, 3, 4, 5]   # 220102
+        self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
+        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]
+        #self.human_list=[[0],[1,2,3,4,5,6,7],[8,9,10,11,12],[13,14,15,16],[17,18],[19,20]]   # 220102
+        
+        # Define Subscriber
+        sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
+        for i in range(self.num_human):
+        #for i in range(21):   # 220102
+            sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
+            sub_list.append(sub)
+            
+        queue_size = 10
+        fps = 1000.
+        delay = 1 / fps * 0.5
 
-        # for get reward and terminate(Didn't use)
-        self.stop_counter = 0
+        mf = message_filters.ApproximateTimeSynchronizer(sub_list, queue_size, delay)
+        mf.registerCallback(self.callback)
+
 
         # -----------Publisher and Subscriber-------------
         cmd_vel_topic = 'robot_' + str(index) + '/cmd_vel'
@@ -589,58 +592,7 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
         
         
-    def initialize_pose_robot_humans(self, rule):   # 211222
-        # reset pose
-        #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
-        '''
-        random_pose = self.generate_group_pose()   # 211129. Groups initialize
-        #rospy.sleep(0.01)
-        rospy.sleep(1.0)   # too laggy
-        self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
-        [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
-
-        # start_time = time.time()
-        while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
-            [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
-            self.control_pose(random_pose)
-
-        #rospy.sleep(0.01)
-        rospy.sleep(1.0)   # too laggy
-        self.is_crashed=False
-
-        # reset goal
-        #[x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
-        self.init_pose = self.get_self_stateGT()
-        if self.index == 0:
-            # for cross scene
-            self.goal_point = [0, 8]
-            # for city scene
-            #self.goal_point = [-13, 10]
-        elif self.index in [1,2,3]:
-            self.goal_point = [8.0, 0.0]
-        elif self.index in [4,5]:
-            self.goal_point = [0.0, -8.0]
-        elif self.index in [6]:
-            self.goal_point = [-8.0, 8.0]
-        else:
-            self.goal_point = [-random_pose[0], -random_pose[1]]                 # set "global" goal
-        [x, y] = self.get_local_goal()               # calculate local(robot's coord) goal
-
-        self.pre_distance = np.sqrt(x ** 2 + y ** 2)   # dist to local goal
-        self.distance = copy.deepcopy(self.pre_distance)
-        '''
-        
-        '''
-        return [[0,-8,0.785],
-                [-5,-5,0.785],[-6,-6,0.785],[-6,-5,0.785],[-5,-6,0.785],[-7,-6,0.785],
-                [-5,5,0.785],[-5,6,0.785],[-6,5,0.785],
-                [7,1,0.785*4],[7,2,0.785*4]],[
-                    [0,8],
-                    [5,5],[6,6],[6,5],[5,6],[7,6],
-                    [5,-5],[5,-6],[6,-5],
-                    [-7,-1],[-7,-2]]
-        '''
-        
+    def initialize_pose_robot_humans(self, rule):   # 211222        
         init_pose_list = [[0,-8,np.pi/2],
                     [-7,-0,np.pi/2],[-6,-0,np.pi/2],[-5,-0,np.pi/2],[-4,-0,np.pi/2],[-3,-0,np.pi/2],
                     [-2,0,np.pi*3/2],[-1,0,np.pi*3/2],[-0,0,np.pi*3/2],
@@ -649,17 +601,16 @@ class StageWorld():
                     [-2,7],[-1,7],[-0,7],[1,7],[4,7],
                     [-2,-7],[-1,-7],[-0,-7],
                     [1,-7],[2,-7]]
-        groups = None
+
         if rule=='group_circle_crossing':   #         Rule circle_crossing: generate start position on a circle, goal position is at the opposite side
             print('scenario:',rule)
             init_pose_list=[]
             init_goal_list=[]
             circle_radius = 8.
-            groups = [0, 1, 2, 3]
-            #groups = [0, 1, 2, 3, 4, 5]   # 220102
+
             groups_pose = []
             groups_goal = []
-            for i in groups:
+            for i in self.groups:
                 while True:            
                     angle = np.random.random() * np.pi * 2
                     px = circle_radius * np.cos(angle)
@@ -676,11 +627,8 @@ class StageWorld():
                         break
                 groups_pose.append([px,py])
                 groups_goal.append([gx,gy])
-                
-            human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
-            #human_list=[[0],[1,2,3,4,5,6,7],[8,9,10,11,12],[13,14,15,16],[17,18],[19,20]]   # 220102
             
-            for grp_index, group in enumerate(human_list):
+            for grp_index, group in enumerate(self.human_list):
                 for i in group:                   
                     while True:
                         angle = np.random.random()* np.pi * 2
@@ -703,16 +651,12 @@ class StageWorld():
                     theta = np.arctan2(gy, gx)
                     init_pose_list.append([px,py,theta])
                     init_goal_list.append([gx,gy])
-                    #print('pose_list:',init_pose_list)
-                
-            # 1. create the groups
-            # 2. assinge humans properly
-            pass
+                    
         elif rule == 'square_crossing':   #         Rule square_crossing: generate start/goal position at two sides of y-axis
             pass
         elif 'circle_crossing':
             pass
-        
+
         return init_pose_list, init_goal_list
         
         

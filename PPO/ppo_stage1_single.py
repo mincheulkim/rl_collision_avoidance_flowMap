@@ -47,9 +47,6 @@ NUM_ENV = 1     # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
-num_human = 11
-#num_human = 21    # 210102 5grp 20 human
-# ROLLBACK
 
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
@@ -96,6 +93,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         # senario reset option
         init_poses = None
         init_goals = None         
+        
+        num_human = env.num_human
+        #num_human = 21    # 210102 5grp 20 human
         
         if env.index==0:
             rule = 'group_circle_crossing'  # crossing

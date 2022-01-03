@@ -197,9 +197,6 @@ class stacked_LM_Policy(nn.Module):
 
 
 
-
-
-
 class MLPPolicy(nn.Module):
     def __init__(self, obs_space, action_space):
         super(MLPPolicy, self).__init__()
