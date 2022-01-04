@@ -58,8 +58,8 @@ test_policy=False
 
 # For fixed Randomization  211230
 import random
-#SEED = 1234
-SEED = 4321 # for test
+SEED = 1234  # for training
+#SEED = 4321 # for test
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)

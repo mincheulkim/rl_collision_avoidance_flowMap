@@ -113,6 +113,13 @@ tensorboard --logdir runs/
 - [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
 - [x] visualize local occupancy map(OpenCV)  (after 211105 meeting)
 - [x] use conv2D, rather than FC for occupancy map: 2 Conv2D, 2 MaxPool2D
+- Dynamic Occpuancy Field
+-- [ ] initial occupancy: space by dynamic objects
+-- [ ] temporal motion field: predicts a 2D velocity filed to describe the motion of objects
+-- [ ] DOF = initial occpuancy + temporal motion filed(11x0.5=5s)
+             어느 공간이 누가 점유 + 그들이 어떻게 움직일 것인지
+-- Prediction은 로봇 주변 BEV기준(or 로봇이 최하단에 있는) discretized된 each cell에 이루어 진다.
+-- 모든 predictions은 modelled as random variable, capturing the uncertainty of the predictions
 ```
 - 3. Make subgroups
 ```

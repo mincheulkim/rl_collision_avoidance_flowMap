@@ -137,9 +137,9 @@ agent( pose [7.00 0.00 0.00 225.00])     # human9
 agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10
 
 # ADD more groups...
-#agent( pose [0.00 0.00 0.00 225.00])
-#agent( pose [0.00 1.00 0.00 225.00])
-#agent( pose [1.00 0.00 0.00 225.00])
+agent( pose [0.00 0.00 0.00 225.00])
+agent( pose [0.00 1.00 0.00 225.00])
+agent( pose [1.00 0.00 0.00 225.00])
 #agent( pose [1.00 1.00 0.00 225.00])
 #agent( pose [1.00 2.00 0.00 225.00])
 #agent( pose [2.00 1.00 0.00 225.00])

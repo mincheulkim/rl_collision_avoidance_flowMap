@@ -265,7 +265,7 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     
     # 211230 fit max channel size
     #print(local_maps.shape, local_maps.shape[1], index, index_max)
-    fit_channel_num = 5
+    fit_channel_num = 10
     source = np.zeros((1, 1, 60, 60))
     if local_maps.shape[1] != fit_channel_num:
         for i in range(fit_channel_num-local_maps.shape[1]):
@@ -287,6 +287,7 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     cv2.imshow('map11',cv2.resize(local_maps[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR))
     cv2.waitKey(1)
     '''
+    
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)    # from Stacked_LM_Policy
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
 
@@ -669,7 +670,7 @@ def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,  
     targets = targets.reshape(num_step*num_env, 1)
 
     local_map_width = 60   # 211214
-    fix_group_num = 5   # 211230
+    fix_group_num = 10   # 211230 5 # 220104 10
     local_mapss = local_mapss.reshape((num_step*num_env, fix_group_num, local_map_width, local_map_width))
 
     for update in range(epoch):
