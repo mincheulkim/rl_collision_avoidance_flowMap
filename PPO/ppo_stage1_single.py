@@ -22,7 +22,7 @@ from collections import deque #test
 
 from model.net import MLPPolicy, CNNPolicy, stacked_LM_Policy #test
 from stage_world1 import StageWorld #test
-from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM  # 211214
+from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
@@ -33,8 +33,8 @@ LASER_BEAM = 512
 LASER_HIST = 3
 #HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
 #HORIZON = 3000    # for city scene
-#HORIZON = 2048    # v3
-HORIZON = 3072    # v4 static obstacle
+HORIZON = 2048    # v3
+#HORIZON = 3072    # v4 static obstacle
 GAMMA = 0.99
 LAMDA = 0.95
 BATCH_SIZE = 1024   # is small batch is good? 64?
@@ -51,7 +51,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'stacked_LM'      # select policy. [LM, stacked_LM, '']
+policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
 #blind_human = True
 test_policy=False
 
@@ -128,7 +128,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             state_list = comm.gather(state, root=0)
             #pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
             
-            speed_poly_list = comm.gather(speed_poly, root=0)
+            #speed_poly_list = comm.gather(speed_poly, root=0)
+            #print('speed_poliy:',speed_poly_list)
             #goal_global_list = comm.gather(goal_global, root=0)
 
             if env.index==0:
@@ -138,11 +139,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose_list = env.pose_list
             goal_global_list = init_goals
             pose_list = np.array(pose_list)
-            #print('1st:',pose_list[1:])
             
+            speed_poly_list = env.speed_poly_list
+            speed_poly_list =np.array(speed_poly_list)
+                        
             # generate humans action
             human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
-            
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -161,6 +163,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
                 else:
                     v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
+                    
+            #print('LM.shape:',LM.shape)   # 1, 3, 60, 60
 
             # distribute and execute actions robot and humans
             for i in range(num_human):
@@ -182,6 +186,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     scaled_action = (length, diff)   
                     
                     env.control_vel_specific(scaled_action, i)
+                    
                      
             # rate.sleep()
             rospy.sleep(0.001)
@@ -257,13 +262,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             ############training#######################################################################################
             if global_step % HORIZON == 0:
-                state_next_list = comm.gather(state_next, root=0)
-                #pose_next_list = comm.gather(pose_next, root=0)     # 211019. 5 states for each human
-                speed_poly_next_list = comm.gather(speed_next_poly, root=0)
+                state_next_list = comm.gather(state_next, root=0)   # robot state
                 
-                pose_next_list = env.pose_list
+                pose_next_list = env.pose_list     # robot+human state
                 pose_next_list = np.array(pose_next_list)
-                #print('2nd:',pose_next_list)
+                
+                speed_poly_next_list = env.speed_poly_list             # 220105
+                speed_poly_next_list =np.array(speed_poly_list)
+                
                 if env.index == 0:   # get last_v_r
                     state_next_list_new = state_next_list[0:1]   # for robot
                     if policy_list=='LM':  # LM: 60x60    # 211214
@@ -274,6 +280,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 else:
                     last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
+                    
+
 
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
@@ -299,7 +307,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
                         #memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                         memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
-                        ppo_update_stage1_stacked_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                        if policy_list == 'stacked_LM':
+                            ppo_update_stage1_stacked_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                                #num_env=NUM_ENV, frames=LASER_HIST,
+                                                num_env=1, frames=LASER_HIST,
+                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+                        elif policy_list == 'LM':
+                            ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
                                                 epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
                                                 #num_env=NUM_ENV, frames=LASER_HIST,
                                                 num_env=1, frames=LASER_HIST,

@@ -94,7 +94,6 @@ def transform_buffer_stacked_LM(buff):   # 211214
     v_batch = np.asarray(v_batch)
 
     local_maps_batch = np.asarray(local_maps_batch)
-    #return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch
     return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch
 
 
@@ -136,69 +135,62 @@ def generate_action(env, state_list, policy, action_bound, mode=False):
 
 def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound, mode=False):   # 211130
     
-    if env.index == 0:
-        s_list, goal_list, speed_list = [], [], []
-        for i in state_list:
-            s_list.append(i[0])
-            goal_list.append(i[1])
-            speed_list.append(i[2])
-            
-        s_list = np.asarray(s_list)
-        goal_list = np.asarray(goal_list)
-        speed_list = np.asarray(speed_list)
-        pose_list = np.asarray(pose_list)
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
         
-        # Build occupancy map
-        cell_size=1*0.1
-        map_size=6
-        local_maps = []
-        
-        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+    pose_list = np.asarray(pose_list)
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
+    # Build occupancy map
+    cell_size=1*0.1
+    map_size=6
+    local_maps = []
+    
+    local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+    for j in range(3):  # pos, velx,vely
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]
-            #print(i, diff,': ', pose-pose_list[0])   # calculate diff position vs robot[0]
-            '''
-            mod_diff_x = np.floor(diff[0] / cell_size + map_size/2)
-            mod_diff_y = np.floor(diff[1] / cell_size + map_size/2)
-            mod_diff_y = np.abs(mod_diff_y)
-            '''
             mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
             mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
             
-            
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-                #print(i, mod_diff_x, 'original diff:',diff[1], (diff[1]-map_size/2)/cell_size, np.ceil((diff[1]-map_size/2)/cell_size),'abs:',mod_diff_y)
-                local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
-            #print('i:',mod_diff_y, mod_diff_x, i)
+                if j==0:   # pose occupancy
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
+                elif j==1: # vel x
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=speed_poly_list[i][0]-speed_poly_list[0][0]
+                elif j==2: # vel y
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=speed_poly_list[i][1]-speed_poly_list[0][1]
+        local_maps.append(local_map.tolist())
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+
+    local_maps = [local_maps]   # 211214 to match shape of robot_state (3072, 1, 3, 512) and local_map(30712, 1, 3, 60, 60)
+    local_maps = np.array(local_maps)
+
+    np.set_printoptions(threshold=np.inf)
+    #print(local_maps[:,2,:,:])
 
 
-        speed_list_human, pose_list_human = [], []  # n-1
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+    #print(goal_list, speed_list)
+    
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+    mean_v = mean.data.cpu().numpy()
+    
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
         
-        for i in velocity_list:  # total # number of human's state
-            speed_list_human.append(i)    # veloclity
-        for i in pose_list:  # total # number of human's state
-            pose_list_human.append(i)    # veloclity
-        speed_list_human = np.asarray(speed_list_human)
-        pose_list_human = np.asarray(pose_list_human)
-
-        s_list = Variable(torch.from_numpy(s_list)).float().cuda()
-        goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
-        speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-        
-        v, a, logprob, mean = policy(s_list, goal_list, speed_list)
-        v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
-        mean_v = mean.data.cpu().numpy()
-        
-        scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
-        if mode==True:
-            scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
-        
-    else:
-        v = None
-        a = None
-        scaled_action = None
-        logprob = None
-    return v, a, logprob, scaled_action, local_map   # local_map = np.ndarray type, shape=(60,60)
+    
+    return v, a, logprob, scaled_action, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
 
 
@@ -225,7 +217,6 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     
     local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
     index_max = max(index)   # in case 3    # index_max = 3, index=[1 1 1 1 1 2 2 2 3 3]
-    #print(index_max, index)
     
     # TODO index_map만큼 돌리고, local_maps=[[],[],[]](3개) 또는 [[],[],[],[]](4개) 형태로 나오게 함
     
@@ -251,17 +242,6 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
     
     local_maps = [local_maps]   # 211214 to match shape of robot_state (3072, 1, 3, 512) and local_map(30712, 1, 3, 60, 60)
     local_maps = np.array(local_maps)
-
-    speed_list_human, pose_list_human = [], []  # n-1
-    
-    '''
-    for i in velocity_list:  # total # number of human's state
-        speed_list_human.append(i)    # veloclity
-    for i in pose_list:  # total # number of human's state
-        pose_list_human.append(i)    # veloclity
-    speed_list_human = np.asarray(speed_list_human)
-    pose_list_human = np.asarray(pose_list_human)
-    '''
     
     # 211230 fit max channel size
     #print(local_maps.shape, local_maps.shape[1], index, index_max)
@@ -650,8 +630,6 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
                                                     dist_entropy.detach().cpu().numpy())
             logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
 
-    #print('update')
-
 def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,    # 211214
                coeff_entropy=0.02, clip_value=0.2,
                num_step=2048, num_env=1, frames=3, obs_size=512, act_size=2):     # num_step = 1000, batch_size=1024
@@ -659,7 +637,7 @@ def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,  
     obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, local_mapss = memory
 
     advs = (advs - advs.mean()) / advs.std()
-    print('ppo_update_stage1_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'local mapss.shape:',local_mapss.shape)
+    print('ppo_update_stage1_stacked_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'local mapss.shape:',local_mapss.shape)
 
     obss = obss.reshape((num_step*num_env, frames, obs_size))    # (3072, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
     goals = goals.reshape((num_step*num_env, 2))
@@ -671,7 +649,8 @@ def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,  
 
     local_map_width = 60   # 211214
     fix_group_num = 10   # 211230 5 # 220104 10
-    local_mapss = local_mapss.reshape((num_step*num_env, fix_group_num, local_map_width, local_map_width))
+    local_mapss = local_mapss.reshape((num_step*num_env, fix_group_num, local_map_width, local_map_width))    # -> (2048, 10, 60, 60)
+    #print('reshape:',local_mapss.shape)     
 
     for update in range(epoch):
         sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,   # from 0~999, pick 1024 nums
@@ -713,6 +692,71 @@ def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,  
             logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
 
     #print('update')
+    
+def ppo_update_stage1_LM(policy, optimizer, batch_size, memory, epoch,    # 211214
+               coeff_entropy=0.02, clip_value=0.2,
+               num_step=2048, num_env=1, frames=3, obs_size=512, act_size=2):     # num_step = 1000, batch_size=1024
+    #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, local_mapss = memory
+
+    advs = (advs - advs.mean()) / advs.std()
+    print('ppo_update_stage1_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'local mapss.shape:',local_mapss.shape)
+                                                                                                                                 # BE (2048, 1, 3, 60, 60)
+
+    obss = obss.reshape((num_step*num_env, frames, obs_size))    # (3072, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
+    goals = goals.reshape((num_step*num_env, 2))
+    speeds = speeds.reshape((num_step*num_env, 2))
+    actions = actions.reshape(num_step*num_env, act_size)
+    logprobs = logprobs.reshape(num_step*num_env, 1)
+    advs = advs.reshape(num_step*num_env, 1)
+    targets = targets.reshape(num_step*num_env, 1)
+
+    local_map_width = 60   # 211214
+    fix_group_num = 3   # 211230 5 # 220104 10
+    fix_num_channel = 3 # pos, velx, vely
+    fix_seq = 8 # t-7, t-6, ..., t
+    local_mapss = local_mapss.reshape((num_step*num_env, fix_group_num, local_map_width, local_map_width))    # BE (2048, 3, 60, 60)  -> TODO(2048, 10, 3, 60, 60)  B S C W H
+
+    for update in range(epoch):
+        sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,   # from 0~999, pick 1024 nums
+                               drop_last=False)
+        for i, index in enumerate(sampler):
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
+
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()  
+
+            sampled_local_maps = Variable(torch.from_numpy(local_mapss[index])).float().cuda()  # 211214
+
+                                                                        # (1024, 3, 512)  (1024, 2)      (1024, 2)        (1024, 2)    be (1024, 3, 60, 60)
+            #new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_local_maps)   # TODO
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)   # Before
+
+            sampled_logprobs = sampled_logprobs.view(-1, 1)
+            ratio = torch.exp(new_logprob - sampled_logprobs)
+
+            sampled_advs = sampled_advs.view(-1, 1)
+            surrogate1 = ratio * sampled_advs
+            surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()
+
+            sampled_targets = sampled_targets.view(-1, 1)
+            value_loss = F.mse_loss(new_value, sampled_targets)
+
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            #loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(
+                                                    dist_entropy.detach().cpu().numpy())
+            logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
+    
 
 
 def ppo_update_stage2(policy, optimizer, batch_size, memory, filter_index, epoch,

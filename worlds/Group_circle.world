@@ -120,26 +120,26 @@ agent( pose [0.00 -8.00 0.00 90.00] name "robot" color "red")
 # Total 3 Groups
 # ref. Don't be Rude! Learning Group-aware Policies for Robot Navigation
 # Group 1: 5 humans
-agent( pose [-5.00 -5.00 0.00 45.00])   # human1, Leader
-agent( pose [-6.00 -5.00 0.00 45.00])  # human2
-agent( pose [-5.00 -6.00 0.00 45.00])  # human3
-agent( pose [-6.00 -6.00 0.00 45.00])  # human4
-agent( pose [-5.50 -5.50 0.00 45.00])  # human5
+agent( pose [-5.00 -5.00 0.00 45.00] color "yellow")   # human1, Leader
+agent( pose [-6.00 -5.00 0.00 45.00] color "yellow")  # human2
+agent( pose [-5.00 -6.00 0.00 45.00] color "yellow")  # human3
+agent( pose [-6.00 -6.00 0.00 45.00] color "yellow")  # human4
+agent( pose [-5.50 -5.50 0.00 45.00] color "yellow")  # human5
 
 # Group 2: 3 humans
-agent( pose [-5.00 5.00 0.00 315.00])    # human6, Leader
-agent( pose [-6.00 5.00 0.00 315.00])    # human7
-agent( pose [-5.00 6.00 0.00 315.00])    # human8
+agent( pose [-5.00 5.00 0.00 315.00] color "black")    # human6, Leader
+agent( pose [-6.00 5.00 0.00 315.00] color "black")    # human7
+agent( pose [-5.00 6.00 0.00 315.00] color "black")    # human8
 
 
 # Group 3: 2 humans
-agent( pose [7.00 0.00 0.00 225.00])     # human9
+agent( pose [7.00 0.00 0.00 225.00] color "blue")     # human9
 agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10
 
 # ADD more groups...
-agent( pose [0.00 0.00 0.00 225.00])
-agent( pose [0.00 1.00 0.00 225.00])
-agent( pose [1.00 0.00 0.00 225.00])
+agent( pose [0.00 0.00 0.00 225.00] color "green")
+agent( pose [0.00 1.00 0.00 225.00] color "green")
+agent( pose [1.00 0.00 0.00 225.00] color "green")
 #agent( pose [1.00 1.00 0.00 225.00])
 #agent( pose [1.00 2.00 0.00 225.00])
 #agent( pose [2.00 1.00 0.00 225.00])

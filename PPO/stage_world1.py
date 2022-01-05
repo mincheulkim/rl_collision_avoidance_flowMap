@@ -25,6 +25,7 @@ class StageWorld():
         rospy.init_node(node_name, anonymous=None)
 
         self.pose_list = []
+        self.speed_poly_list = []  # 220104
 
         self.beam_mum = beam_num   # 512
         self.laser_cb_num = 0
@@ -59,6 +60,7 @@ class StageWorld():
         
         # Define Subscriber
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
+        
         for i in range(self.num_human):
         #for i in range(21):   # 220102
             sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
@@ -124,15 +126,22 @@ class StageWorld():
 
     def callback(self, *msgs):
         pose_list = []
+        speed_poly_list=[]
+        
         for msg in msgs:
             #msg_list.append(i)
             Quaternious = msg.pose.pose.orientation
             Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
             #self.state_GT = [msg.pose.pose.position.x, msg.pose.pose.position.y, Euler[2]]
             x,y=msg.pose.pose.position.x, msg.pose.pose.position.y
+            vx=msg.twist.twist.linear.x
+            vy=msg.twist.twist.linear.y
             pose_list.append([x,y, Euler[2]])
+            speed_poly_list.append([vx,vy])
+            
             #self.pose_list.append([x,y, Euler[2]])
         self.pose_list = pose_list
+        self.speed_poly_list = speed_poly_list
         
         #self.post_list = post_lists
         #for i in range(len(msg_list)):
