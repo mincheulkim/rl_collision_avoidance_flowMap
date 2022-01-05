@@ -20,7 +20,7 @@ from mpi4py import MPI #test
 from torch.optim import Adam #test
 from collections import deque #test
 
-from model.net import MLPPolicy, CNNPolicy, stacked_LM_Policy #test
+from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
@@ -33,11 +33,13 @@ LASER_BEAM = 512
 LASER_HIST = 3
 #HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
 #HORIZON = 3000    # for city scene
-HORIZON = 2048    # v3
+#HORIZON = 2048    # v3
+HORIZON = 1024    # v3
 #HORIZON = 3072    # v4 static obstacle
 GAMMA = 0.99
 LAMDA = 0.95
-BATCH_SIZE = 1024   # is small batch is good? 64?
+#BATCH_SIZE = 1024   # is small batch is good? 64?
+BATCH_SIZE = 32   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
 #BATCH_SIZE = 128   # is small batch is good? 64?
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
@@ -111,6 +113,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         goal = np.asarray(env.get_local_goal())
         speed = np.asarray(env.get_self_speed())
         state = [obs_stack, goal, speed]
+        
+        LM = np.zeros((3, 60, 60))
+        LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
+        #LM_stack = deque([[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]]])
+        
+        
 
         speed_poly = np.asarray(env.get_self_speed_poly())  # 211103
         pose_ori = env.get_self_stateGT()   # 211019
@@ -155,16 +163,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             
             # generate robot action (at rank==0)
-            if env.index==0:
-                if policy_list=='LM':  # LM: 60x60
-                    v, a, logprob, scaled_action, LM =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, mode=test_policy)
-                                                                        # env, state_list, pose_list, velocity_poly_list, policy, action_bound
-                elif policy_list=='stacked_LM':
-                    v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
-                else:
-                    v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
-                    
-            #print('LM.shape:',LM.shape)   # 1, 3, 60, 60
+            if policy_list=='LM':  # LM: 60x60
+                # 1. generate local map
+                
+                # 2. generate actions
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)
+                                                                    # env, state_list, pose_list, velocity_poly_list, policy, action_bound
+            elif policy_list=='stacked_LM':
+                v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
+            else:
+                v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
+            
 
             # distribute and execute actions robot and humans
             for i in range(num_human):
@@ -224,7 +233,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #env.control_pose_specific([0,0,0],0)
 
             # LIDAR visualize, 3 * 512 2D LIDAR history map  # 211220
-            if env.index ==0 and LIDAR_visualize:
+            if LIDAR_visualize:
                 greyscale = False
                 if greyscale:
                     #robot_state[0][0][0](t-2), [0][0][1], [0][0][2](current)
@@ -259,6 +268,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose_next = np.asarray(pose_ori_next[:2])   # 211019
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
+            
 
             ############training#######################################################################################
             if global_step % HORIZON == 0:
@@ -270,63 +280,72 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 speed_poly_next_list = env.speed_poly_list             # 220105
                 speed_poly_next_list =np.array(speed_poly_list)
                 
-                if env.index == 0:   # get last_v_r
-                    state_next_list_new = state_next_list[0:1]   # for robot
-                    if policy_list=='LM':  # LM: 60x60    # 211214
-                        last_v_r, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound)
-                    elif policy_list=='stacked_LM':
-                        last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx)
-                    else:
-                        last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
+                state_next_list_new = state_next_list[0:1]   # for robot
+                if policy_list=='LM':  # LM: 60x60    # 211214
+                    last_v_r, _, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack)
+                elif policy_list=='stacked_LM':
+                    last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx)
                 else:
-                    last_v, _, _, _ = generate_action(env=env, state_list=state_next_list, policy=policy, action_bound=action_bound)
-                    
+                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
+                
+            
 
 
             # add transitons in buff and update policy
             r_list = comm.gather(r, root=0)
             terminal_list = comm.gather(terminal, root=0)
-            if env.index ==0:
-                r_list_new = r_list[0:1]
-                terminal_list_new=terminal_list[0:1]
-
+            
+            r_list_new = r_list[0:1]
+            terminal_list_new=terminal_list[0:1]
+            
             #if env.index == 0:  (original)
             if env.index == 0 and not (step == 1 and terminal):
                 ############## LM or stacekd LM ######################################################
-                if policy_list =='LM' or policy_list == 'stacked_LM':
-                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM))   # 211214
+                if policy_list =='LM':
+                    
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
 
                     memory_size += 1
 
                     if len(buff) > HORIZON - 1:
-                        #s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
                         s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
                             transform_buffer_stacked_LM(buff=buff)
 
                         t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
-                        #memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                         memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
-                        if policy_list == 'stacked_LM':
-                            ppo_update_stage1_stacked_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
-                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
-                                                #num_env=NUM_ENV, frames=LASER_HIST,
-                                                num_env=1, frames=LASER_HIST,
-                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
-                        elif policy_list == 'LM':
-                            ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
-                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
-                                                #num_env=NUM_ENV, frames=LASER_HIST,
-                                                num_env=1, frames=LASER_HIST,
-                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+                        
 
-                        #with open('buff.pickle', 'wb') as f:                  # 211215. save buffer
-                        #    pickle.dump(buff[1:], f, pickle.HIGHEST_PROTOCOL)
-                        #with open('last_v_r.pickle', 'wb') as f:                  # 211215. save buffer
-                        #    pickle.dump(last_v_r, f, pickle.HIGHEST_PROTOCOL)
+                        ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                            num_env=1, frames=LASER_HIST,
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
 
                         buff = []
                         global_update += 1
+                        
+                elif policy_list == 'stacked_LM':
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM))   # 211214
+
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
+                            transform_buffer_stacked_LM(buff=buff)
+
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        ppo_update_stage1_stacked_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                            #num_env=NUM_ENV, frames=LASER_HIST,
+                                            num_env=1, frames=LASER_HIST,
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+                    
+                        buff = []
+                        global_update += 1
+
 
                 ############## original method ######################################################
                 else:
@@ -367,23 +386,22 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
 
         #####save policy and logger##############################################################################################
-        if env.index == 0:
-            #if global_update != 0 and global_update % 5 == 0:
-            if global_update != 0 and global_update % 2 == 0:   # 211217
-                #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
-                torch.save(policy.state_dict(), policy_path + '/Stage1')
-                #torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
-                torch.save(policy, policy_path + '/Stage1_tot')
-                logger.info('########################## model saved when update {} times#########'
-                            '################'.format(global_update))
-            
-            
-            #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
-            #distance = 0
-            if not (step==2 and terminal):
-                logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
-                        (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
-                logger_cal.info(ep_reward)
+        #if global_update != 0 and global_update % 5 == 0:
+        if global_update != 0 and global_update % 2 == 0:   # 211217
+            #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
+            torch.save(policy.state_dict(), policy_path + '/Stage1')
+            #torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
+            torch.save(policy, policy_path + '/Stage1_tot')
+            logger.info('########################## model saved when update {} times#########'
+                        '################'.format(global_update))
+        
+        
+        #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+        #distance = 0
+        if not (step==2 and terminal):
+            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
+            logger_cal.info(ep_reward)
                 
 
         ###################################################################################################
@@ -435,6 +453,9 @@ if __name__ == '__main__':
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)
             policy = stacked_LM_Policy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'LM':   # 220105
+            policy_path = 'policy'
+            policy = LM_Policy(frames=LASER_HIST, action_space=2)
         else:
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)

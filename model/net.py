@@ -35,8 +35,6 @@ class CNNPolicy(nn.Module):
         self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.critic = nn.Linear(128, 1)
 
-
-
     def forward(self, x, goal, speed):
         """
             returns value estimation, action, log_action_prob
