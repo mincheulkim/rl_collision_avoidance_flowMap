@@ -66,6 +66,8 @@ class CNNPolicy(nn.Module):
         #---------------------------------------------------------------------#
 
         # value
+        
+        '''
         v = F.relu(self.crt_fea_cv1(x))
         v = F.relu(self.crt_fea_cv2(v))
         v = v.view(v.shape[0], -1)
@@ -73,6 +75,8 @@ class CNNPolicy(nn.Module):
         v = torch.cat((v, goal, speed), dim=-1)
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)
+        '''
+        v = self.critic(a)
 
         return v, action, logprob, mean
 
