@@ -31,16 +31,15 @@ from dbscan.dbscan import DBSCAN
 MAX_EPISODES = 5000
 LASER_BEAM = 512
 LASER_HIST = 3
-#HORIZON = 1024    # originaly 128. maybe it is memory size?. for static obstacle scene?
-#HORIZON = 3000    # for city scene
-#HORIZON = 2048    # v3
+
+
 HORIZON = 1024    # v3
-#HORIZON = 3072    # v4 static obstacle
+#HORIZON = 3072    # original
 GAMMA = 0.99
 LAMDA = 0.95
-#BATCH_SIZE = 1024   # is small batch is good? 64?
-BATCH_SIZE = 32   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
-#BATCH_SIZE = 128   # is small batch is good? 64?
+#BATCH_SIZE = 1024   # oriignal
+BATCH_SIZE = 256   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
+
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
 #CLIP_VALUE = 0.1
@@ -53,7 +52,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
+policy_list = ''      # select policy. [LM, stacked_LM, '']
 #blind_human = True
 test_policy=False
 

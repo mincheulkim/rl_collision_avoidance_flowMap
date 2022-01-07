@@ -99,24 +99,29 @@ class LM_Policy(nn.Module):
         self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.act_fc1 = nn.Linear(128*32, 256)
-        self.act_fc2 =  nn.Linear(256+2+2, 128)
+        #self.act_fc2 =  nn.Linear(256+2+2, 128)
+        self.act_fc2 =  nn.Linear(256+2+2+512, 128)
         self.actor1 = nn.Linear(128, 1)
         self.actor2 = nn.Linear(128, 1)
 
         self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
-        self.crt_fc2 = nn.Linear(256+2+2, 128)
+        #self.crt_fc2 = nn.Linear(256+2+2, 128)
+        self.crt_fc2 = nn.Linear(256+2+2+512, 128)
         self.critic = nn.Linear(128, 1)
         
         
         
         # convLSTM
-        nf = 64
+        nf = 16
         input_chanel = 3
         padding = 3 // 2, 3 // 2
-        self.conv1 = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
-        self.conv2 = nn.Conv2d(in_channels=nf+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.act_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        #self.conv2 = nn.Conv2d(in_channels=nf+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.crt_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        
+        self.act_conv_fc = nn.Linear(16*15*15, 512)
         
         
 
@@ -131,14 +136,14 @@ class LM_Policy(nn.Module):
         #print(local_maps.shape)  # 1, 8, 3, 60, 60    B, S, C, W, H        # 1024, 8, 3, 60, 60
 
         a = F.relu(self.act_fea_cv1(x))
-        a = F.relu(self.act_fea_cv2(a))
-        a = a.view(a.shape[0], -1)
+        a = F.relu(self.act_fea_cv2(a)) # 1, 32, 128
+        a = a.view(a.shape[0], -1) #1, 4096
         a = F.relu(self.act_fc1(a))
         
         # convLSTM
         # initialize hidden
-        h_t, c_t = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv1.weight.device),torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv1.weight.device)
-        h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
+        h_t, c_t = torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.act_conv.weight.device)
+        #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
         
         for t in range(local_maps.shape[1]):   # 8
             
@@ -149,8 +154,8 @@ class LM_Policy(nn.Module):
 
             combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
-            combined_conv = self.conv1(combined)
-            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 64, dim=1)
+            combined_conv = self.act_conv(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 16, dim=1)
             i = torch.sigmoid(cc_i)
             f = torch.sigmoid(cc_f)
             o = torch.sigmoid(cc_o)
@@ -160,10 +165,9 @@ class LM_Policy(nn.Module):
             h_next = o * torch.tanh(c_next)
             h_t=h_next
             c_t=c_next
-            
-            
 
             #################
+            '''
             input_tensor=h_t
             cur_state=[h_t2, c_t2]
             
@@ -183,14 +187,21 @@ class LM_Policy(nn.Module):
             
             h_t2=h_next
             c_t2=c_next
+            '''
             
         # encoder_vector
-        encoder_vector = h_t2
-        #print(encoder_vector.shape)
+        #encoder_vector = h_t2
+        encoder_vector = h_t
+        encoder_vector=F.max_pool2d(encoder_vector, 2)                          
+        encoder_vector=F.max_pool2d(encoder_vector, 2)                          
+        #print(x.shape, encoder_vector.shape)   # 1, 16, 15, 15  
+        encoder_vector=encoder_vector.view(encoder_vector.shape[0], -1) #1, 3600
+        vvv=F.relu(self.act_conv_fc(encoder_vector))
+        #print(vvv.shape)    # 1, 512
         
-        
-
-        a = torch.cat((a, goal, speed), dim=-1)
+        # dbscan 그룹 채널을 convlstm 채널에 넣기
+        #a = torch.cat((a, goal, speed), dim=-1)
+        a = torch.cat((a, goal, speed, vvv), dim=-1)
         a = F.relu(self.act_fc2(a))
         mean1 = torch.sigmoid(self.actor1(a))
         mean2 = torch.tanh(self.actor2(a))
@@ -205,14 +216,21 @@ class LM_Policy(nn.Module):
         
         #---------------------------------------------------------------------#
 
+
+
         # value
+        '''
         v = F.relu(self.crt_fea_cv1(x))
         v = F.relu(self.crt_fea_cv2(v))
         v = v.view(v.shape[0], -1)
         v = F.relu(self.crt_fc1(v))
-        v = torch.cat((v, goal, speed), dim=-1)
+        #v = torch.cat((v, goal, speed), dim=-1)
+        v = torch.cat((v, goal, speed, vvv), dim=-1)
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)
+        '''
+        v=self.critic(a)
+        
 
         return v, action, logprob, mean
 
