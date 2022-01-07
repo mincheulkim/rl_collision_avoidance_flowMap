@@ -52,7 +52,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '']
+policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
 #blind_human = True
 test_policy=False
 
@@ -141,7 +141,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             if env.index==0:
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
-
+            
             
             pose_list = env.pose_list
             goal_global_list = init_goals
@@ -297,6 +297,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             r_list_new = r_list[0:1]
             terminal_list_new=terminal_list[0:1]
             
+            #print('crash:',env.crash_list)
+            
             #if env.index == 0:  (original)
             if env.index == 0 and not (step == 1 and terminal):
                 ############## LM or stacekd LM ######################################################
@@ -371,6 +373,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
                         buff = []
                         global_update += 1     
+                        
+                
 
 
             step += 1
