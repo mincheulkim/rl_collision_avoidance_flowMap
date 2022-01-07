@@ -52,7 +52,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
+policy_list = ''      # select policy. [LM, stacked_LM, '']
 #blind_human = True
 test_policy=False
 
