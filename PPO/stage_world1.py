@@ -26,6 +26,8 @@ class StageWorld():
 
         self.pose_list = []
         self.speed_poly_list = []  # 220104
+        
+        self.crash_list = []  # 220107
 
         self.beam_mum = beam_num   # 512
         self.laser_cb_num = 0
@@ -51,20 +53,26 @@ class StageWorld():
         #self.num_human = 11
         self.num_human = 14
         #self.num_human = 21
+        
         #self.groups = [0, 1, 2, 3]
         self.groups = [0, 1, 2, 3, 4]
         #self.groups = [0, 1, 2, 3, 4, 5]   # 220102
+        
         #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
         self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]
         #self.human_list=[[0],[1,2,3,4,5,6,7],[8,9,10,11,12],[13,14,15,16],[17,18],[19,20]]   # 220102
         
         # Define Subscriber
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
+        sub_crash_list = []
         
         for i in range(self.num_human):
         #for i in range(21):   # 220102
             sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
             sub_list.append(sub)
+            
+            crash_sub = message_filters.Subscriber('robot_' + str(i) + '/is_crashed', Int8)
+            sub_crash_list.append(crash_sub)
             
         queue_size = 10
         fps = 1000.
@@ -72,6 +80,9 @@ class StageWorld():
 
         mf = message_filters.ApproximateTimeSynchronizer(sub_list, queue_size, delay)
         mf.registerCallback(self.callback)
+        
+        crash_mf = message_filters.ApproximateTimeSynchronizer(sub_crash_list, queue_size, delay, allow_headerless=True)
+        crash_mf.registerCallback(self.crash_callback_mf)
 
 
         # -----------Publisher and Subscriber-------------
@@ -99,10 +110,6 @@ class StageWorld():
 
         # -----------Service-------------------
         self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
-        
-
-
-
 
         # # Wait until the first callback
         self.speed = None
@@ -148,6 +155,14 @@ class StageWorld():
         #    x,y=msg_list[i].pose.pose.position.x, msg_list[i].pose.pose.position.y
         #    pose_list.append([x,y])
         #print('pose_list:',pose_list)
+        
+    def crash_callback_mf(self, *msgs):
+        crash = []
+        
+        for msg in msgs:
+            crash.append(msg.data)
+            
+        self.crash_list = crash
         
     def ground_truth_callback(self, GT_odometry):   # topic: robot_0_base_pose_ground topic callback F
         Quaternious = GT_odometry.pose.pose.orientation
@@ -613,7 +628,7 @@ class StageWorld():
                     [1,-7],[2,-7]]
 
         if rule=='group_circle_crossing':   #         Rule circle_crossing: generate start position on a circle, goal position is at the opposite side
-            print('scenario:',rule)
+            #print('scenario:',rule)
             init_pose_list=[]
             init_goal_list=[]
             circle_radius = 8.
@@ -629,10 +644,12 @@ class StageWorld():
                     gy = -py
                     collide = False
                     for grp_pose, grp_goal in zip(groups_pose, groups_goal):
-                        min_dist = 1
-                        if np.linalg.norm((px-grp_pose[0],py-grp_goal[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
+                        #min_dist = 1
+                        min_dist = 3  # 220107
+                        if np.linalg.norm((px-grp_pose[0],py-grp_pose[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
                             collide=True
                             break
+                        #print(grp_pose[0],grp_pose[1],grp_goal[0],grp_goal[1])
                     if not collide:
                         break
                 groups_pose.append([px,py])
