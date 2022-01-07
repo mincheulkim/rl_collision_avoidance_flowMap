@@ -329,7 +329,8 @@ class StageWorld():
         #        print('v:',scaled_action[0],'w:',scaled_action[1],'rot_penalty:',reward_w,'r_back:',r_back)
 
         #if t > 150:  # timeout check
-        if t > 1000:  # timeout check  211020 for long-term
+        #if t > 1000:  # timeout check  211020 for long-term
+        if t > 700:  # 220107
             terminate = True      
             result = 'Time out'
         

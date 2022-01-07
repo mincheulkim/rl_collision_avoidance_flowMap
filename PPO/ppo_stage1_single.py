@@ -38,7 +38,7 @@ HORIZON = 1024    # v3
 GAMMA = 0.99
 LAMDA = 0.95
 #BATCH_SIZE = 1024   # oriignal
-BATCH_SIZE = 256   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
+BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
 
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
@@ -52,7 +52,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '']
+policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
 #blind_human = True
 test_policy=False
 
