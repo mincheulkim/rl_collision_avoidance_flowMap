@@ -1,6 +1,3 @@
-
-
-
 import os #test
 import logging
 import sys
@@ -297,7 +294,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             r_list_new = r_list[0:1]
             terminal_list_new=terminal_list[0:1]
             
-            #print('crash:',env.crash_list)
+            
+            # 220110 reset human pose when collision arrise
+            for i, crash in enumerate(env.crash_list):
+                #print(i, crash, human_actions[i][1], human_actions[i][0])
+                if i != 0 and crash == 1:
+                    env.control_pose_specific(init_poses[i], i)
+                
             
             #if env.index == 0:  (original)
             if env.index == 0 and not (step == 1 and terminal):
