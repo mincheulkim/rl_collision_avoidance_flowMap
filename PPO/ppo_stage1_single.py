@@ -17,10 +17,10 @@ from mpi4py import MPI #test
 from torch.optim import Adam #test
 from collections import deque #test
 
-from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy #test
+from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
 
@@ -46,10 +46,10 @@ OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
-LM_visualize = False    # True or False         # visualize local map(s)
+LM_visualize = True    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'LM'      # select policy. [LM, stacked_LM, '']
+policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
 #blind_human = True
 test_policy=False
 
@@ -160,13 +160,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             # generate robot action (at rank==0)
             if policy_list=='LM':  # LM: 60x60
-                # 1. generate local map
-                
-                # 2. generate actions
-                v, a, logprob, scaled_action, LM, LM_stack =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)
-                                                                    # env, state_list, pose_list, velocity_poly_list, policy, action_bound
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)                                                                    # env, state_list, pose_list, velocity_poly_list, policy, action_bound
             elif policy_list=='stacked_LM':
                 v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
+            elif policy_list=='concat_LM':
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_concat_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=idx, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
@@ -176,7 +174,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 if i==0:
                     env.control_vel_specific(scaled_action, i)
                 else:
-                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])                  
+                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
                     diff = angles - pose_list[i,2]
                     # fix SF rotational issus 211222
@@ -221,6 +219,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     dist = cv2.resize(LM[0][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist2 = cv2.resize(LM[0][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
                     dist3 = cv2.resize(LM[0][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)
+                    cv2.imshow("Local flow map", dist)
+                    cv2.imshow("Local flow map2", dist2)
+                    cv2.imshow("Local flow map3", dist3)
+                elif policy_list == 'concat_LM':
+                    dist = cv2.resize(LM_stack[7][0], dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # t=0, pose
+                    dist2 = cv2.resize(LM_stack[7][1], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  # t=0, vx
+                    dist3 = cv2.resize(LM_stack[7][2], dsize=(480,480), interpolation=cv2.INTER_LINEAR)  # t=0, vy
                     cv2.imshow("Local flow map", dist)
                     cv2.imshow("Local flow map2", dist2)
                     cv2.imshow("Local flow map3", dist3)
@@ -281,6 +286,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     last_v_r, _, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack)
                 elif policy_list=='stacked_LM':
                     last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx)
+                elif policy_list=='concat_LM':  # LM: 60x60    # 211214
+                    last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, LM_stack=LM_stack)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
                 
@@ -347,6 +354,29 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                             num_env=1, frames=LASER_HIST,
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
                     
+                        buff = []
+                        global_update += 1
+                
+                elif policy_list =='concat_LM':
+                    
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
+
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
+                            transform_buffer_stacked_LM(buff=buff)
+
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        
+
+                        ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                            num_env=1, frames=LASER_HIST,
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+
                         buff = []
                         global_update += 1
 
@@ -462,6 +492,9 @@ if __name__ == '__main__':
         elif policy_list == 'LM':   # 220105
             policy_path = 'policy'
             policy = LM_Policy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'concat_LM':   # 220105
+            policy_path = 'policy'
+            policy = concat_LM_Policy(frames=LASER_HIST, action_space=2)
         else:
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)

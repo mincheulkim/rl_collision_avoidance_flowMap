@@ -288,6 +288,97 @@ def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy
         
     return v, a, logprob, scaled_action, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
+
+def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, mode=False):   # 211130
+    # t-7 ~ t까지의 8개 time sequence 정보를 받음     LM_stack
+    # 각 sequence별 3개 채널: Grop(0), vx(1), vy(2)  index
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
+        
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+    robot_rot = pose_list[0,2]
+    pose_list = np.asarray(pose_list[:,0:2])
+    
+    
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
+    # Build occupancy map
+    cell_size=1*0.1
+    map_size=6
+    local_maps = []
+    
+    local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
+    for j in range(3):  # grp, vel_x,vel_y
+        for i, pose in enumerate(pose_list):
+            diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+            # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
+            dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+            dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+            
+            #print('diff=',diff)
+            #print('robot rot=',robot_rot)
+            #mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
+            #mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
+            mod_diff_x = np.floor((dx_rot+map_size/2)/cell_size)
+            mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
+            #mod_diff_y = np.ceil((map_size-diff[1])/cell_size)
+            #print('total:',speed_poly_list)
+            #print('robot:',speed_poly_list[0])
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                if j==0:   # pose occupancy
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
+                    #print(i,'의',j,'존재한다:')
+                elif j==1: # vel x
+                    diff_vx = speed_poly_list[i][0]-speed_poly_list[0][0]
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vx
+                    #print(i,'의', j, 'vx:',diff_vx)
+                elif j==2: # vel y
+                    diff_vy = speed_poly_list[i][1]-speed_poly_list[0][1]
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vy
+                    #print(i,'의', j, 'vy:',diff_vy)
+        local_maps.append(local_map.tolist())
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+
+    
+    local_maps = np.array(local_maps) # 3,60,60
+    left_LM = LM_stack.popleft()
+    LM_stack.append(local_maps)   # 8,3,60,60
+    
+
+    diablos = [LM_stack]
+    diablos = np.array(diablos)
+    #print(diablos.shape)    # 1,8,3,60,60
+    #print(diablos[:,7,0,:,:])
+    
+    np.set_printoptions(threshold=np.inf)
+    
+
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()        # 1,3,512
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+    local_maps_torch = Variable(torch.from_numpy(diablos)).float().cuda()    # (1, 8, 3,60,60)   B, S, C, W, H
+    #print(s_list.shape, local_maps_torch.shape)
+    
+    
+    
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+    mean_v = mean.data.cpu().numpy()
+    
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+    
+        
+    return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
+
 def generate_action_no_sampling(env, state_list, policy, action_bound):
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []

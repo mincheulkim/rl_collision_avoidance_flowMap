@@ -2,8 +2,11 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+
+import cv2
 from torch.nn import init
 from torch.nn import functional as F
+
 
 from model.utils import log_normal_density
 
@@ -114,15 +117,15 @@ class LM_Policy(nn.Module):
         
         
         # convLSTM
-        nf = 16
+        nf = 3
         input_chanel = 3
         padding = 3 // 2, 3 // 2
         self.act_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
         #self.conv2 = nn.Conv2d(in_channels=nf+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
         self.crt_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
         
-        self.act_conv_fc = nn.Linear(16*15*15, 512)
-        self.crt_conv_fc = nn.Linear(16*15*15, 512)
+        self.act_conv_fc = nn.Linear(nf*15*15, 512)
+        self.crt_conv_fc = nn.Linear(nf*15*15, 512)
         
         
 
@@ -143,7 +146,7 @@ class LM_Policy(nn.Module):
         
         # convLSTM
         # initialize hidden
-        h_t, c_t = torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.act_conv.weight.device)
+        h_t, c_t = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device)
         #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
         
         for t in range(local_maps.shape[1]):   # 8
@@ -156,7 +159,7 @@ class LM_Policy(nn.Module):
             combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
             combined_conv = self.act_conv(combined)
-            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 16, dim=1)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
             i = torch.sigmoid(cc_i)
             f = torch.sigmoid(cc_f)
             o = torch.sigmoid(cc_o)
@@ -168,12 +171,36 @@ class LM_Policy(nn.Module):
             c_t=c_next
             
         # encoder_vector
-        #encoder_vector = h_t2
         encoder_vector = h_t
+        
+        '''
+        # 220110 Visualize Feature map (three channel)
+        show_h_t= encoder_vector[0, :, :, :]
+        show_h_t=show_h_t.transpose(0,1)
+        show_h_t=show_h_t.transpose(1,2)
+        show_h_t=show_h_t.cpu().detach().numpy()
+
+        hsv = cv2.cvtColor(np.float32(show_h_t), cv2.COLOR_RGB2HSV)
+        hsv=cv2.resize(hsv, dsize=(240,240), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('image',hsv)
+        cv2.waitKey(1)
+        '''
+        
         encoder_vector=F.max_pool2d(encoder_vector, 2)                          
-        encoder_vector=F.max_pool2d(encoder_vector, 2)                          
-        #print(x.shape, encoder_vector.shape)   # 1, 16, 15, 15  
-        encoder_vector=encoder_vector.view(encoder_vector.shape[0], -1) #1, 3600
+        encoder_vector=F.max_pool2d(encoder_vector, 2)              # 1, 3, 15, 15              
+
+        '''
+        # 220110 Visualize Feature map (one channel)
+        show_h_t=encoder_vector[:,9,:,:]   # 1, 3, 15, 15
+        show_h_t=show_h_t.transpose(0, 1)  # 15, 3, 15
+        show_h_t=show_h_t.transpose(1, 2)  # 15, 15, 3
+        show_h_t=show_h_t.cpu().detach().numpy()
+        dist = cv2.resize(show_h_t*10, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+        cv2.imshow("Local flow map", dist)
+        cv2.waitKey(1)
+        '''
+        
+        encoder_vector=encoder_vector.view(encoder_vector.shape[0], -1) #1, 675
         vvv=F.relu(self.act_conv_fc(encoder_vector))
         #print(vvv.shape)    # 1, 512
         
@@ -203,7 +230,7 @@ class LM_Policy(nn.Module):
         
        # convLSTM
         # initialize hidden
-        h_t_c, c_t_c = torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], 16, 60, 60, device=self.crt_conv.weight.device)
+        h_t_c, c_t_c = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device)
         #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
         
         for t in range(local_maps.shape[1]):   # 8
@@ -216,7 +243,7 @@ class LM_Policy(nn.Module):
             combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
             combined_conv = self.crt_conv(combined)
-            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 16, dim=1)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
             i = torch.sigmoid(cc_i)
             f = torch.sigmoid(cc_f)
             o = torch.sigmoid(cc_o)
@@ -407,6 +434,201 @@ class stacked_LM_Policy(nn.Module):
         dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
         dist_entropy = dist_entropy.sum(-1).mean()
         return v, logprob, dist_entropy
+
+
+
+
+
+
+
+
+# 220105    
+class concat_LM_Policy(nn.Module):
+    def __init__(self, frames, action_space):
+        super(concat_LM_Policy, self).__init__()
+        self.logstd = nn.Parameter(torch.zeros(action_space))
+
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.act_fc1 = nn.Linear(128*32, 256)
+        #self.act_fc2 =  nn.Linear(256+2+2, 128)
+        self.act_fc2 =  nn.Linear(256+2+2+512, 128)
+        self.actor1 = nn.Linear(128, 1)
+        self.actor2 = nn.Linear(128, 1)
+
+        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.crt_fc1 = nn.Linear(128*32, 256)
+        #self.crt_fc2 = nn.Linear(256+2+2, 128)
+        self.crt_fc2 = nn.Linear(256+2+2+512, 128)
+        self.critic = nn.Linear(128, 1)
+        
+        
+        
+        # convLSTM
+        nf = 3
+        input_chanel = 3
+        padding = 3 // 2, 3 // 2
+        self.act_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        #self.conv2 = nn.Conv2d(in_channels=nf+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.crt_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        
+        self.act_conv_fc = nn.Linear(nf*15*15, 512)
+        self.crt_conv_fc = nn.Linear(nf*15*15, 512)
+        
+        
+
+    def forward(self, x, goal, speed, local_maps):
+        """
+            returns value estimation, action, log_action_prob
+        """
+         # action
+        #print(x.shape)      # 1, 3, 512                                    # 1024, 3, 512  
+        #print(goal.shape)   # 1, 2                                         # 1024, 2
+        #print(speed.shape)  # 1, 2                                         # 1024, 2
+        #print(local_maps.shape)  # 1, 8, 3, 60, 60    B, S, C, W, H        # 1024, 8, 3, 60, 60
+
+        a = F.relu(self.act_fea_cv1(x))
+        a = F.relu(self.act_fea_cv2(a)) # 1, 32, 128
+        a = a.view(a.shape[0], -1) #1, 4096
+        a = F.relu(self.act_fc1(a))
+        
+        # convLSTM
+        # initialize hidden
+        h_t, c_t = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device)
+        #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
+        
+        for t in range(local_maps.shape[1]):   # 8
+            
+            input_tensor = local_maps[:, t, :, :]
+            cur_state=[h_t, c_t]
+            
+            h_cur, c_cur = cur_state
+
+            combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+
+            combined_conv = self.act_conv(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
+            i = torch.sigmoid(cc_i)
+            f = torch.sigmoid(cc_f)
+            o = torch.sigmoid(cc_o)
+            g = torch.tanh(cc_g)
+
+            c_next = f * c_cur + i * g
+            h_next = o * torch.tanh(c_next)
+            h_t=h_next
+            c_t=c_next
+            
+        # encoder_vector
+        encoder_vector = h_t
+        
+        '''
+        # 220110 Visualize Feature map (three channel)
+        show_h_t= encoder_vector[0, :, :, :]
+        show_h_t=show_h_t.transpose(0,1)
+        show_h_t=show_h_t.transpose(1,2)
+        show_h_t=show_h_t.cpu().detach().numpy()
+
+        hsv = cv2.cvtColor(np.float32(show_h_t), cv2.COLOR_RGB2HSV)
+        hsv=cv2.resize(hsv, dsize=(240,240), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('image',hsv)
+        cv2.waitKey(1)
+        '''
+        
+        encoder_vector=F.max_pool2d(encoder_vector, 2)                          
+        encoder_vector=F.max_pool2d(encoder_vector, 2)              # 1, 3, 15, 15              
+
+        '''
+        # 220110 Visualize Feature map (one channel)
+        show_h_t=encoder_vector[:,9,:,:]   # 1, 3, 15, 15
+        show_h_t=show_h_t.transpose(0, 1)  # 15, 3, 15
+        show_h_t=show_h_t.transpose(1, 2)  # 15, 15, 3
+        show_h_t=show_h_t.cpu().detach().numpy()
+        dist = cv2.resize(show_h_t*10, dsize=(480,480), interpolation=cv2.INTER_LINEAR)   # https://076923.github.io/posts/Python-opencv-8/
+        cv2.imshow("Local flow map", dist)
+        cv2.waitKey(1)
+        '''
+        
+        encoder_vector=encoder_vector.view(encoder_vector.shape[0], -1) #1, 675
+        vvv=F.relu(self.act_conv_fc(encoder_vector))
+        #print(vvv.shape)    # 1, 512
+        
+        # dbscan 그룹 채널을 convlstm 채널에 넣기
+        #a = torch.cat((a, goal, speed), dim=-1)
+        a = torch.cat((a, goal, speed, vvv), dim=-1)
+        a = F.relu(self.act_fc2(a))
+        mean1 = torch.sigmoid(self.actor1(a))
+        mean2 = torch.tanh(self.actor2(a))
+        mean = torch.cat((mean1, mean2), dim=-1)
+
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
+        action = torch.normal(mean, std)
+
+        # action prob on log scale
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+        
+        #---------------------------------------------------------------------#
+        # value
+        v = F.relu(self.crt_fea_cv1(x))
+        v = F.relu(self.crt_fea_cv2(v))
+        v = v.view(v.shape[0], -1)
+        v = F.relu(self.crt_fc1(v))
+        
+        
+        
+       # convLSTM
+        # initialize hidden
+        h_t_c, c_t_c = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device)
+        #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
+        
+        for t in range(local_maps.shape[1]):   # 8
+            
+            input_tensor = local_maps[:, t, :, :]
+            cur_state=[h_t_c, c_t_c]
+            
+            h_cur, c_cur = cur_state
+
+            combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+
+            combined_conv = self.crt_conv(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
+            i = torch.sigmoid(cc_i)
+            f = torch.sigmoid(cc_f)
+            o = torch.sigmoid(cc_o)
+            g = torch.tanh(cc_g)
+
+            c_next = f * c_cur + i * g
+            h_next = o * torch.tanh(c_next)
+            h_t_c=h_next
+            c_t_c=c_next
+            
+        # encoder_vector
+        #encoder_vector = h_t2
+        encoder_vector_c = h_t_c
+        encoder_vector_c=F.max_pool2d(encoder_vector_c, 2)                          
+        encoder_vector_c=F.max_pool2d(encoder_vector_c, 2)                          
+        #print(x.shape, encoder_vector.shape)   # 1, 16, 15, 15  
+        encoder_vector_c=encoder_vector_c.view(encoder_vector_c.shape[0], -1) #1, 3600
+        vvvv=F.relu(self.crt_conv_fc(encoder_vector_c))
+                
+        v = torch.cat((v, goal, speed, vvvv), dim=-1)
+        v = F.relu(self.crt_fc2(v))
+        v = self.critic(v)
+
+        return v, action, logprob, mean
+
+    def evaluate_actions(self, x, goal, speed, action, local_maps):
+        v, _, _, mean = self.forward(x, goal, speed, local_maps)
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
+        # evaluate
+        logprob = log_normal_density(action, mean, log_std=logstd, std=std)
+        dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
+        dist_entropy = dist_entropy.sum(-1).mean()
+        return v, logprob, dist_entropy
+
+
 
 
 
