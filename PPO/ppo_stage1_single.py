@@ -190,7 +190,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                     
-                     
             # rate.sleep()
             rospy.sleep(0.001)
             

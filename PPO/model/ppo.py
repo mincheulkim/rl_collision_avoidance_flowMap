@@ -362,6 +362,7 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
         
     return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
 
+
 def generate_action_no_sampling(env, state_list, policy, action_bound):
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []

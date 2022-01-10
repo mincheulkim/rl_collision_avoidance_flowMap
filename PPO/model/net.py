@@ -557,13 +557,14 @@ class concat_LM_Policy(nn.Module):
         #a = torch.cat((a, goal, speed), dim=-1)
         a = torch.cat((a, goal, speed, vvv), dim=-1)
         a = F.relu(self.act_fc2(a))
-        mean1 = torch.sigmoid(self.actor1(a))
-        mean2 = torch.tanh(self.actor2(a))
+        mean1 = torch.sigmoid(self.actor1(a))   # 0~1, linear vel
+        mean2 = torch.tanh(self.actor2(a))      # -1~1, angular rot
         mean = torch.cat((mean1, mean2), dim=-1)
-
-        logstd = self.logstd.expand_as(mean)
-        std = torch.exp(logstd)
+        #print('mean:',mean)
+        logstd = self.logstd.expand_as(mean)    # mean처럼 [2,] 즉 [[0,0]]으로 확장한다
+        std = torch.exp(logstd)     # [[1,1]]
         action = torch.normal(mean, std)
+        #print(action)
 
         # action prob on log scale
         logprob = log_normal_density(action, mean, std=std, log_std=logstd)
@@ -577,7 +578,7 @@ class concat_LM_Policy(nn.Module):
         
         
         
-       # convLSTM
+        # convLSTM
         # initialize hidden
         h_t_c, c_t_c = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device)
         #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
