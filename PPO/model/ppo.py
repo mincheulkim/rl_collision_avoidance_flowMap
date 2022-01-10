@@ -320,15 +320,10 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
             dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
             dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
             
-            #print('diff=',diff)
-            #print('robot rot=',robot_rot)
-            #mod_diff_x = np.floor((diff[0]+map_size/2)/cell_size)
-            #mod_diff_y = np.ceil((map_size/2-diff[1])/cell_size)
-            mod_diff_x = np.floor((dx_rot+map_size/2)/cell_size)
+            # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+            mod_diff_x = np.floor((dx_rot)/cell_size)
             mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
-            #mod_diff_y = np.ceil((map_size-diff[1])/cell_size)
-            #print('total:',speed_poly_list)
-            #print('robot:',speed_poly_list[0])
+
             
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                 if j==0:   # pose occupancy
