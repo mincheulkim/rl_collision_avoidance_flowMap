@@ -304,8 +304,8 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     robot_rot = pose_list[0,2]
     pose_list = np.asarray(pose_list[:,0:2])
     
-    
     speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
     
     # Build occupancy map
     cell_size=1*0.1
@@ -323,20 +323,17 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
             # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
             mod_diff_x = np.floor((dx_rot)/cell_size)
             mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
-
+                        
+            diff_vel = speed_poly_list - speed_poly_list[0]
             
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                 if j==0:   # pose occupancy
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
-                    #print(i,'의',j,'존재한다:')
+                # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                 elif j==1: # vel x
-                    diff_vx = speed_poly_list[i][0]-speed_poly_list[0][0]
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vx
-                    #print(i,'의', j, 'vx:',diff_vx)
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
                 elif j==2: # vel y
-                    diff_vy = speed_poly_list[i][1]-speed_poly_list[0][1]
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vy
-                    #print(i,'의', j, 'vy:',diff_vy)
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
         local_maps.append(local_map.tolist())
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
 

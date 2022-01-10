@@ -120,7 +120,7 @@ agent( pose [0.00 -8.00 0.00 90.00] name "robot" color "red")
 # Total 3 Groups
 # ref. Don't be Rude! Learning Group-aware Policies for Robot Navigation
 # Group 1: 5 humans
-agent( pose [-5.00 -5.00 0.00 45.00] color "yellow")   # human1, Leader
+agent( pose [-5.00 -5.00 0.00 45.00] color "cyan")   # human1, Leader
 agent( pose [-6.00 -5.00 0.00 45.00] color "yellow")  # human2
 agent( pose [-5.00 -6.00 0.00 45.00] color "yellow")  # human3
 agent( pose [-6.00 -6.00 0.00 45.00] color "yellow")  # human4
