@@ -197,15 +197,12 @@ def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action
     scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
     if mode==True:
         scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
-        
     
-        
     return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
 
 
 def generate_action_stacked_LM(env, state_list, pose_list, velocity_list, policy, action_bound, index, mode=False):   # 211213
     s_list, goal_list, speed_list = [], [], []
-    s_total_list, goal_total_list, speed_total_list = [], [], []
     #print('grp index:', index)
     
     for i in state_list:
@@ -312,6 +309,8 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     map_size=6
     local_maps = []
     
+    #print('인덱스:',index)    # 0~12: human1~human13
+    
     local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
     for j in range(3):  # grp, vel_x,vel_y
         for i, pose in enumerate(pose_list):
@@ -327,8 +326,9 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
             diff_vel = speed_poly_list - speed_poly_list[0]
             
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-                if j==0:   # pose occupancy
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
+                if j==0:
+                    # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=index[i-1]
                 # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                 elif j==1: # vel x
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
@@ -342,23 +342,16 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     left_LM = LM_stack.popleft()
     LM_stack.append(local_maps)   # 8,3,60,60
     
-
     diablos = [LM_stack]
     diablos = np.array(diablos)
-    #print(diablos.shape)    # 1,8,3,60,60
-    #print(diablos[:,7,0,:,:])
-    
+
     np.set_printoptions(threshold=np.inf)
     
-
     s_list = Variable(torch.from_numpy(s_list)).float().cuda()        # 1,3,512
     goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
     speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
     local_maps_torch = Variable(torch.from_numpy(diablos)).float().cuda()    # (1, 8, 3,60,60)   B, S, C, W, H
-    #print(s_list.shape, local_maps_torch.shape)
-    
-    
-    
+
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
     mean_v = mean.data.cpu().numpy()
@@ -366,8 +359,6 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
     if mode==True:
         scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
-        
-    
         
     return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
 

@@ -103,6 +103,7 @@ tensorboard --logdir runs/
 - [ ] after reaching the goal, human change their next goal
 - [x] using social force, create behavior of humans and groups
 - [ ] On/Off for visible/invisible robot for human
+- [x] Human regenerate when they checked collision via others 220110
 ```
 - 2. Generate Flow Map
 ```
@@ -113,10 +114,11 @@ tensorboard --logdir runs/
 - [x] visualize local occupancy map(plt.imshow)   by 211201:  but it is too slow
 - [x] visualize local occupancy map(OpenCV)  (after 211105 meeting)
 - [x] use conv2D, rather than FC for occupancy map: 2 Conv2D, 2 MaxPool2D
+- [x] Robot-coordinate oriented local map 220110
 - Dynamic Occpuancy Field
--- [ ] initial occupancy: space by dynamic objects
--- [ ] temporal motion field: predicts a 2D velocity filed to describe the motion of objects
--- [ ] DOF = initial occpuancy + temporal motion filed(11x0.5=5s)
+-- [x] initial occupancy: space by dynamic objects
+-- [x] temporal motion field: predicts a 2D velocity filed to describe the motion of objects
+-- [x] DOF = initial occpuancy + temporal motion filed(11x0.5=5s)
              어느 공간이 누가 점유 + 그들이 어떻게 움직일 것인지
 -- Prediction은 로봇 주변 BEV기준(or 로봇이 최하단에 있는) discretized된 each cell에 이루어 진다.
 -- 모든 predictions은 modelled as random variable, capturing the uncertainty of the predictions
@@ -125,7 +127,10 @@ tensorboard --logdir runs/
 ```
 - [x] gather humans in similar groups
 - [X] DBSCAN or KNN utilize (on-time real group algorithm): DBSCAN
-- [ ] DBSCAN 할때 세개의 카테고리로 세분화: position, heading, magnitude: 참고 RA-L20 Group Split and Merge Prediction ... 논문
+- [ ] DBSCAN 할때 세개의 카테고리로 세분화
+		[ ] position
+		[ ] heading
+		[ ] magnitude: 참고 RA-L20 Group Split and Merge Prediction ... 논문
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
 ```
 - 4. Reward shaping (after 211217 meeting)

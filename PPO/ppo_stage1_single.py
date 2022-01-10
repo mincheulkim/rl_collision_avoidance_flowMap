@@ -46,7 +46,7 @@ OBS_SIZE = 512
 ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
-LM_visualize = True    # True or False         # visualize local map(s)
+LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
@@ -88,18 +88,19 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         terminal = False
         ep_reward = 0
         step = 1
+        nav_length = 0.0     # 220120 Metric
         # senario reset option
         init_poses = None
         init_goals = None         
         
         num_human = env.num_human
-        #num_human = 21    # 210102 5grp 20 human
         
         if env.index==0:
             rule = 'group_circle_crossing'  # crossing
             init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
             for i, init_pose in enumerate(init_poses):
                 env.control_pose_specific(init_pose, i)
+        rospy.sleep(1)
                    
         #env.set_init_pose(init_pose)
         env.set_init_goal(init_goals[0])
@@ -114,8 +115,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
         #LM_stack = deque([[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]]])
         
-        
-
         speed_poly = np.asarray(env.get_self_speed_poly())  # 211103
         pose_ori = env.get_self_stateGT()   # 211019
         pose = np.asarray(pose_ori[:2])   # 211019
@@ -138,8 +137,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
             if env.index==0:
                 robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
-            
-            
+        
             pose_list = env.pose_list
             goal_global_list = init_goals
             pose_list = np.array(pose_list)
@@ -156,7 +154,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
             g_cluster,n_cluster = dbscan.sort()     # Result SORTING
             #dbscan.plot()          # Visualization results
-
             
             # generate robot action (at rank==0)
             if policy_list=='LM':  # LM: 60x60
@@ -290,8 +287,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, LM_stack=LM_stack)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
-                
-            
 
 
             # add transitons in buff and update policy
@@ -302,14 +297,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             terminal_list_new=terminal_list[0:1]
             
             
-            # 220110 reset human pose when collision arrise
+            # 220110 reset human pose when collision arise
             for i, crash in enumerate(env.crash_list):
                 #print(i, crash, human_actions[i][1], human_actions[i][0])
                 if i != 0 and crash == 1:
                     env.control_pose_specific(init_poses[i], i)
                 
-            
-            #if env.index == 0:  (original)
             if env.index == 0 and not (step == 1 and terminal):
                 ############## LM or stacekd LM ######################################################
                 if policy_list =='LM':
@@ -395,7 +388,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                         ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
                                                 epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
-                                                #num_env=NUM_ENV, frames=LASER_HIST,
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)
 
@@ -407,20 +399,18 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         buff = []
                         global_update += 1     
                         
-                
-
-
             step += 1
+            # 220110 Metric as NavLeng 추가
+            movlength = np.linalg.norm(pose_next-pose)
+            nav_length += movlength
+            
             ###################################################################################################
             state = state_next
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
-            #if env.index ==0:
-            #    print('termina:',terminal)
             
-
-
+        ###### while문 끝 ######
         #####save policy and logger##############################################################################################
         #if global_update != 0 and global_update % 5 == 0:
         if global_update != 0 and global_update % 2 == 0:   # 211217
@@ -435,9 +425,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         #distance = 0
         if not (step==2 and terminal):
-            logger.info('Env %02d, Goal (%05.1f, %05.1f), Episode %05d, setp %03d, Reward %-5.1f, Result %s, MemSize: %05d' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size))
+            logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length))
             logger_cal.info(ep_reward)
+            
+        
                 
 
         ###################################################################################################
