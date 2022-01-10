@@ -1,3 +1,4 @@
+import enum
 import os #test
 import logging
 import sys
@@ -89,6 +90,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         ep_reward = 0
         step = 1
         nav_length = 0.0     # 220120 Metric
+        min_dist = 999.0     # 220120 Metric
+        num_inclusion = 0     # 220120 Metric
         # senario reset option
         init_poses = None
         init_goals = None         
@@ -247,9 +250,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # get informtion
-            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, idx, g_cluster)   # 211221 for backward penalty
-            if env.index != 0:
-                terminal = False    
+            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, idx, g_cluster)   # 211221 for backward penalty 
             ep_reward += r
             global_step += 1
 
@@ -400,15 +401,32 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         global_update += 1     
                         
             step += 1
-            # 220110 Metric as NavLeng 추가
+            # 220110 Metric as NavLength 추가
             movlength = np.linalg.norm(pose_next-pose)
             nav_length += movlength
+            
+            # 220110 Metric as minDist, num_inclusion 두개 추가
+            proximity = 1.0
+            after_pose = env.pose_list
+            after_pose = np.array(after_pose)
+            for i, pose in enumerate(after_pose):
+                diff = pose-after_pose[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+                diff = np.linalg.norm([diff[0],diff[1]])
+                #print(i, diff)
+                if i!=0 and min_dist > diff:
+                    min_dist = diff 
+                if i!=0 and diff < proximity:
+                    num_inclusion += 1
+                    
+            # 220110 Metric as zitters
+            
             
             ###################################################################################################
             state = state_next
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+
             
         ###### while문 끝 ######
         #####save policy and logger##############################################################################################
@@ -425,8 +443,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         #distance = 0
         if not (step==2 and terminal):
-            logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length))
+            logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion))
             logger_cal.info(ep_reward)
             
         
