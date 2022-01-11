@@ -139,8 +139,19 @@ tensorboard --logdir runs/
 ```
 - 5. Evaluation Metric
 ```
-- [ ] most closest(minest) distance with human
-- [ ] # of intrusion of personal space
+- [X] most closest(minest) distance with human
+- [X] # of intrusion of personal space
+- 6. Training scenes
+  1) Group circle
+     [1] 4 grps, 13 humans as 5, 3, 2, 3: basic group navigation 
+	 
+- 7. Evaluating scens
+  1) Group circle
+     [1] 4 grps, 13 humans as 5, 3, 2, 3: test basic navigation performance
+	 [2] 8 grps, 34 humans: to test generalization across different densities
+  2) Square cross
+     [1] 4 grps, 13 humans: test generalization to unseen environments
+
 ```
 - 6. MISC
 ```
@@ -149,6 +160,7 @@ tensorboard --logdir runs/
 - [ ] [Sim-2-real gap manage] ? Increase the delay in subscribing to current velocity observations to mimic the real-world conditions  (From IJCAI20 work, crowd-steer)
 - [ ] change lidar timestamp t-2, t-1, t -> t-10, t-5, t or t-4, t-3, t-2, t-1, t(5 timesteps or 10 timesteps)
 - [X] change python 3 environment (for social force): done 211220
+- [ ] continuous / discrete action
 ```
 
 

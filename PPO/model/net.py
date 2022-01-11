@@ -455,6 +455,8 @@ class concat_LM_Policy(nn.Module):
         self.act_fc2 =  nn.Linear(256+2+2+512, 128)
         self.actor1 = nn.Linear(128, 1)
         self.actor2 = nn.Linear(128, 1)
+        # For discrete action
+        #self.discrete = nn.Linear(128, 35)
 
         self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
@@ -568,6 +570,27 @@ class concat_LM_Policy(nn.Module):
 
         # action prob on log scale
         logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+        
+        # TODO discrete action:
+        # 1. 512 -> 28 FC layer추가
+        # 2. 28 FC -> softmax layer 거치게 함. 이 값은 28개쌍의 (linear, angular) 쌍에 할당. linear:{0.0, 0.2, 0.4, 0.6}
+        linear_vel = [0.0, 0.25, 0.50, 0.75, 1.0]  # 5
+        angular_vel = [-0.9, -0.6, -0.3, 0.0, 0.3, 0.6, 0.9]  # 7
+        
+        action_space = [[0.0,-0.9],[0.0,-0.6],[0.0,-0.3],[0.0,0.0],[0.0,0.3],[0.0,0.6],[0.0,0.9],
+                        [0.25,-0.9],[0.25,-0.6],[0.25,-0.3],[0.25,0.0],[0.25,0.3],[0.25,0.6],[0.25,0.9],
+                        [0.50,-0.9],[0.50,-0.6],[0.50,-0.3],[0.50,0.0],[0.50,0.3],[0.50,0.6],[0.50,0.9],
+                        [0.75,-0.9],[0.75,-0.6],[0.75,-0.3],[0.75,0.0],[0.75,0.3],[0.75,0.6],[0.75,0.9],
+                        [1.0,-0.9],[1.0,-0.6],[1.0,-0.3],[1.0,0.0],[1.0,0.3],[1.0,0.6],[1.0,0.9]]       # 5 * 7 = 35 discrete actions 장점: no clipping
+    
+        # TODO continuous action다르게
+        # 1. mean 가질때, self.actor1(a), self.actor2(a)로 따로 하지말고 (128, 2)의 self.actor(a)의 2 units 거쳐서 각각 0, 1이 mean1, mean2 되게
+        #ppi = softmax(self.discrete(a), dim=1)
+        #ppi = Categorical(probs=ppi)
+        #a=ppi.sample()
+        #a=a.data.item()
+        #action = action_space[a]
+        
         
         #---------------------------------------------------------------------#
         # value
