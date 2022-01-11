@@ -31,12 +31,13 @@ LASER_BEAM = 512
 LASER_HIST = 3
 
 
-HORIZON = 1024    # v3
+HORIZON = 1024    # v3            # 220111 TODO as 2048
 #HORIZON = 3072    # original
 GAMMA = 0.99
 LAMDA = 0.95
 #BATCH_SIZE = 1024   # oriignal
-BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32
+BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
+#TODO SGD style learning에서는 매개변수가 작을수록 더 잘된다고 하네...
 
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
@@ -50,7 +51,7 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
+policy_list = ''      # select policy. [LM, stacked_LM, '', concat_LM]
 #blind_human = True
 test_policy=False
 
@@ -98,11 +99,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         
         num_human = env.num_human
         
-        if env.index==0:
-            rule = 'group_circle_crossing'  # crossing
-            init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
-            for i, init_pose in enumerate(init_poses):
-                env.control_pose_specific(init_pose, i)
+        
+        rule = 'group_circle_crossing'  # crossing
+        init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
+        for i, init_pose in enumerate(init_poses):
+            env.control_pose_specific(init_pose, i)
         rospy.sleep(1)
                    
         #env.set_init_pose(init_pose)

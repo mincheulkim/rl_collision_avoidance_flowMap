@@ -127,10 +127,12 @@ tensorboard --logdir runs/
 ```
 - [x] gather humans in similar groups
 - [X] DBSCAN or KNN utilize (on-time real group algorithm): DBSCAN
-- [ ] DBSCAN 할때 세개의 카테고리로 세분화
-		[ ] position
-		[ ] heading
-		[ ] magnitude: 참고 RA-L20 Group Split and Merge Prediction ... 논문
+- [ ] DBSCAN 할때 세개의 카테고리로 세분화(: 참고 RA-L20)
+		[x] position: default threshold 2m, [1.5m, 2.5m]
+		[ ] velocity direction(not heading!): default threshold 30도, [15도,45도]
+		[ ] velocity magnitude: default threshold 1m/s, [0.5m/s, 1.5m/s]
+		Group Split and Merge Prediction ... 논문
+		- DBSCAN총 세번 돌림. velocity direction -> vel.dct 결과 clusters 내에서 velocity magnitude -> vel.mag 결과 clusters 내에서 position
 - [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
 ```
 - 4. Reward shaping (after 211217 meeting)
