@@ -51,16 +51,16 @@ class StageWorld():
         
         # Initialize Groups and Humans  # 220103
         #self.num_human = 11
-        #self.num_human = 14      # 
-        self.num_human = 22     # 220111(+14)
+        self.num_human = 14      # 
+        #self.num_human = 22     # 220111(+14)
         
         #self.groups = [0, 1, 2, 3]
-        #self.groups = [0, 1, 2, 3, 4]
-        self.groups = [0, 1, 2, 3, 4, 5]   # 220102
+        self.groups = [0, 1, 2, 3, 4]       # 220110
+        #self.groups = [0, 1, 2, 3, 4, 5]   # 220111
         
         #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
-        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]
-        self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # 220111
+        self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]                               # 220110
+        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # 220111
         
         # Define Subscriber
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs

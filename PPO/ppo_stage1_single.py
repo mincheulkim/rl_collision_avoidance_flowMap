@@ -25,14 +25,15 @@ from model.ppo import generate_action, generate_action_human, generate_action_hu
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
 
-
-MAX_EPISODES = 5000
+# 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
+#MAX_EPISODES = 5000   # For Train    5000
+MAX_EPISODES = 500     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
 
 HORIZON = 1024    # v3            # 220111 TODO as 2048
-#HORIZON = 3072    # original
+
 GAMMA = 0.99
 LAMDA = 0.95
 #BATCH_SIZE = 1024   # oriignal
@@ -51,15 +52,16 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = ''      # select policy. [LM, stacked_LM, '', concat_LM]
+policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
 #blind_human = True
-test_policy=False
+#test_policy=False      # For test:True, For Train: False(default)
+test_policy=True      # For test:True, For Train: False(default)
 
 
 # For fixed Randomization  211230
 import random
-SEED = 1234  # for training
-#SEED = 4321 # for test
+#SEED = 1234  # for training
+SEED = 4321 # for test
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -85,14 +87,23 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
 
     if env.index == 0:
         env.reset_world()
+    
+    avg_success_nav_time=0
+    avg_success_nag_length=0
+    avg_success_min_dist=0.0
+    avg_success_min_inclusion = 0
+    success_counter = 0.00000000001
 
     for id in range(MAX_EPISODES):
         terminal = False
         ep_reward = 0
         step = 1
+        nav_time = 0
         nav_length = 0.0     # 220120 Metric
         min_dist = 999.0     # 220120 Metric
         num_inclusion = 0     # 220120 Metric
+        
+        
         # senario reset option
         init_poses = None
         init_goals = None         
@@ -281,13 +292,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 
                 state_next_list_new = state_next_list[0:1]   # for robot
                 if policy_list=='LM':  # LM: 60x60    # 211214
-                    last_v_r, _, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack)
+                    last_v_r, _, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list=='stacked_LM':
-                    last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx)
+                    last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
                 elif policy_list=='concat_LM':  # LM: 60x60    # 211214
-                    last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, LM_stack=LM_stack)
+                    last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, LM_stack=LM_stack, mode=test_policy)
                 else:
-                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound)
+                    last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
 
             # add transitons in buff and update policy
@@ -438,13 +449,21 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             torch.save(policy, policy_path + '/Stage1_tot')
             logger.info('########################## model saved when update {} times#########'
                         '################'.format(global_update))
+            
         
+        if result == 'Reach Goal':
+            success_counter += 1     # 1 2 3
+            avg_success_nav_time += step
+            avg_success_nag_length += nav_length
+            avg_success_min_dist += min_dist
+            avg_success_min_inclusion += num_inclusion
+            
         
         #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
         #distance = 0
         if not (step==2 and terminal):
-            logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d' % \
-                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion))
+            logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d, avg.suc.nav.time: %3.3f, avg.suc.nav.length: %3.3f, avg.suc.min_Dist: %2.3f, avg.suc.num_Inclu: %2.3f' % \
+                    (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion, avg_success_nav_time/success_counter, avg_success_nag_length/success_counter, avg_success_min_dist/success_counter, avg_success_min_inclusion/success_counter))
             logger_cal.info(ep_reward)
             
         
