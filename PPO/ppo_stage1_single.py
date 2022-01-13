@@ -32,12 +32,15 @@ LASER_BEAM = 512
 LASER_HIST = 3
 
 
-HORIZON = 1024    # v3            # 220111 TODO as 2048
+#HORIZON = 3072    # v3            # 220111 TODO as 2048
+#HORIZON = 1024    # v3            # 220111 TODO as 2048
+HORIZON = 512    # For small batch test
 
 GAMMA = 0.99
 LAMDA = 0.95
 #BATCH_SIZE = 1024   # oriignal
-BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
+#BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
+BATCH_SIZE = 32   # For small batch test
 #TODO SGD style learning에서는 매개변수가 작을수록 더 잘된다고 하네...
 
 EPOCH = 2
