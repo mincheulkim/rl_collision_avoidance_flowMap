@@ -26,8 +26,8 @@ from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #te
 from dbscan.dbscan import DBSCAN
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
-#MAX_EPISODES = 5000   # For Train    5000
-MAX_EPISODES = 500     # For Test
+MAX_EPISODES = 5000   # For Train    5000
+#MAX_EPISODES = 100     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
@@ -54,14 +54,15 @@ DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
 #blind_human = True
-#test_policy=False      # For test:True, For Train: False(default)
-test_policy=True      # For test:True, For Train: False(default)
+test_policy=False      # For test:True, For Train: False(default)
+#test_policy=True      # For test:True, For Train: False(default)
 
 
 # For fixed Randomization  211230
 import random
-#SEED = 1234  # for training
-SEED = 4321 # for test
+SEED = 1234  # for training
+#SEED = 4321 # for test
+#SEED = 5 # for test
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -539,7 +540,8 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load model
-        file = policy_path + '/Stage1'
+        #file = policy_path + '/Stage1'
+        file = policy_path + '/Stage1_our'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'

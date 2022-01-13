@@ -468,15 +468,16 @@ class concat_LM_Policy(nn.Module):
         
         
         # convLSTM
-        nf = 3
+        self.nf = 6
         input_chanel = 3
         padding = 3 // 2, 3 // 2
-        self.act_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
-        #self.conv2 = nn.Conv2d(in_channels=nf+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
-        self.crt_conv = nn.Conv2d(in_channels=input_chanel+nf, out_channels=4*nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.act_conv = nn.Conv2d(in_channels=input_chanel+self.nf, out_channels=4*self.nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.act_conv2 = nn.Conv2d(in_channels=self.nf+self.nf, out_channels=4*self.nf, kernel_size=(3,3), padding=padding, bias=True)   # Erase me!
+        self.crt_conv = nn.Conv2d(in_channels=input_chanel+self.nf, out_channels=4*self.nf, kernel_size=(3,3), padding=padding, bias=True)
+        self.crt_conv2 = nn.Conv2d(in_channels=self.nf+self.nf, out_channels=4*self.nf, kernel_size=(3,3), padding=padding, bias=True)   # Erase me!
         
-        self.act_conv_fc = nn.Linear(nf*15*15, 512)
-        self.crt_conv_fc = nn.Linear(nf*15*15, 512)
+        self.act_conv_fc = nn.Linear(self.nf*15*15, 512)
+        self.crt_conv_fc = nn.Linear(self.nf*15*15, 512)
         
         
 
@@ -497,11 +498,12 @@ class concat_LM_Policy(nn.Module):
         
         # convLSTM
         # initialize hidden
-        h_t, c_t = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.act_conv.weight.device)
-        #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
+        h_t, c_t = torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.act_conv.weight.device),torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.act_conv.weight.device)
+        # Erase me!
+        h_t2, c_t2 = torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.act_conv2.weight.device), torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.act_conv2.weight.device)
         
         for t in range(local_maps.shape[1]):   # 8
-            
+            # encoder_1_convlstm
             input_tensor = local_maps[:, t, :, :]
             cur_state=[h_t, c_t]
             
@@ -510,7 +512,7 @@ class concat_LM_Policy(nn.Module):
             combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
             combined_conv = self.act_conv(combined)
-            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.nf, dim=1)
             i = torch.sigmoid(cc_i)
             f = torch.sigmoid(cc_f)
             o = torch.sigmoid(cc_o)
@@ -520,9 +522,38 @@ class concat_LM_Policy(nn.Module):
             h_next = o * torch.tanh(c_next)
             h_t=h_next
             c_t=c_next
+            # output has h_t, c_t
+            
+            
+            
+            # Erase me!
+            # encoder_2_convlstm
+            input_tensor = h_t
+            cur_state=[h_t, c_t]
+            
+            h_cur, c_cur = cur_state
+
+            combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+
+            combined_conv = self.act_conv2(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.nf, dim=1)
+            i = torch.sigmoid(cc_i)
+            f = torch.sigmoid(cc_f)
+            o = torch.sigmoid(cc_o)
+            g = torch.tanh(cc_g)
+
+            c_next = f * c_cur + i * g
+            h_next = o * torch.tanh(c_next)
+            h_t2=h_next
+            c_t2=c_next
+            # output has h_t, c_t
             
         # encoder_vector
-        encoder_vector = h_t
+        
+        #encoder_vector = h_t
+        # Erase me!
+        encoder_vector = h_t2
+        
         
         '''
         # 220110 Visualize Feature map (three channel)
@@ -603,8 +634,8 @@ class concat_LM_Policy(nn.Module):
         
         # convLSTM
         # initialize hidden
-        h_t_c, c_t_c = torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], 3, 60, 60, device=self.crt_conv.weight.device)
-        #h_t2, c_t2 = torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device), torch.zeros(local_maps.shape[0], 64, 60, 60, device=self.conv2.weight.device)
+        h_t_c, c_t_c = torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.crt_conv.weight.device),torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.crt_conv.weight.device)
+        h_t2_c, c_t2_c = torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.crt_conv2.weight.device), torch.zeros(local_maps.shape[0], self.nf, 60, 60, device=self.crt_conv2.weight.device)
         
         for t in range(local_maps.shape[1]):   # 8
             
@@ -616,7 +647,7 @@ class concat_LM_Policy(nn.Module):
             combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
             combined_conv = self.crt_conv(combined)
-            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, 3, dim=1)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.nf, dim=1)
             i = torch.sigmoid(cc_i)
             f = torch.sigmoid(cc_f)
             o = torch.sigmoid(cc_o)
@@ -627,9 +658,29 @@ class concat_LM_Policy(nn.Module):
             h_t_c=h_next
             c_t_c=c_next
             
+            # Erase below me!
+            input_tensor = h_t_c
+            cur_state=[h_t_c, c_t_c]
+            
+            h_cur, c_cur = cur_state
+
+            combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
+
+            combined_conv = self.crt_conv2(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.nf, dim=1)
+            i = torch.sigmoid(cc_i)
+            f = torch.sigmoid(cc_f)
+            o = torch.sigmoid(cc_o)
+            g = torch.tanh(cc_g)
+
+            c_next = f * c_cur + i * g
+            h_next = o * torch.tanh(c_next)
+            h_t2_c=h_next
+            c_t2_c=c_next
+            
         # encoder_vector
-        #encoder_vector = h_t2
-        encoder_vector_c = h_t_c
+        encoder_vector_c = h_t2_c  #Erase me!!
+        #encoder_vector_c = h_t_c
         encoder_vector_c=F.max_pool2d(encoder_vector_c, 2)                          
         encoder_vector_c=F.max_pool2d(encoder_vector_c, 2)                          
         #print(x.shape, encoder_vector.shape)   # 1, 16, 15, 15  
