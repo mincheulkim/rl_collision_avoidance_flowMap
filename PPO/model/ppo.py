@@ -712,6 +712,59 @@ def ppo_update_stage1(policy, optimizer, batch_size, memory, epoch,
                                                      float(value_loss.detach().cpu().numpy()), float(
                                                     dist_entropy.detach().cpu().numpy())
             logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
+            
+def ppo_update_stage1_new(policy, optimizer, batch_size, memory, epoch,
+               coeff_entropy=0.02, clip_value=0.2,
+               num_step=2048, num_env=12, frames=1, obs_size=24, act_size=4):     # num_step = 1000, batch_size=1024
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
+
+    advs = (advs - advs.mean()) / advs.std()
+    print('ppo_update_stage1():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape)
+    obss = obss.reshape((num_step*num_env, frames, obs_size))    # 1000 samples   # reshape as num_step(3000,horizon)*num_env(1), 3, 512
+    goals = goals.reshape((num_step*num_env, 2))
+    speeds = speeds.reshape((num_step*num_env, 2))
+    actions = actions.reshape(num_step*num_env, act_size)
+    logprobs = logprobs.reshape(num_step*num_env, 1)
+    advs = advs.reshape(num_step*num_env, 1)
+    targets = targets.reshape(num_step*num_env, 1)
+
+    for update in range(epoch):
+        sampler = BatchSampler(SubsetRandomSampler(list(range(advs.shape[0]))), batch_size=batch_size,   # from 0~999, pick 1024 nums
+                               drop_last=False)
+        for i, index in enumerate(sampler):
+            sampled_obs = Variable(torch.from_numpy(obss[index])).float().cuda()
+            sampled_goals = Variable(torch.from_numpy(goals[index])).float().cuda()
+            sampled_speeds = Variable(torch.from_numpy(speeds[index])).float().cuda()
+
+            sampled_actions = Variable(torch.from_numpy(actions[index])).float().cuda()
+            sampled_logprobs = Variable(torch.from_numpy(logprobs[index])).float().cuda()
+            sampled_targets = Variable(torch.from_numpy(targets[index])).float().cuda()
+            sampled_advs = Variable(torch.from_numpy(advs[index])).float().cuda()
+
+
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions)
+
+            sampled_logprobs = sampled_logprobs.view(-1, 1)
+            ratio = torch.exp(new_logprob - sampled_logprobs)
+
+            sampled_advs = sampled_advs.view(-1, 1)
+            surrogate1 = ratio * sampled_advs
+            surrogate2 = torch.clamp(ratio, 1 - clip_value, 1 + clip_value) * sampled_advs
+            policy_loss = -torch.min(surrogate1, surrogate2).mean()
+
+            sampled_targets = sampled_targets.view(-1, 1)
+            value_loss = F.mse_loss(new_value, sampled_targets)
+
+            loss = policy_loss + 0.5 * value_loss - 0.01 * dist_entropy
+            #loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            info_p_loss, info_v_loss, info_entropy = float(policy_loss.detach().cpu().numpy()), \
+                                                     float(value_loss.detach().cpu().numpy()), float(
+                                                    dist_entropy.detach().cpu().numpy())
+            logger_ppo.info('{}, {}, {}, {}'.format(info_p_loss, info_v_loss, info_entropy, optimizer.param_groups[0]['lr']))
 
 def ppo_update_stage1_stacked_LM(policy, optimizer, batch_size, memory, epoch,    # 211214
                coeff_entropy=0.02, clip_value=0.2,

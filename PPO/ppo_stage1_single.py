@@ -20,7 +20,7 @@ from collections import deque #test
 
 from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy #test
 from stage_world1 import StageWorld #test
-from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
+from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM, ppo_update_stage1_new  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
@@ -403,6 +403,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
                         memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
                         ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                        #ppo_update_stage1_new(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
                                                 epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
                                                 num_env=1, frames=LASER_HIST,
                                                 obs_size=OBS_SIZE, act_size=ACT_SIZE)
@@ -535,7 +536,11 @@ if __name__ == '__main__':
         print(policy)
         policy.cuda()
 
-        opt = Adam(policy.parameters(), lr=LEARNING_RATE)
+        # DELETE ME!
+
+        #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
+        opt = Adam(policy.parameters(), lr=LEARNING_RATE, betas=[0.9, 0.990])   # 이것만 이번에 추가한거
+        #opt = Adam(policy.parameters(), lr=0.0003, betas=[0.9, 0.990])
         mse = nn.MSELoss()
 
 
@@ -543,8 +548,8 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load model
-        #file = policy_path + '/Stage1'
-        file = policy_path + '/Stage1_our'
+        file = policy_path + '/Stage1'
+        #file = policy_path + '/Stage1_our'
         #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
