@@ -97,6 +97,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     avg_success_min_dist=0.0
     avg_success_min_inclusion = 0
     success_counter = 0.00000000001
+    
+    global_best_reward = -999.0   # 220117
 
     for id in range(MAX_EPISODES):
         terminal = False
@@ -446,7 +448,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
         ###### while문 끝 ######
         #####save policy and logger##############################################################################################
-        #if global_update != 0 and global_update % 5 == 0:
+        # [MODIFIED] 220117 Most Best Reward policy will be updated
+        if global_update !=0 and ep_reward > global_best_reward:
+            torch.save(policy.state_dict(), policy_path + '/Stage1')
+            torch.save(policy, policy_path + '/Stage1_tot')
+            logger.info('########################## model saved when update {} times#########'
+                        '################'.format(global_update))
+            print('기존 리워드:',global_best_reward,'뉴 reward:',ep_reward)
+            global_best_reward = ep_reward
+            
+        '''
         if global_update != 0 and global_update % 2 == 0:   # 211217
             #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
             torch.save(policy.state_dict(), policy_path + '/Stage1')
@@ -454,6 +465,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             torch.save(policy, policy_path + '/Stage1_tot')
             logger.info('########################## model saved when update {} times#########'
                         '################'.format(global_update))
+        '''
             
         
         if result == 'Reach Goal':
@@ -463,9 +475,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             avg_success_min_dist += min_dist
             avg_success_min_inclusion += num_inclusion
             
-        
-        #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
-        #distance = 0
         if not (step==2 and terminal):
             logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d, avg.suc.nav.time: %3.3f, avg.suc.nav.length: %3.3f, avg.suc.min_Dist: %2.3f, avg.suc.num_Inclu: %2.3f' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion, avg_success_nav_time/success_counter, avg_success_nag_length/success_counter, avg_success_min_dist/success_counter, avg_success_min_inclusion/success_counter))
@@ -536,7 +545,6 @@ if __name__ == '__main__':
         print(policy)
         policy.cuda()
 
-        # DELETE ME!
 
         #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         opt = Adam(policy.parameters(), lr=LEARNING_RATE, betas=[0.9, 0.990])   # 이것만 이번에 추가한거
@@ -550,7 +558,6 @@ if __name__ == '__main__':
         # Load model
         file = policy_path + '/Stage1'
         #file = policy_path + '/Stage1_our'
-        #file = policy_path + '/_____'
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
