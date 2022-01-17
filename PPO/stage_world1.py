@@ -129,7 +129,13 @@ class StageWorld():
             pass
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
-        # rospy.on_shutdown(self.shutdown)
+        rospy.on_shutdown(self.shutdown)   # [ADDED]220117
+        
+    def shutdown(self):   # [ADDED]220117
+        # stop agent.
+        rospy.loginfo("Stop Moving")
+        self.cmd_vel.publish(Twist())
+        rospy.sleep(1)
 
     def callback(self, *msgs):
         pose_list = []
