@@ -76,7 +76,7 @@ torch.backends.cudnn.deterministic = True
 
 #def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):   # buffer loader
 def run(comm, env, policy, policy_path, action_bound, optimizer):
-    # rate = rospy.Rate(5)
+    rate = rospy.Rate(5)   # 5 Hz   # http://wiki.ros.org/rospy/Overview/Time  1초에 5번 루프 반복하게 즉 0.2초만에 루프 돌아야 함
     buff = []
     #last_v_r = 0.0
 
@@ -119,7 +119,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
-        rospy.sleep(1)
+        #rospy.sleep(1)    # 220117 disable
                    
         #env.set_init_pose(init_pose)
         env.set_init_goal(init_goals[0])
@@ -206,8 +206,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                     
-            # rate.sleep()
-            rospy.sleep(0.001)
+            rate.sleep()
+            #rospy.sleep(0.001)
             
             
             # 211228 Visualize DBSCAN subgroups
