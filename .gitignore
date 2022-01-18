@@ -40,3 +40,6 @@ PPO/dbscan/README.md
 PPO/dbscan/dbscan_sklean.py
 PPO/dbscan/sample/sample.mat
 PPO/test.py
+PPO/PPO_continuous.py
+PPO/PPO_discrete.py
+PPO/model/convlstm2d_new.py

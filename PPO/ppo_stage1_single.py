@@ -208,8 +208,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                     
-            #rate.sleep()
-            rospy.sleep(0.001)
+            rate.sleep()
+            #rospy.sleep(0.001)
             
             
             # 211228 Visualize DBSCAN subgroups
@@ -543,14 +543,10 @@ if __name__ == '__main__':
         print(policy)
         policy.cuda()
 
-<<<<<<< HEAD
 
         #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         opt = Adam(policy.parameters(), lr=LEARNING_RATE, betas=[0.9, 0.990])   # 이것만 이번에 추가한거
         #opt = Adam(policy.parameters(), lr=0.0003, betas=[0.9, 0.990])
-=======
-        opt = Adam(policy.parameters(), lr=LEARNING_RATE)
->>>>>>> parent of b2a50f2... modify optimizer ADAM add betas
         mse = nn.MSELoss()
 
 
@@ -558,14 +554,8 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load model
-<<<<<<< HEAD
         file = policy_path + '/Stage1'
         #file = policy_path + '/Stage1_our'
-=======
-        #file = policy_path + '/Stage1'
-        file = policy_path + '/Stage1_our'
-        #file = policy_path + '/_____'
->>>>>>> parent of b2a50f2... modify optimizer ADAM add betas
         file_tot = policy_path + '/stage_____tot'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
