@@ -129,13 +129,7 @@ class StageWorld():
             pass
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
-        rospy.on_shutdown(self.shutdown)   # [ADDED]220117
-        
-    def shutdown(self):   # [ADDED]220117
-        # stop agent.
-        rospy.loginfo("Stop Moving")
-        self.cmd_vel.publish(Twist())
-        rospy.sleep(1)
+        # rospy.on_shutdown(self.shutdown)
 
     def callback(self, *msgs):
         pose_list = []
@@ -282,8 +276,8 @@ class StageWorld():
         self.step_goal = [0., 0.]
         self.step_r_cnt = 0.
         self.start_time = time.time()
-        rospy.sleep(0.5)    # 220117
-        #rospy.sleep(1.0)   # 211214
+        #rospy.sleep(0.5)
+        rospy.sleep(1.0)   # 211214
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
@@ -582,7 +576,7 @@ class StageWorld():
 
         return [x, y]
 
-    def generate_pose_goal_circle(self):   # 안쓰임
+    def generate_pose_goal_circle(self):
         # reset pose
         #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
         random_pose = self.generate_group_pose()   # 211129. Groups initialize
@@ -695,7 +689,7 @@ class StageWorld():
     def set_init_pose(self, init_pose):
         self.control_pose(init_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
-        #rospy.sleep(0.01)   # 220117 disabled
+        rospy.sleep(0.01)
         
     
     def set_init_goal(self, init_goal):

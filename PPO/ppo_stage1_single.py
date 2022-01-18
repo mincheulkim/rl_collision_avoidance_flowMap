@@ -27,20 +27,19 @@ from dbscan.dbscan import DBSCAN
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
 MAX_EPISODES = 5000   # For Train    5000
-#MAX_EPISODES = 100     # For Test
+#MAX_EPISODES = 500     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
 
-#HORIZON = 3072    # v3            # 220111 TODO as 2048
-#HORIZON = 1024    # v3            # 220111 TODO as 2048
-HORIZON = 512    # For small batch test
+HORIZON = 1024    # v3            # 220111 TODO as 2048
+#HORIZON = 512
 
 GAMMA = 0.99
 LAMDA = 0.95
 #BATCH_SIZE = 1024   # oriignal
-#BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
-BATCH_SIZE = 32   # For small batch test
+BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
+#BATCH_SIZE = 32
 #TODO SGD style learning에서는 매개변수가 작을수록 더 잘된다고 하네...
 
 EPOCH = 2
@@ -56,7 +55,7 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
-visible_robot = True
+robot_visible = True           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
 
@@ -65,7 +64,6 @@ test_policy=False      # For test:True, For Train: False(default)
 import random
 SEED = 1234  # for training
 #SEED = 4321 # for test
-#SEED = 5 # for test
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -76,7 +74,7 @@ torch.backends.cudnn.deterministic = True
 
 #def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):   # buffer loader
 def run(comm, env, policy, policy_path, action_bound, optimizer):
-    rate = rospy.Rate(5)   # 5 Hz   # http://wiki.ros.org/rospy/Overview/Time  1초에 5번 루프 반복하게 즉 0.2초만에 루프 돌아야 함
+    # rate = rospy.Rate(5)
     buff = []
     #last_v_r = 0.0
 
@@ -97,8 +95,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     avg_success_min_dist=0.0
     avg_success_min_inclusion = 0
     success_counter = 0.00000000001
-    
-    global_best_reward = -999.0   # 220117
 
     for id in range(MAX_EPISODES):
         terminal = False
@@ -121,7 +117,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
-        #rospy.sleep(1)    # 220117 disable
+        rospy.sleep(1)
                    
         #env.set_init_pose(init_pose)
         env.set_init_goal(init_goals[0])
@@ -167,7 +163,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly_list =np.array(speed_poly_list)
                         
             # generate humans action
-            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, visible_robot=visible_robot)
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible)
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -208,8 +204,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                     
-            rate.sleep()
-            #rospy.sleep(0.001)
+            # rate.sleep()
+            rospy.sleep(0.001)
             
             
             # 211228 Visualize DBSCAN subgroups
@@ -447,17 +443,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
         ###### while문 끝 ######
         #####save policy and logger##############################################################################################
-        # [MODIFIED] 220117 Most Best Reward policy will be updated
-        '''
-        if global_update !=0 and ep_reward > global_best_reward:
-            torch.save(policy.state_dict(), policy_path + '/Stage1')
-            torch.save(policy, policy_path + '/Stage1_tot')
-            logger.info('########################## model saved when update {} times#########'
-                        '################'.format(global_update))
-            print('기존 리워드:',global_best_reward,'뉴 reward:',ep_reward)
-            global_best_reward = ep_reward
-            
-        '''
+        #if global_update != 0 and global_update % 5 == 0:
         if global_update != 0 and global_update % 2 == 0:   # 211217
             #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
             torch.save(policy.state_dict(), policy_path + '/Stage1')
@@ -465,6 +451,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             torch.save(policy, policy_path + '/Stage1_tot')
             logger.info('########################## model saved when update {} times#########'
                         '################'.format(global_update))
+            
         
         if result == 'Reach Goal':
             success_counter += 1     # 1 2 3
@@ -473,6 +460,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             avg_success_min_dist += min_dist
             avg_success_min_inclusion += num_inclusion
             
+        
+        #distance = np.sqrt((env.goal_point[0] - env.init_pose[0])**2 + (env.goal_point[1]-env.init_pose[1])**2)
+        #distance = 0
         if not (step==2 and terminal):
             logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d, avg.suc.nav.time: %3.3f, avg.suc.nav.length: %3.3f, avg.suc.min_Dist: %2.3f, avg.suc.num_Inclu: %2.3f' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion, avg_success_nav_time/success_counter, avg_success_nag_length/success_counter, avg_success_min_dist/success_counter, avg_success_min_inclusion/success_counter))
@@ -543,10 +533,7 @@ if __name__ == '__main__':
         print(policy)
         policy.cuda()
 
-
-        #opt = Adam(policy.parameters(), lr=LEARNING_RATE)
-        opt = Adam(policy.parameters(), lr=LEARNING_RATE, betas=[0.9, 0.990])   # 이것만 이번에 추가한거
-        #opt = Adam(policy.parameters(), lr=0.0003, betas=[0.9, 0.990])
+        opt = Adam(policy.parameters(), lr=LEARNING_RATE)
         mse = nn.MSELoss()
 
 
@@ -555,8 +542,8 @@ if __name__ == '__main__':
 
         # Load model
         file = policy_path + '/Stage1'
-        #file = policy_path + '/Stage1_our'
-        file_tot = policy_path + '/stage_____tot'
+        #file = policy_path + '/_____'
+        file_tot = policy_path + '/Stage1_ttt'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')
