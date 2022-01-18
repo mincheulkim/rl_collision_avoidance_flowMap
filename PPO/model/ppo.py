@@ -524,107 +524,108 @@ def generate_action_human_groups(env, pose_list, goal_global_list, num_env):
     
     return scaled_action
 
-def generate_action_human_sf(env, pose_list, goal_global_list, num_env):   # 211221
-    if env.index == 0:
+def generate_action_human_sf(env, pose_list, goal_global_list, num_env, visible_robot):   # 211221
+    #print(visible_robot)
+    #그룹정보 받아야 된다
+    human_max_speed = 1.0
+    p_list = []
+    scaled_action = []
+    scaled_position = []
+    
+    for i in pose_list:
+        p_list.append(i)
+    p_list = np.asarray(p_list)
 
-        human_max_speed = 1.0
-        p_list = []
-        scaled_action = []
-        scaled_position = []
-        
-        for i in pose_list:
-            p_list.append(i)
-        p_list = np.asarray(p_list)
+    # 1. initial states
+    initial_state = np.zeros((num_env, 6))
+    #print(num_env, 'goal:',goal_global_list, 'plist;',p_list)
+    for i in range(num_env):  # i=0, 1,2,3,4        
+        hv = goal_global_list[i] - p_list[i] 
+        hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+        prefv=hv/hs if hs >human_max_speed else hv
+        initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
+    # ROLLBACK
+    # 2. group #################################
+    groups = []
+    groups.append([])  # 0 grp as robot
+    groups.append([])  # 1 grp 5 human
+    groups.append([])  # 2 groups 3 human
+    groups.append([])  # 3 groups 2 human
+    groups.append([])  # 4 groups 3 human
+    #groups.append([])  # 5 groups 8 human
+    
 
-        # 1. initial states
-        initial_state = np.zeros((num_env, 6))
-        #print(num_env, 'goal:',goal_global_list, 'plist;',p_list)
-        for i in range(num_env):  # i=0, 1,2,3,4        
-            hv = goal_global_list[i] - p_list[i] 
-            hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
-            prefv=hv/hs if hs >human_max_speed else hv
-            initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
-        # ROLLBACK
-        # 2. group #################################
-        groups = []
-        groups.append([])  # 0 grp as robot
-        groups.append([])  # 1 grp 5 human
-        groups.append([])  # 2 groups 3 human
-        groups.append([])  # 3 groups 2 human
-        #groups.append([])  # 4
-        #groups.append([])  # 5
-        
+    # assign humans to groups
+    
+    groups[0].append(0)
+    groups[1].append(1)
+    groups[1].append(2)
+    groups[1].append(3)
+    groups[1].append(4)
+    groups[1].append(5)
+    groups[2].append(6)
+    groups[2].append(7)
+    groups[2].append(8)
+    groups[3].append(9)
+    groups[3].append(10)
+    groups[4].append(11)
+    groups[4].append(12)
+    groups[4].append(13)
+    
+    
+    '''
+    #7 5 4 2 2 
+    groups[0].append(0)
+    groups[1].append(1)
+    groups[1].append(2)
+    groups[1].append(3)
+    groups[1].append(4)
+    groups[1].append(5)
+    groups[1].append(6)
+    groups[1].append(7)
+    groups[2].append(8)
+    groups[2].append(9)
+    groups[2].append(10)
+    groups[2].append(11)
+    groups[2].append(12)
+    groups[3].append(13)
+    groups[3].append(14)
+    groups[3].append(15)
+    groups[3].append(16)
+    groups[4].append(17)
+    groups[4].append(18)
+    groups[5].append(19)
+    groups[5].append(20)
+    '''
 
-        # assign humans to groups
-        
-        groups[0].append(0)
-        groups[1].append(1)
-        groups[1].append(2)
-        groups[1].append(3)
-        groups[1].append(4)
-        groups[1].append(5)
-        groups[2].append(6)
-        groups[2].append(7)
-        groups[2].append(8)
-        groups[3].append(9)
-        groups[3].append(10)
-        
-        '''
-        #7 5 4 2 2 
-        groups[0].append(0)
-        groups[1].append(1)
-        groups[1].append(2)
-        groups[1].append(3)
-        groups[1].append(4)
-        groups[1].append(5)
-        groups[1].append(6)
-        groups[1].append(7)
-        groups[2].append(8)
-        groups[2].append(9)
-        groups[2].append(10)
-        groups[2].append(11)
-        groups[2].append(12)
-        groups[3].append(13)
-        groups[3].append(14)
-        groups[3].append(15)
-        groups[3].append(16)
-        groups[4].append(17)
-        groups[4].append(18)
-        groups[5].append(19)
-        groups[5].append(20)
-        '''
+    # 3. assign obstacles
+    #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
+    psf_sim = None
+    
+    # 4. initiate simulator
+    psf_sim = psf.Simulator(
+            initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
+            # TOML doesn't work. modify directly pysocialforce/scene.py
+        )
+    # do 1 updates
+    psf_sim.step(n=1)
+    ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
 
-        # 3. assign obstacles
-        #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
-        psf_sim = None
-        
-        # 4. initiate simulator
-        psf_sim = psf.Simulator(
-                initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
-                # TOML doesn't work. modify directly pysocialforce/scene.py
-            )
-        # do 1 updates
-        psf_sim.step(n=1)
-        ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
-
-        # 5. visualize
-        #with psf.plot.SceneVisualizer(psf_sim, "output_image_sf") as sv:
-        #    sv.animate()
-        
-        for i in range(num_env):
-            #print(i,':',ped_states[1][i][0],ped_states[1][i][1],'vel:',ped_states[1][i][2],ped_states[1][i][3])
-            vx = ped_states[1][i][2]
-            vy = ped_states[1][i][3]
-            vx = vx/1
-            vy=vy/1
-            scaled_action.append([vx,vy])
-            scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
+    # 5. visualize
+    #with psf.plot.SceneVisualizer(psf_sim, "output_image_sf") as sv:
+    #    sv.animate()
+    
+    for i in range(num_env):
+        #print(i,':',ped_states[1][i][0],ped_states[1][i][1],'vel:',ped_states[1][i][2],ped_states[1][i][3])
+        vx = ped_states[1][i][2]
+        vy = ped_states[1][i][3]
+        vx = vx/1
+        vy=vy/1
+        scaled_action.append([vx,vy])
+        scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
             
         
-    else:  # env.index =! 0
-        scaled_action = None
-        scaled_position = None
-
+    
     return scaled_action, scaled_position
 
 

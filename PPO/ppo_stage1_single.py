@@ -56,7 +56,7 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
-#blind_human = True
+visible_robot = True
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
 
@@ -167,7 +167,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly_list =np.array(speed_poly_list)
                         
             # generate humans action
-            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human)
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, visible_robot=visible_robot)
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -208,8 +208,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     
                     env.control_vel_specific(scaled_action, i)
                     
-            rate.sleep()
-            #rospy.sleep(0.001)
+            #rate.sleep()
+            rospy.sleep(0.001)
             
             
             # 211228 Visualize DBSCAN subgroups
@@ -449,6 +449,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         ###### while문 끝 ######
         #####save policy and logger##############################################################################################
         # [MODIFIED] 220117 Most Best Reward policy will be updated
+        '''
         if global_update !=0 and ep_reward > global_best_reward:
             torch.save(policy.state_dict(), policy_path + '/Stage1')
             torch.save(policy, policy_path + '/Stage1_tot')
@@ -465,8 +466,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             torch.save(policy, policy_path + '/Stage1_tot')
             logger.info('########################## model saved when update {} times#########'
                         '################'.format(global_update))
-        '''
-            
         
         if result == 'Reach Goal':
             success_counter += 1     # 1 2 3
