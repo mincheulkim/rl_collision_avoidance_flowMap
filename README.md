@@ -133,7 +133,7 @@ tensorboard --logdir runs/
 		[ ] velocity magnitude: default threshold 1m/s, [0.5m/s, 1.5m/s]
 		Group Split and Merge Prediction ... 논문
 		- DBSCAN총 세번 돌림. velocity direction -> vel.dct 결과 clusters 내에서 velocity magnitude -> vel.mag 결과 clusters 내에서 position
-- [ ] calcurate CoM and nominal velocities, ...
+- [ ] regard each groups as fluidic-rigid body, calcurate CoM and nominal velocities, ...
 ```
 - 4. Reward shaping (after 211217 meeting)
 ```
