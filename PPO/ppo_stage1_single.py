@@ -55,7 +55,7 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
-robot_visible = True           # 220118
+robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
 
@@ -105,13 +105,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         min_dist = 999.0     # 220120 Metric
         num_inclusion = 0     # 220120 Metric
         
-        
         # senario reset option
         init_poses = None
         init_goals = None         
         
         num_human = env.num_human
-        
         
         rule = 'group_circle_crossing'  # crossing
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
@@ -146,14 +144,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         while not terminal and not rospy.is_shutdown():
             
             state_list = comm.gather(state, root=0)
-            #pose_list = comm.gather(pose, root=0)     # 211019. 5 states for each human
-            
-            #speed_poly_list = comm.gather(speed_poly, root=0)
-            #print('speed_poliy:',speed_poly_list)
-            #goal_global_list = comm.gather(goal_global, root=0)
 
-            if env.index==0:
-                robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
+            robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
         
             pose_list = env.pose_list
             goal_global_list = init_goals

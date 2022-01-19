@@ -10,6 +10,7 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import rvo2
 import pysocialforce as psf
 import cv2
+import copy
 
 
 hostname = socket.gethostname()
@@ -528,52 +529,90 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
     p_list = []
     scaled_action = []
     scaled_position = []
+
+    if robot_visible:    
+        for i in pose_list:
+            p_list.append(i)
+        p_list = np.asarray(p_list)
+
+        # 1. initial states
+        initial_state = np.zeros((num_env, 6))
+        #print(num_env, 'goal:',goal_global_list, 'plist;',p_list)
+        for i in range(num_env):  # i=0, 1,2,3,4        
+            hv = goal_global_list[i] - p_list[i] 
+            hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+            prefv=hv/hs if hs >human_max_speed else hv
+            initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
+        # ROLLBACK
+        # 2. group #################################
+        groups = grp_list          # 220118
+
+        #인비지블 사람 해야 함
+
+        # 3. assign obstacles
+        #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
+        psf_sim = None
+        
+        # 4. initiate simulator
+        psf_sim = psf.Simulator(
+                initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
+                # TOML doesn't work. modify directly pysocialforce/scene.py
+            )
+        # do 1 updates
+        psf_sim.step(n=1)
+        ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
+
+        # 5. visualize
+        #with psf.plot.SceneVisualizer(psf_sim, "output_image_sf") as sv:
+        #    sv.animate()
+        
+        for i in range(num_env):
+            #print(i,':',ped_states[1][i][0],ped_states[1][i][1],'vel:',ped_states[1][i][2],ped_states[1][i][3])
+            vx = ped_states[1][i][2]
+            vy = ped_states[1][i][3]
+            vx = vx/1
+            vy=vy/1
+            scaled_action.append([vx,vy])
+            scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
+                
+        return scaled_action, scaled_position
     
-    for i in pose_list:
-        p_list.append(i)
-    p_list = np.asarray(p_list)
+    else:     # 220119 robot is not visible
+        for i in pose_list:
+            p_list.append(i)
+        p_list = np.asarray(p_list)
 
-    # 1. initial states
-    initial_state = np.zeros((num_env, 6))
-    #print(num_env, 'goal:',goal_global_list, 'plist;',p_list)
-    for i in range(num_env):  # i=0, 1,2,3,4        
-        hv = goal_global_list[i] - p_list[i] 
-        hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
-        prefv=hv/hs if hs >human_max_speed else hv
-        initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
-    # ROLLBACK
-    # 2. group #################################
-    groups = grp_list          # 220118
+        initial_state = np.zeros((num_env, 6))
 
+        for i in range(num_env):  # i=0, 1,2,3,4        
+            hv = goal_global_list[i] - p_list[i] 
+            hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+            prefv=hv/hs if hs >human_max_speed else hv
+            initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
+        
+        groupss = copy.deepcopy(grp_list)          # 220119
 
+        psf_sim = None
+        groups_ex_human = []
+        for group_d in groupss[1:]:
+            for i in range(len(group_d)):
+                group_d[i]=group_d[i]-1
+            groups_ex_human.append(group_d)
+        
+        psf_sim = psf.Simulator(
+                initial_state[1:], groups=groups_ex_human, obstacles=None, config_file="./pysocialforce/config/example.toml"
+            )
+        # do 1 updates
+        psf_sim.step(n=1)
+        ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
 
-    # 3. assign obstacles
-    #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
-    psf_sim = None
-    
-    # 4. initiate simulator
-    psf_sim = psf.Simulator(
-            initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
-            # TOML doesn't work. modify directly pysocialforce/scene.py
-        )
-    # do 1 updates
-    psf_sim.step(n=1)
-    ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
-
-    # 5. visualize
-    #with psf.plot.SceneVisualizer(psf_sim, "output_image_sf") as sv:
-    #    sv.animate()
-    
-    for i in range(num_env):
-        #print(i,':',ped_states[1][i][0],ped_states[1][i][1],'vel:',ped_states[1][i][2],ped_states[1][i][3])
-        vx = ped_states[1][i][2]
-        vy = ped_states[1][i][3]
-        vx = vx/1
-        vy=vy/1
-        scaled_action.append([vx,vy])
-        scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
-            
-    return scaled_action, scaled_position
+        for i in range(num_env-1):
+            vx = ped_states[1][i][2]
+            vy = ped_states[1][i][3]
+            scaled_action.append([vx,vy])
+            scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
+        scaled_action.insert(0,[0.0,0.0])     # 220119 for robot
+        return scaled_action, scaled_position    
 
 
 def calculate_returns(rewards, dones, last_value, values, gamma=0.99):
