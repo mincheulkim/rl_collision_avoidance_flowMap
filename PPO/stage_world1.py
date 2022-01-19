@@ -293,7 +293,7 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
 
     # TODO: Reward reshape: penalty for circuling around
-    def get_reward_and_terminate(self, t, scaled_action, idx, g_cluster):   # t is increased 1, but initializezd 1 when terminate=True
+    def get_reward_and_terminate(self, t, scaled_action):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state

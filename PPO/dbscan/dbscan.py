@@ -30,13 +30,27 @@ from matplotlib import pyplot as plt
 
 class DBSCAN(object):
 
-    def __init__(self,x,epsilon,minpts):   # x: 입력, epsilon: 최소 이웃 반경  minpts: 최소 이우 ㅅ개수
+    #def __init__(self,x,epsilon,minpts):   # x: 입력, epsilon: 최소 이웃 반경  minpts: 최소 이우 ㅅ개수
+    def __init__(self,x, y,epsilon,minpts):   # x: pose_list  y: poly_speed_list of humans
         # The number of input dataset
         self.n = len(x)
         #print('x:',x.shape)
         # Euclidean distance
-        p, q = np.meshgrid(np.arange(self.n), np.arange(self.n))
+        p, q = np.meshgrid(np.arange(self.n), np.arange(self.n))   # 격자 그리드 만들기
         self.dist = np.sqrt(np.sum(((x[p] - x[q])**2),2))
+        # Relative velocity
+        self.dist_vel = np.sqrt(np.sum(((y[p] - y[q])**2),2))
+        hyper_params = [5]
+        #self.dist = (np.add(self.dist,np.multiply(hyper_params,self.dist_vel)))/(np.add([1],hyper_params))   # option 1 (나누는 숫자가 너무 커서 전반적을 작아짐(관대해짐))
+        self.dist = (np.add(self.dist,np.multiply(hyper_params,self.dist_vel)))/2         # option 2   (나누는 숫자 고정)
+
+        
+
+        
+        
+        
+        #self.dist = (self.dist + hyper_params*self.dist_vel)/(1+hyper_params)
+        
         #print('길이:',self.n)
         #print('p,q:',p,q)
         #print('거리:',self.dist)

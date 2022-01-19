@@ -52,7 +52,7 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
-DBSCAN_visualize=False
+DBSCAN_visualize=True
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
 robot_visible = False           # 220118
@@ -153,10 +153,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
-            dbscan = DBSCAN(pose_list_dbscan,2,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
+            speed_poly_list_dbscan = speed_poly_list[1:]
+            #dbscan = DBSCAN(pose_list_dbscan,2,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
+            dbscan = DBSCAN(pose_list_dbscan, speed_poly_list_dbscan,2,2)   # 220119. add relative velocity
             idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
             g_cluster,n_cluster = dbscan.sort()     # Result SORTING
             #dbscan.plot()          # Visualization results
+            #print(idx)
+            
             
             # generate robot action (at rank==0)
             if policy_list=='LM':  # LM: 60x60
@@ -247,7 +251,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # get informtion
-            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, idx, g_cluster)   # 211221 for backward penalty 
+            r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty 
             ep_reward += r
             global_step += 1
 
@@ -265,7 +269,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_next_poly = np.asarray(env.get_self_speed_poly())  # 211103
             rot_next = np.asarray(pose_ori_next[2])   # 211108
             
-
             ############training#######################################################################################
             if global_step % HORIZON == 0:
                 state_next_list = comm.gather(state_next, root=0)   # robot state
@@ -275,6 +278,16 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 
                 speed_poly_next_list = env.speed_poly_list             # 220105
                 speed_poly_next_list =np.array(speed_poly_list)
+                
+                # DBSCAN one-more
+                pose_list_dbscan = pose_next_list[1:, :-1]
+                speed_poly_list_dbscan = speed_poly_next_list[1:]
+                #dbscan = DBSCAN(pose_list_dbscan,2,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
+                dbscan = DBSCAN(pose_list_dbscan, speed_poly_list_dbscan,2,2)   # 220119. add relative velocity
+                idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
+                g_cluster,n_cluster = dbscan.sort()     # Result SORTING
+                #dbscan.plot()          # Visualization results
+                #print('after:',idx)
                 
                 state_next_list_new = state_next_list[0:1]   # for robot
                 if policy_list=='LM':  # LM: 60x60    # 211214
