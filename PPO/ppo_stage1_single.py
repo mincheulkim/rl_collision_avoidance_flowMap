@@ -53,7 +53,7 @@ ACT_SIZE = 2
 LEARNING_RATE = 5e-5
 
 LM_visualize = False    # True or False         # visualize local map(s)
-DBSCAN_visualize=True
+DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
 robot_visible = False           # 220118
@@ -63,6 +63,7 @@ test_policy=False      # For test:True, For Train: False(default)
 
 # For fixed Randomization  211230
 import random
+'''
 SEED = 1234  # for training
 #SEED = 4321 # for test
 random.seed(SEED)
@@ -70,10 +71,9 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
+'''
 
 
-
-#def run(comm, env, policy, policy_path, action_bound, optimizer, buffer, last_v_r_p):   # buffer loader
 def run(comm, env, policy, policy_path, action_bound, optimizer):
     # rate = rospy.Rate(5)
     buff = []
@@ -82,8 +82,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     global_step = 0
     memory_size = 0
 
-    if env.index == 0:
-        env.reset_world()
+
+    env.reset_world()
     
     avg_success_nav_time=0
     avg_success_nag_length=0

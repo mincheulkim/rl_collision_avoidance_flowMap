@@ -415,7 +415,7 @@ class StageWorld():
         else:  # TODO time penalty
             reward_t = -0.1
         '''
-        print('reward:',reward)
+        #print('reward:',reward)
         return reward, terminate, result   # float, T or F(base), description
 
     def reset_pose(self):
