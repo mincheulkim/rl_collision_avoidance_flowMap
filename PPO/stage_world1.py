@@ -251,6 +251,15 @@ class StageWorld():
             self.is_collision = 0
 
         self.scan_min = scan_min
+        
+    def get_min_lidar_dist(self):
+        scan = copy.deepcopy(self.scan)
+        scan[np.isnan(scan)] = 6.0
+        scan[np.isinf(scan)] = 6.0
+        scan_min=np.min(scan)
+        return scan_min
+        
+    
 
 
     def get_self_speed(self):
@@ -323,20 +332,32 @@ class StageWorld():
             #reward_c = -30.
             result = 'Crashed(ROS)'
         
+        min_dist_rrr = 10.0   # 220119
         # 220119 Collision check by rel.dist around 360 degree
         pose_list_np = np.array(self.pose_list)
         rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
         for i in rel_dist_list[1:]:
             min_dist = np.sqrt(i[0]**2+i[1]**2)
+            if min_dist < min_dist_rrr:
+                min_dist_rrr = min_dist
             if min_dist < 0.6:
                 terminate = True
                 reward_c = -15.
                 result = 'Crashed(Compuatation)'
                 break
             
-
-        # TODO Lidar collsion check 211215
+        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
+        kkk = self.get_min_lidar_dist()
+        #print(kkk, min_dist_rrr)
+        penalty_lidar = 0.
+        if kkk <= 1.0:
+            penalty_lidar = (-1. + kkk)/10
+        
+        # 220119. timestep penalty
+        #constant_penalty = -0.005
+        
         '''
+        # Lidar collsion check 211215
         self.collision_laser_flag(r=0.4)
         if self.is_collision==1:
             #print(self.index, 'is_collision : ',self.is_collision, 'min_dist_LIDAR:',self.scan_min)
@@ -386,13 +407,15 @@ class StageWorld():
         coll_grp = np.array([1 if (dist_to_grp[j] < collision_dist) else 0 for j in range(len(g_cluster))])
         reward_grp = -0.25 * coll_grp.sum()   # 0,1,2,~ max grp num
         '''
-        reward = reward_g + reward_c + reward_w  # original
+        reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
+        #reward = reward_g + reward_c + reward_w  # original befrom 220119
         #reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added
         #reward = reward_g + reward_c + reward_w + r_back # 211221
         '''
         else:  # TODO time penalty
             reward_t = -0.1
         '''
+        print('reward:',reward)
         return reward, terminate, result   # float, T or F(base), description
 
     def reset_pose(self):
