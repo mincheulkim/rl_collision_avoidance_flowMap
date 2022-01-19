@@ -41,8 +41,10 @@ class DBSCAN(object):
         # Relative velocity
         self.dist_vel = np.sqrt(np.sum(((y[p] - y[q])**2),2))
         hyper_params = [5]
+        
+        # 아래 중 택 1
         #self.dist = (np.add(self.dist,np.multiply(hyper_params,self.dist_vel)))/(np.add([1],hyper_params))   # option 1 (나누는 숫자가 너무 커서 전반적을 작아짐(관대해짐))
-        self.dist = (np.add(self.dist,np.multiply(hyper_params,self.dist_vel)))/2         # option 2   (나누는 숫자 고정)
+        #self.dist = (np.add(self.dist,np.multiply(hyper_params,self.dist_vel)))/2         # option 2   (나누는 숫자 고정)
 
         
 

@@ -310,7 +310,7 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     map_size=6
     local_maps = []
     
-    #print('인덱스:',index)    # 0~12: human1~human13
+    #print('인덱스:',index)    # 0~12: human1~human13  (13)
     
     local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
     for j in range(3):  # grp, vel_x,vel_y
@@ -325,16 +325,20 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
             mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
                         
             diff_vel = speed_poly_list - speed_poly_list[0]
+            #print('index max:',index)
             
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-                if j==0:
+                if j==0:   # grp idx    
                     # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=index[i-1]
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
+                    #print(i,'번째 사람의 index:',(index[i-1]+1)/(np.max(index)+1) )
                 # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                 elif j==1: # vel x
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                    #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
                 elif j==2: # vel y
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                    #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
         local_maps.append(local_map.tolist())
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
 

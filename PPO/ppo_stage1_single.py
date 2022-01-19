@@ -24,6 +24,7 @@ from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
+from dbscan.dbscan_new import DBSCAN_new
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
 MAX_EPISODES = 5000   # For Train    5000
@@ -159,16 +160,24 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
             g_cluster,n_cluster = dbscan.sort()     # Result SORTING
             #dbscan.plot()          # Visualization results
-            #print(idx)
+            #print('기존:',idx)
+            
+            # New DBSCAN  220119
+            dbscan_new = DBSCAN_new(pose_list_dbscan, speed_poly_list_dbscan,2,2)
+            labels = dbscan_new.grouping(pose_list_dbscan, speed_poly_list_dbscan)
+            #print('새거:',labels)
+            idx = labels
+                
+            
             
             
             # generate robot action (at rank==0)
             if policy_list=='LM':  # LM: 60x60
                 v, a, logprob, scaled_action, LM, LM_stack =generate_action_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)                                                                    # env, state_list, pose_list, velocity_poly_list, policy, action_bound
             elif policy_list=='stacked_LM':
-                v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
+                v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=labels, mode=test_policy)
             elif policy_list=='concat_LM':
-                v, a, logprob, scaled_action, LM, LM_stack =generate_action_concat_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=idx, mode=test_policy)
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_concat_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
@@ -282,20 +291,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 # DBSCAN one-more
                 pose_list_dbscan = pose_next_list[1:, :-1]
                 speed_poly_list_dbscan = speed_poly_next_list[1:]
-                #dbscan = DBSCAN(pose_list_dbscan,2,2)   # init papameters. eps: 클수록 클러스터 사이즈 커짐(클러스터 갯수 감소), 작으면 잡음 포인트 증가. 매우 크게하면 모든 포인트가 하나의 클러스터에 속하게됨
-                dbscan = DBSCAN(pose_list_dbscan, speed_poly_list_dbscan,2,2)   # 220119. add relative velocity
-                idx,noise = dbscan.run()    # # Run DBSCAN(CLUSTERING)
-                g_cluster,n_cluster = dbscan.sort()     # Result SORTING
-                #dbscan.plot()          # Visualization results
-                #print('after:',idx)
+
+                dbscan_new = DBSCAN_new(pose_list_dbscan, speed_poly_list_dbscan,2,2)
+                labels = dbscan_new.grouping(pose_list_dbscan, speed_poly_list_dbscan)
+
+                
+                
                 
                 state_next_list_new = state_next_list[0:1]   # for robot
                 if policy_list=='LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list=='stacked_LM':
-                    last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, mode=test_policy)
+                    last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, mode=test_policy)
                 elif policy_list=='concat_LM':  # LM: 60x60    # 211214
-                    last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=idx, LM_stack=LM_stack, mode=test_policy)
+                    last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
