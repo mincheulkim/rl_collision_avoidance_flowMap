@@ -547,8 +547,6 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         # 2. group #################################
         groups = grp_list          # 220118
 
-        #인비지블 사람 해야 함
-
         # 3. assign obstacles
         #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
         psf_sim = None

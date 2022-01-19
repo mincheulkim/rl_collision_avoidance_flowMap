@@ -322,33 +322,41 @@ class StageWorld():
             reward_c = -15.
             #reward_c = -30.
             result = 'Crashed(ROS)'
+        
+        # 220119 Collision check by rel.dist around 360 degree
+        pose_list_np = np.array(self.pose_list)
+        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
+        for i in rel_dist_list[1:]:
+            min_dist = np.sqrt(i[0]**2+i[1]**2)
+            if min_dist < 0.6:
+                terminate = True
+                reward_c = -15.
+                result = 'Crashed(Compuatation)'
+                break
+            
 
         # TODO Lidar collsion check 211215
+        '''
         self.collision_laser_flag(r=0.4)
         if self.is_collision==1:
             #print(self.index, 'is_collision : ',self.is_collision, 'min_dist_LIDAR:',self.scan_min)
             terminate = True
             reward_c = -15.
             result = 'Crashed(LIDAR)'
+        '''
         
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
             #reward_w = -0.45 * np.abs(w) **2
-        '''
-        if np.abs(scaled_action[1])>1.05:
-            reward_w = -0.45 * np.abs(scaled_action[1])**2    # 211221 from DSRNN
-        '''
 
         # 211221 add a penalty for going backwoards
         if scaled_action[0]<0:
             r_back = -0.45 * np.abs(scaled_action[0])
         else:
             r_back = 0
-        #if self.index==0:
-        #        print('v:',scaled_action[0],'w:',scaled_action[1],'rot_penalty:',reward_w,'r_back:',r_back)
 
-        #if t > 1000:  # timeout check  211020 for long-term
-        if t > 700:  # 220107
+        if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
+        #if t > 700:  # 220107
             terminate = True      
             result = 'Time out'
         
