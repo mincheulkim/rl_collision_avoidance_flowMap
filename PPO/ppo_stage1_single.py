@@ -90,6 +90,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     avg_success_min_dist=0.0
     avg_success_min_inclusion = 0
     success_counter = 0.00000000001
+    
+    # 220121
+    
 
     for id in range(MAX_EPISODES):
         terminal = False
@@ -106,6 +109,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         
         num_human = env.num_human
         
+        # 220121
+        done_list = []
+        for i in range(num_human):
+            done_list.append(False)
+                    
         rule = 'group_circle_crossing'  # crossing
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
@@ -167,7 +175,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             labels = dbscan_new.grouping(pose_list_dbscan, speed_poly_list_dbscan)
             #print('새거:',labels)
             idx = labels
-                
+            
+            # 220121
+            for i, done in enumerate(done_list):
+                if done:
+                    env.control_vel_specific((0,0),i)
+                    env.control_pose_specific((init_goals[i][0]+0.01,init_goals[i][1]+0.01,0), i)
             
             
             
@@ -439,6 +452,21 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             pose = pose_next   # 2l.,j,j,11020
             speed_poly = speed_next_poly  # 211104
             rot = rot_next
+                       
+            curr_human_pose_list = env.pose_list     # robot+human state
+            curr_human_pose_list = np.array(curr_human_pose_list)
+            init_goals_list = np.array(init_goals)
+            diff_dist = curr_human_pose_list[:,0:2]-init_goals_list
+            #print('curr:',curr_human_pose_list[:,0:2], 'gl_list:',init_goals_list)
+            
+            diff_dist_length = np.linalg.norm(diff_dist, axis=1)
+            #print(diff_dist_length)
+            for i, dist in enumerate(diff_dist_length):
+                if dist < 0.5 and i != 0:
+                    done_list[i] = True
+                    
+            #print(done_list)
+                    
 
             
         ###### while문 끝 ######
