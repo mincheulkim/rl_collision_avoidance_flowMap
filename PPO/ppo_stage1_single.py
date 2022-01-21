@@ -175,7 +175,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             labels = dbscan_new.grouping(pose_list_dbscan, speed_poly_list_dbscan)
             #print('새거:',labels)
             idx = labels
-            
+            #print(idx)
             # 220121
             for i, done in enumerate(done_list):
                 if done:
@@ -462,7 +462,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             diff_dist_length = np.linalg.norm(diff_dist, axis=1)
             #print(diff_dist_length)
             for i, dist in enumerate(diff_dist_length):
-                if dist < 0.5 and i != 0:
+                if dist < 0.15 and i != 0:
                     done_list[i] = True
                     
             #print(done_list)
