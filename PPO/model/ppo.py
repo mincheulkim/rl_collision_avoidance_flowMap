@@ -300,9 +300,32 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     goal_list = np.asarray(goal_list)
     speed_list = np.asarray(speed_list)
     robot_rot = pose_list[0,2]
-    pose_list = np.asarray(pose_list[:,0:2])
+    pose_list = np.asarray(pose_list[:,0:2])    # 13+1개
     
     speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
+
+    # 220121 그룹별 평균 거리 계산    
+    rel_dist = pose_list - pose_list[0]
+    rel_dist = rel_dist[1:]
+    num_dist = np.linalg.norm(rel_dist, axis=1)
+
+    num_grp_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    #print(num_grp_dist_array)
+    for idx, grp_dist in zip(index, num_dist):   # 0~13 humans
+        #print(idx, grp_dist)
+        num_grp_dist_array[idx] += grp_dist
+    #print('final:',num_grp_dist_array)
+    
+    num_cnt_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    for i in range(np.max(index)+1):
+        num_cnt_dist_array[i] += index.count(i)
+    #print(num_cnt_dist_array)
+    num_grp_dist_array = num_grp_dist_array / num_cnt_dist_array
+    #print('average:',num_grp_dist_array)
+        
+
+    
     
     
     # Build occupancy map
@@ -330,8 +353,11 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                 if j==0:   # grp idx    
                     # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
-                    #print(i,'번째 사람의 index:',(index[i-1]+1)/(np.max(index)+1) )
+                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1/num_grp_dist_array[index[i-1]]  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
+                    #print(index)
+                    #print(i,'번째 사람의 index:',index[i-1]+1 , num_grp_dist_array[index[i-1]])
+                    #print(i, 1/num_grp_dist_array[index[i-1]])
                 # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                 elif j==1: # vel x
                     local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
