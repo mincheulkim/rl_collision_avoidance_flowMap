@@ -273,7 +273,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # get informtion
-            r, terminal, result = env.get_reward_and_terminate(step, scaled_action)   # 211221 for backward penalty 
+            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, policy_list)   # 211221 for backward penalty 
             ep_reward += r
             global_step += 1
 
@@ -336,7 +336,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 if i != 0 and crash == 1:
                     env.control_pose_specific(init_poses[i], i)
                 
-            if env.index == 0 and not (step == 1 and terminal):
+            if env.index == 0 and not (step == 1 and terminal) and test_policy is not True:
                 ############## LM or stacekd LM ######################################################
                 if policy_list =='LM':
                     
@@ -569,9 +569,9 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load model
-        file = policy_path + '/Stage1'
+        file = policy_path + '/Stage1d'
         #file = policy_path + '/_____'
-        file_tot = policy_path + '/Stage1_ttt'
+        file_tot = policy_path + '/Stage1_tot'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')

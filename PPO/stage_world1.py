@@ -302,12 +302,11 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
 
     # TODO: Reward reshape: penalty for circuling around
-    def get_reward_and_terminate(self, t, scaled_action):   # t is increased 1, but initializezd 1 when terminate=True
+    def get_reward_and_terminate(self, t, scaled_action, policy_list):   # t is increased 1, but initializezd 1 when terminate=True
         terminate = False
         laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state
         [v, w] = self.get_self_speedGT()            # updated current velocity
-
         self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
         # Propotional Reward
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
@@ -336,6 +335,8 @@ class StageWorld():
         # 220119 Collision check by rel.dist around 360 degree
         pose_list_np = np.array(self.pose_list)
         rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
+        '''
+        # 220124 disabled for 더 높은 성공률 위해
         for i in rel_dist_list[1:]:
             min_dist = np.sqrt(i[0]**2+i[1]**2)
             if min_dist < min_dist_rrr:
@@ -345,6 +346,7 @@ class StageWorld():
                 reward_c = -15.
                 result = 'Crashed(Compuatation)'
                 break
+        '''
             
         # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
         kkk = self.get_min_lidar_dist()
@@ -407,10 +409,15 @@ class StageWorld():
         coll_grp = np.array([1 if (dist_to_grp[j] < collision_dist) else 0 for j in range(len(g_cluster))])
         reward_grp = -0.25 * coll_grp.sum()   # 0,1,2,~ max grp num
         '''
-        reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
+        
+        # 220124
+        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM':
+            reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
+        elif policy_list == '':
+            reward = reward_g + reward_c + reward_w
         #reward = reward_g + reward_c + reward_w  # original befrom 220119
         #reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added
-        #reward = reward_g + reward_c + reward_w + r_back # 211221
+        #reward = reward_g + reward_c + reward_w + r_back # 211221   # raw policy에서 뒤로 갈때 페널티
         '''
         else:  # TODO time penalty
             reward_t = -0.1
