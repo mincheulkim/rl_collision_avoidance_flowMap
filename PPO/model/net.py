@@ -649,9 +649,216 @@ class concat_LM_Policy(nn.Module):
         dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
         dist_entropy = dist_entropy.sum(-1).mean()
         return v, logprob, dist_entropy
+    
+    
+    
+# 220124 
+class depth_LM_Policy(nn.Module):
+    def __init__(self, frames, action_space):
+        super(depth_LM_Policy, self).__init__()
+        self.logstd = nn.Parameter(torch.zeros(action_space))
+
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.act_fc1 = nn.Linear(128*32, 256)
+        self.act_fc2 =  nn.Linear(256+2+2, 128)
+        
+        self.actor1 = nn.Linear(128, 1)
+        self.actor2 = nn.Linear(128, 1)
+
+
+        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.crt_fc1 = nn.Linear(128*32, 256)
+        self.crt_fc2 = nn.Linear(256+2+2, 128)
+        
+        self.critic = nn.Linear(128, 1)
+        
+        # depth LM
+        # 1. actor
+        ## step1. each maps
+        #self.act_fea_grp = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_grp = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_vx = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_vy = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        
+        ## step2. depthsize
+        
+        # 2. critic                
+        # convLSTM
+        ## step1. each maps
+        '''
+        self.crt_fea_grp
+        self.crt_fea_vx
+        self.crt_fea_vy
+        '''
+        
+        
+
+    def forward(self, x, goal, speed, local_maps):
+        """
+            returns value estimation, action, log_action_prob
+        """
+         # action
+        #print(x.shape)      # 1, 3, 512                                    # 1024, 3, 512  
+        #print(goal.shape)   # 1, 2                                         # 1024, 2
+        #print(speed.shape)  # 1, 2                                         # 1024, 2
+        #print(local_maps.shape)  # 1, 8, 3, 60, 60    B, S, C, W, H        # 1024, 8, 3, 60, 60
+        #print('1:',x.shape)
+        a = F.relu(self.act_fea_cv1(x))  # 1, 32, 255
+        #print('2:',a.shape)
+        a = F.relu(self.act_fea_cv2(a)) # 1, 32, 128
+        #print('3:',a.shape)
+        a = a.view(a.shape[0], -1) #1, 4096
+        #print('4:',a.shape)
+        a = F.relu(self.act_fc1(a))     
+        
+        conv_grp = F.relu(self.act_fea_grp(local_maps[:,:,0,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        conv_vx = F.relu(self.act_fea_vx(local_maps[:,:,1,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        conv_vy = F.relu(self.act_fea_vy(local_maps[:,:,2,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        crt_output = torch.cat
+        
+        #output = 
+        #print(conv_grp.shape)    # (1,32,60,60)
+        
+        a = torch.cat((a, goal, speed), dim=-1)
+        a = F.relu(self.act_fc2(a))
+        mean1 = torch.sigmoid(self.actor1(a))   # 0~1, linear vel
+        mean2 = torch.tanh(self.actor2(a))      # -1~1, angular rot
+        mean = torch.cat((mean1, mean2), dim=-1)
+        logstd = self.logstd.expand_as(mean)    # mean처럼 [2,] 즉 [[0,0]]으로 확장한다
+        std = torch.exp(logstd)     # [[1,1]]
+        action = torch.normal(mean, std)
+
+        # action prob on log scale
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+
+        #---------------------------------------------------------------------#
+        # value
+        v = F.relu(self.crt_fea_cv1(x))
+        v = F.relu(self.crt_fea_cv2(v))
+        v = v.view(v.shape[0], -1)
+        v = F.relu(self.crt_fc1(v))
+        v = torch.cat((v, goal, speed), dim=-1)
+        v = F.relu(self.crt_fc2(v))
+        v = self.critic(v)
+
+        return v, action, logprob, mean
+
+    def evaluate_actions(self, x, goal, speed, action, local_maps):
+        v, _, _, mean = self.forward(x, goal, speed, local_maps)
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
+        # evaluate
+        logprob = log_normal_density(action, mean, log_std=logstd, std=std)
+        dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
+        dist_entropy = dist_entropy.sum(-1).mean()
+        return v, logprob, dist_entropy
 
 
 
+# 220124 
+class baseline_LM_Policy(nn.Module):
+    def __init__(self, frames, action_space):
+        super(baseline_LM_Policy, self).__init__()
+        self.logstd = nn.Parameter(torch.zeros(action_space))
+
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.act_fc1 = nn.Linear(128*32, 256)
+        self.act_fc2 =  nn.Linear(256+2+2, 128)
+        
+        self.actor1 = nn.Linear(128, 1)
+        self.actor2 = nn.Linear(128, 1)
+
+
+        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.crt_fc1 = nn.Linear(128*32, 256)
+        self.crt_fc2 = nn.Linear(256+2+2, 128)
+        
+        self.critic = nn.Linear(128, 1)
+        
+        # depth LM
+        # 1. actor
+        ## step1. each maps
+        #self.act_fea_grp = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_grp = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_vx = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        self.act_fea_vy = nn.Conv2d(in_channels = 8, out_channels = 32, kernel_size=(3,3), padding=(1,1), stride=2)
+        
+        ## step2. depthsize
+        
+        # 2. critic                
+        # convLSTM
+        ## step1. each maps
+        '''
+        self.crt_fea_grp
+        self.crt_fea_vx
+        self.crt_fea_vy
+        '''
+        
+        
+
+    def forward(self, x, goal, speed, local_maps):
+        """
+            returns value estimation, action, log_action_prob
+        """
+         # action
+        #print(x.shape)      # 1, 3, 512                                    # 1024, 3, 512  
+        #print(goal.shape)   # 1, 2                                         # 1024, 2
+        #print(speed.shape)  # 1, 2                                         # 1024, 2
+        #print(local_maps.shape)  # 1, 8, 3, 60, 60    B, S, C, W, H        # 1024, 8, 3, 60, 60
+        #print('1:',x.shape)
+        a = F.relu(self.act_fea_cv1(x))  # 1, 32, 255
+        #print('2:',a.shape)
+        a = F.relu(self.act_fea_cv2(a)) # 1, 32, 128
+        #print('3:',a.shape)
+        a = a.view(a.shape[0], -1) #1, 4096
+        #print('4:',a.shape)
+        a = F.relu(self.act_fc1(a))     
+        
+        conv_grp = F.relu(self.act_fea_grp(local_maps[:,:,0,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        conv_vx = F.relu(self.act_fea_vx(local_maps[:,:,1,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        conv_vy = F.relu(self.act_fea_vy(local_maps[:,:,2,:,:]))  # (1,8,60,60) as grp idx  -> (1,32,30,30)
+        crt_output = torch.cat
+        
+        #output = 
+        #print(conv_grp.shape)    # (1,32,60,60)
+        
+        a = torch.cat((a, goal, speed), dim=-1)
+        a = F.relu(self.act_fc2(a))
+        mean1 = torch.sigmoid(self.actor1(a))   # 0~1, linear vel
+        mean2 = torch.tanh(self.actor2(a))      # -1~1, angular rot
+        mean = torch.cat((mean1, mean2), dim=-1)
+        logstd = self.logstd.expand_as(mean)    # mean처럼 [2,] 즉 [[0,0]]으로 확장한다
+        std = torch.exp(logstd)     # [[1,1]]
+        action = torch.normal(mean, std)
+
+        # action prob on log scale
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+
+        #---------------------------------------------------------------------#
+        # value
+        v = F.relu(self.crt_fea_cv1(x))
+        v = F.relu(self.crt_fea_cv2(v))
+        v = v.view(v.shape[0], -1)
+        v = F.relu(self.crt_fc1(v))
+        v = torch.cat((v, goal, speed), dim=-1)
+        v = F.relu(self.crt_fc2(v))
+        v = self.critic(v)
+
+        return v, action, logprob, mean
+
+    def evaluate_actions(self, x, goal, speed, action, local_maps):
+        v, _, _, mean = self.forward(x, goal, speed, local_maps)
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
+        # evaluate
+        logprob = log_normal_density(action, mean, log_std=logstd, std=std)
+        dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
+        dist_entropy = dist_entropy.sum(-1).mean()
+        return v, logprob, dist_entropy
 
 
 

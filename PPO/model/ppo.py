@@ -394,6 +394,198 @@ def generate_action_concat_LM(env, state_list, pose_list, velocity_list, policy,
     return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
 
 
+
+def generate_action_depth_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, mode=False):   # 211130
+    # t-7 ~ t까지의 8개 time sequence 정보를 받음     LM_stack
+    # 각 sequence별 3개 채널: Grop(0), vx(1), vy(2)  index
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
+
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+    robot_rot = pose_list[0,2]
+    pose_list = np.asarray(pose_list[:,0:2])    # 13+1개
+    
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
+
+    # 220121 그룹별 평균 거리 계산    
+    rel_dist = pose_list - pose_list[0]
+    rel_dist = rel_dist[1:]
+    num_dist = np.linalg.norm(rel_dist, axis=1)
+
+    num_grp_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    for idx, grp_dist in zip(index, num_dist):   # 0~13 humans
+        num_grp_dist_array[idx] += grp_dist
+    
+    num_cnt_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    for i in range(np.max(index)+1):
+        num_cnt_dist_array[i] += index.count(i)
+    num_grp_dist_array = num_grp_dist_array / num_cnt_dist_array
+    
+    # Build occupancy map
+    cell_size=1*0.1
+    map_size=6
+    local_maps = []
+
+    local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
+    for j in range(3):  # grp, vel_x,vel_y
+        for i, pose in enumerate(pose_list):
+            diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+            # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
+            dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+            dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+            
+            # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+            mod_diff_x = np.floor((dx_rot)/cell_size)
+            mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
+                        
+            diff_vel = speed_poly_list - speed_poly_list[0]
+            #print('index max:',index)
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                if j==0:   # grp idx    
+                    # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
+                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1/num_grp_dist_array[index[i-1]]  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
+                    #print(index)
+                    #print(i,'번째 사람의 index:',index[i-1]+1 , num_grp_dist_array[index[i-1]])
+                    #print(i, 1/num_grp_dist_array[index[i-1]])
+                # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
+                elif j==1: # vel x
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                    #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
+                elif j==2: # vel y
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                    #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
+        local_maps.append(local_map.tolist())
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+
+    
+    local_maps = np.array(local_maps) # 3,60,60
+    left_LM = LM_stack.popleft()
+    LM_stack.append(local_maps)   # 8,3,60,60
+    
+    diablos = [LM_stack]
+    diablos = np.array(diablos)
+
+    np.set_printoptions(threshold=np.inf)
+    
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()        # 1,3,512
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+    local_maps_torch = Variable(torch.from_numpy(diablos)).float().cuda()    # (1, 8, 3,60,60)   B, S, C, W, H
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+    mean_v = mean.data.cpu().numpy()
+    
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+    return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
+
+
+# 220124 IROS baseline
+def generate_action_baseline_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, mode=False):   # 211130
+    # t-7 ~ t까지의 8개 time sequence 정보를 받음     LM_stack
+    # 각 sequence별 3개 채널: Grop(0), vx(1), vy(2)  index
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
+
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+    robot_rot = pose_list[0,2]
+    pose_list = np.asarray(pose_list[:,0:2])    # 13+1개
+    
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+    
+
+    # 220121 그룹별 평균 거리 계산    
+    rel_dist = pose_list - pose_list[0]
+    rel_dist = rel_dist[1:]
+    num_dist = np.linalg.norm(rel_dist, axis=1)
+
+    num_grp_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    for idx, grp_dist in zip(index, num_dist):   # 0~13 humans
+        num_grp_dist_array[idx] += grp_dist
+    
+    num_cnt_dist_array = np.zeros(shape=(np.max(index)+1), dtype=np.float32)
+    for i in range(np.max(index)+1):
+        num_cnt_dist_array[i] += index.count(i)
+    num_grp_dist_array = num_grp_dist_array / num_cnt_dist_array
+    
+    # Build occupancy map
+    cell_size=1*0.1
+    map_size=6
+    local_maps = []
+
+    local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
+    for j in range(3):  # grp, vel_x,vel_y
+        for i, pose in enumerate(pose_list):
+            diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+            # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
+            dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+            dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+            
+            # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+            mod_diff_x = np.floor((dx_rot)/cell_size)
+            mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
+                        
+            diff_vel = speed_poly_list - speed_poly_list[0]
+            #print('index max:',index)
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                if j==0:   # grp idx    
+                    # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
+                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1/num_grp_dist_array[index[i-1]]  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
+                    #print(index)
+                    #print(i,'번째 사람의 index:',index[i-1]+1 , num_grp_dist_array[index[i-1]])
+                    #print(i, 1/num_grp_dist_array[index[i-1]])
+                # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
+                elif j==1: # vel x
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                    #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
+                elif j==2: # vel y
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                    #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
+        local_maps.append(local_map.tolist())
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+
+    
+    local_maps = np.array(local_maps) # 3,60,60
+    left_LM = LM_stack.popleft()
+    LM_stack.append(local_maps)   # 8,3,60,60
+    
+    diablos = [LM_stack]
+    diablos = np.array(diablos)
+
+    np.set_printoptions(threshold=np.inf)
+    
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()        # 1,3,512
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+    local_maps_torch = Variable(torch.from_numpy(diablos)).float().cuda()    # (1, 8, 3,60,60)   B, S, C, W, H
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list, local_maps_torch)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+    mean_v = mean.data.cpu().numpy()
+    
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+    return v, a, logprob, scaled_action, local_maps, LM_stack   # local_map = np.ndarray type, shape=(60,60)
+
+
 def generate_action_no_sampling(env, state_list, policy, action_bound):
     if env.index == 0:
         s_list, goal_list, speed_list = [], [], []

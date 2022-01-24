@@ -4,6 +4,12 @@ import copy
 import tf
 import numpy as np
 
+
+import lidar_to_grid_map as lg
+import matplotlib.pyplot as plt
+import cv2
+
+
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
@@ -13,6 +19,10 @@ from std_msgs.msg import Int8
 import message_filters
 
 from scipy.spatial import ConvexHull
+
+from nav_msgs.msg import OccupancyGrid
+from map_msgs.msg import OccupancyGridUpdate
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 
 
@@ -112,6 +122,7 @@ class StageWorld():
 
 
         self.sim_clock = rospy.Subscriber('clock', Clock, self.sim_clock_callback)
+        
 
         # -----------Service-------------------
         self.reset_stage = rospy.ServiceProxy('reset_positions', Empty)
@@ -135,6 +146,7 @@ class StageWorld():
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
         # rospy.on_shutdown(self.shutdown)
+        
 
     def callback(self, *msgs):
         pose_list = []
@@ -220,22 +232,55 @@ class StageWorld():
         scan[np.isinf(scan)] = 6.0
         raw_beam_num = len(scan)
         sparse_beam_num = self.beam_mum   # 512
-        step = float(raw_beam_num) / sparse_beam_num
+        step = float(raw_beam_num) / sparse_beam_num   # 1.0
         sparse_scan_left = []   # left scan
         index = 0.
+        
+        # 220124 create 2D Grid map(3x3, forward of robot, back is dark) from lidar_sensor
+        [x, y, theta] = self.get_self_stateGT()     # robot's pose
+        self.map1 = np.ones((60, 60)) * 0.0   # 60 by 60 with default value as 0.5
+        inc_angle = np.pi/sparse_beam_num     # np.pi(3.14=180deg) / 512 = 0.00625deg...
+        end_list = []
+        for i in range(sparse_beam_num):
+            distance = scan[int(i)]
+            end_list.append([x+distance*np.cos(inc_angle*i),y+distance*np.sin(inc_angle*i)])
+            mod_x = np.floor((3+distance*np.cos(inc_angle*i))/0.1)
+            mod_y = np.ceil((3-distance*np.sin(inc_angle*i))/0.1)
 
-        for x in range(int(sparse_beam_num / 2)):   # routine 256
+            if mod_x>59:
+                mod_x=59
+            if mod_y>59:
+                mod_y=59
+            if mod_y<0:
+                mod_y=0
+            if mod_x<0:
+                mod_x=0
+
+            line = lg.bresenham((30, 30), (int(mod_y),int(mod_x)))
+            for l in line:
+                self.map1[l[0]][l[1]] = 0.5
+
+        for x in range(int(sparse_beam_num / 2)):   # 256
             sparse_scan_left.append(scan[int(index)])
-            index += step
+            index += step    # 1~256
+
 
         sparse_scan_right = []   # right scan
         index = raw_beam_num - 1.
         for x in range(int(sparse_beam_num / 2)):
             sparse_scan_right.append(scan[int(index)])
-            index -= step
+            index -= step    # 510~255
+            #print(index, step)
+
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
         scan_sparse = scan_sparse[::-1]    # 211115  fliped input
+        hsv=cv2.resize(self.map1, dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+
+        cv2.imshow('image',hsv)
+        
+        cv2.waitKey(1)
+
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
 
     def collision_laser_flag(self, r):
@@ -411,7 +456,7 @@ class StageWorld():
         '''
         
         # 220124
-        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM':
+        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM' or policy_list=='depth_LM' or policy_list=='baseline_LM':
             reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
         elif policy_list == '':
             reward = reward_g + reward_c + reward_w

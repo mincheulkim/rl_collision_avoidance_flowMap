@@ -18,10 +18,10 @@ from mpi4py import MPI #test
 from torch.optim import Adam #test
 from collections import deque #test
 
-from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy #test
+from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy, depth_LM_Policy, baseline_LM_Policy #test
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
@@ -55,23 +55,26 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'concat_LM'      # select policy. [LM, stacked_LM, '', concat_LM]
+policy_list = 'baseline_LM'      # select policy. [LM, stacked_LM, '', concat_LM, depth_LM(TODO), baseline_LM]
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
 
 
+
 # For fixed Randomization  211230
 import random
-'''
-SEED = 1234  # for training
-#SEED = 4321 # for test
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-torch.cuda.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-'''
+
+if test_policy:
+    print('TEST(EVALUATION) MODE')
+    SEED = 1234  # for training
+    #SEED = 4321 # for test
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+
 
 
 def run(comm, env, policy, policy_path, action_bound, optimizer):
@@ -81,7 +84,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     global_update = 0
     global_step = 0
     memory_size = 0
-
 
     env.reset_world()
     
@@ -130,6 +132,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         state = [obs_stack, goal, speed]
         
         LM = np.zeros((3, 60, 60))
+        sensor_map = np.zeros((1,60,60))               # 220124
         LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
         #LM_stack = deque([[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]]])
         
@@ -145,7 +148,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         noise_cluster = None
 
         while not terminal and not rospy.is_shutdown():
-            
+                        
             state_list = comm.gather(state, root=0)
 
             robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32
@@ -191,9 +194,14 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 v, a, logprob, scaled_action, LM =generate_action_stacked_LM(env=env, state_list=robot_state, pose_list=pose_list[:,0:2], velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, index=labels, mode=test_policy)
             elif policy_list=='concat_LM':
                 v, a, logprob, scaled_action, LM, LM_stack =generate_action_concat_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
+            elif policy_list=='depth_LM':
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_depth_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
+            elif policy_list=='baseline_LM':
+                v, a, logprob, scaled_action, LM, LM_stack =generate_action_baseline_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
-            
+                
+            #print(np.array(LM_stack).shape)              # (8,3,60,60)
 
             # distribute and execute actions robot and humans
             for i in range(num_human):
@@ -318,6 +326,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     last_v_r, _, _, _, _ = generate_action_stacked_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list[:,0:2], velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, mode=test_policy)
                 elif policy_list=='concat_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_concat_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
+                elif policy_list=='depth_LM':  # LM: 60x60    # 211214
+                    last_v_r, _, _, _, _, _ = generate_action_depth_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
+                elif policy_list=='baseline_LM':  # LM: 60x60    # 211214
+                    last_v_r, _, _, _, _, _ = generate_action_baseline_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
@@ -384,6 +396,53 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         global_update += 1
                 
                 elif policy_list =='concat_LM':
+                    
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
+
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
+                            transform_buffer_stacked_LM(buff=buff)
+
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        
+
+                        ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                            num_env=1, frames=LASER_HIST,
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+
+                        buff = []
+                        global_update += 1
+
+                # 220124                        
+                elif policy_list =='baseline_LM':
+                    
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
+
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
+                            transform_buffer_stacked_LM(buff=buff)
+
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        
+
+                        ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                            epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                            num_env=1, frames=LASER_HIST,
+                                            obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214
+
+                        buff = []
+                        global_update += 1
+                        
+                elif policy_list =='depth_LM':
                     
                     buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
 
@@ -554,6 +613,12 @@ if __name__ == '__main__':
         elif policy_list == 'concat_LM':   # 220105
             policy_path = 'policy'
             policy = concat_LM_Policy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'depth_LM':   # 220124
+            policy_path = 'policy'
+            policy = depth_LM_Policy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'baseline_LM':   # 220124
+            policy_path = 'policy'
+            policy = baseline_LM_Policy(frames=LASER_HIST, action_space=2)
         else:
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)
@@ -570,7 +635,7 @@ if __name__ == '__main__':
 
         # Load model
         file = policy_path + '/Stage1d'
-        #file = policy_path + '/_____'
+        #file = policy_path + '/Stage1'
         file_tot = policy_path + '/Stage1_tot'
         #file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
