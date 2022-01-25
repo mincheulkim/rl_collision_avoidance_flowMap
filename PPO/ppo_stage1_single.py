@@ -20,7 +20,7 @@ from collections import deque #test
 
 from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy, depth_LM_Policy, baseline_LM_Policy #test
 from stage_world1 import StageWorld #test
-from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM  # 211214
+from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM, transform_buffer_baseline_LM, ppo_update_stage1_baseline_LM  # 211214
 from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
@@ -131,9 +131,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         speed = np.asarray(env.get_self_speed())
         state = [obs_stack, goal, speed]
         
-        LM = np.zeros((3, 60, 60))
-        sensor_map = np.zeros((1,60,60))               # 220124
-        LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
+        LM = np.zeros((1, 60, 60))
+        Sensor_map = np.zeros((1,60,60))               # 220124
+        if policy_list == 'baseline_LM':
+            LM_stack = np.zeros((3,60,60))
+        else:
+            LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
         #LM_stack = deque([[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]],[[[]]]])
         
         speed_poly = np.asarray(env.get_self_speed_poly())  # 211103
@@ -197,10 +200,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             elif policy_list=='depth_LM':
                 v, a, logprob, scaled_action, LM, LM_stack =generate_action_depth_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list=='baseline_LM':
-                v, a, logprob, scaled_action, LM, LM_stack =generate_action_baseline_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
+                v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
-                
+            
+            
+            #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
 
             # distribute and execute actions robot and humans
@@ -421,20 +426,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 # 220124                        
                 elif policy_list =='baseline_LM':
                     
-                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, LM_stack))   # 211214
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, Sensor_map, LM_stack))   # 211214
 
                     memory_size += 1
 
                     if len(buff) > HORIZON - 1:
-                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, local_maps_batch = \
-                            transform_buffer_stacked_LM(buff=buff)
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, sensor_map_batch, local_maps_batch = \
+                            transform_buffer_baseline_LM(buff=buff)
 
                         t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
-                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, local_maps_batch)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, sensor_map_batch, local_maps_batch)
                         
 
-                        ppo_update_stage1_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                        ppo_update_stage1_baseline_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
                                             epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
                                             num_env=1, frames=LASER_HIST,
                                             obs_size=OBS_SIZE, act_size=ACT_SIZE)   # 211214

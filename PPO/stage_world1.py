@@ -134,6 +134,8 @@ class StageWorld():
         self.state_GT = None
         self.speed_poly = None  # 211103
         self.is_crashed = None
+        
+        self.map1 = None
 
         # TODO for lidar collision check 211130
         self.is_collision = 0
@@ -238,7 +240,7 @@ class StageWorld():
         
         # 220124 create 2D Grid map(3x3, forward of robot, back is dark) from lidar_sensor
         [x, y, theta] = self.get_self_stateGT()     # robot's pose
-        self.map1 = np.ones((60, 60)) * 0.0   # 60 by 60 with default value as 0.5
+        map1 = np.ones((60, 60)) * 0.0   # 60 by 60 with default value as 0.5
         inc_angle = np.pi/sparse_beam_num     # np.pi(3.14=180deg) / 512 = 0.00625deg...
         end_list = []
         for i in range(sparse_beam_num):
@@ -258,7 +260,18 @@ class StageWorld():
 
             line = lg.bresenham((30, 30), (int(mod_y),int(mod_x)))
             for l in line:
-                self.map1[l[0]][l[1]] = 0.5
+                #self.map1[l[0]][l[1]] = 0.5
+                map1[l[0]][l[1]] = 0.5
+                
+        self.map1 = map1
+        
+        '''
+        # Visualize
+        hsv=cv2.resize(self.map1, dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('image',hsv)
+        cv2.waitKey(1)
+        '''
+        
 
         for x in range(int(sparse_beam_num / 2)):   # 256
             sparse_scan_left.append(scan[int(index)])
@@ -275,11 +288,6 @@ class StageWorld():
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
         scan_sparse = scan_sparse[::-1]    # 211115  fliped input
-        hsv=cv2.resize(self.map1, dsize=(480,480), interpolation=cv2.INTER_NEAREST)
-
-        cv2.imshow('image',hsv)
-        
-        cv2.waitKey(1)
 
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
 
@@ -328,6 +336,10 @@ class StageWorld():
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
         return [local_x, local_y]
+    
+    def get_sensor_map(self):
+        return self.map1
+
 
     def reset_world(self):
         self.reset_stage()
