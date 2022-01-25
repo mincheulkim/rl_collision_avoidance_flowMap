@@ -632,11 +632,7 @@ def generate_action_baseline_LM(env, state_list, pose_list, velocity_list, polic
     cv2.imshow('vy',hsv)
     cv2.waitKey(1)
     '''
-   
-    
-    
-    
-        
+
     return v, a, logprob, scaled_action, sensor_map, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
 
