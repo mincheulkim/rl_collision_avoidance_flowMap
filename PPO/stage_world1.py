@@ -20,9 +20,6 @@ import message_filters
 
 from scipy.spatial import ConvexHull
 
-from nav_msgs.msg import OccupancyGrid
-from map_msgs.msg import OccupancyGridUpdate
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 
 
