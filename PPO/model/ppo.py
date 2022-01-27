@@ -677,7 +677,7 @@ def generate_action_baseline_LM(env, state_list, pose_list, velocity_list, polic
 
     return v, a, logprob, scaled_action, sensor_map, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
-def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, mode=False):   # 211130
+def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, policy, action_bound, Sensor_map, LM_stack, index, mode=False):   # 211130
     s_list, goal_list, speed_list = [], [], []
     for i in state_list:
         s_list.append(i[0])
@@ -692,6 +692,7 @@ def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, 
     
     speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
     #print('포즈 리스트:',pose_list)
+    #print(np.array(Sensor_map).shape)
 
     # Build occupancy map
     cell_size=1*0.1
@@ -730,23 +731,44 @@ def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, 
         local_maps.append(local_map.tolist())
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
 
-    local_maps = [local_maps]
+    #local_maps = [local_maps]
     local_maps = np.array(local_maps) # 3,60,60
     local_maps[:,30:60,:]=0  # masking back area of robot
+    #print('로칼 맵:',local_maps.shape)
+
     
     sensor_map = env.get_sensor_map()   # got sensor map
     sensor_map = [sensor_map]
-    sensor_map = [sensor_map]
     sensor_map = np.array(sensor_map)   # (1,60,60)
 
+    
+    left_sensor_map = Sensor_map.popleft()
+    Sensor_map.append(sensor_map)                    # (4, 1, 60, 60)
+    
+    
+
+    diablo = [Sensor_map]
+    diablo = np.array(diablo)
+    
+    
+    
+    
+    #print('LM스택 오리진:',LM_stack)
+    left_ped_map = LM_stack.popleft()
+    LM_stack.append(local_maps)
+    #print('LM스택:',np.array(LM_stack).shape)
+    mepisto = [LM_stack]
+    mepisto = np.array(mepisto)
+    
+    
 
     np.set_printoptions(threshold=np.inf)
     
     s_list = Variable(torch.from_numpy(s_list)).float().cuda()        # 1,3,512
     goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
     speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
-    sensor_map_torch = Variable(torch.from_numpy(sensor_map)).float().cuda()    # 1, 60, 60)
-    local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()    # (3,60,60)   B, C, W, H
+    sensor_map_torch = Variable(torch.from_numpy(diablo)).float().cuda()    # 1, 60, 60)
+    local_maps_torch = Variable(torch.from_numpy(mepisto)).float().cuda()    # (3,60,60)   B, C, W, H
     
     v, a, logprob, mean = policy(s_list, goal_list, speed_list, sensor_map_torch, local_maps_torch)
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
@@ -756,7 +778,7 @@ def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, 
     if mode==True:
         scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
     
-    
+    #print(v, a)
     
     '''
     # Visualize sensor and ped maps
@@ -777,7 +799,7 @@ def generate_action_baseline_ours_LM(env, state_list, pose_list, velocity_list, 
     cv2.waitKey(1)
     '''
 
-    return v, a, logprob, scaled_action, sensor_map, local_maps   # local_map = np.ndarray type, shape=(60,60)
+    return v, a, logprob, scaled_action, Sensor_map, LM_stack   # local_map = np.ndarray type, shape=(60,60)
 
 
 def generate_action_no_sampling(env, state_list, policy, action_bound):
@@ -1314,9 +1336,8 @@ def ppo_update_stage1_baseline_ours_LM(policy, optimizer, batch_size, memory, ep
 
     advs = (advs - advs.mean()) / advs.std()
     print('ppo_update_stage1_baseline_ours_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'sensormaps:',sensor_maps.shape, 'local mapss.shape:',local_mapss.shape)
-                                                                                        # in (2048, 1, 8, 3, 60, 60)   -> (2048, 8, 3, 60, 60)
 
-    obss = obss.reshape((num_step*num_env, frames, obs_size))    # (3072, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
+    obss = obss.reshape((num_step*num_env, frames, obs_size))    # (1024, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
     goals = goals.reshape((num_step*num_env, 2))
     speeds = speeds.reshape((num_step*num_env, 2))
     actions = actions.reshape(num_step*num_env, act_size)
@@ -1326,9 +1347,10 @@ def ppo_update_stage1_baseline_ours_LM(policy, optimizer, batch_size, memory, ep
 
     local_map_width = 60   # 211214
     fix_num_channel = 3 # pos, velx, vely       # pos, vx, vy for ped map
+    time_sequence = 3   # 220127
     
-    sensor_maps = sensor_maps.reshape(num_step*num_env, 1, local_map_width, local_map_width)                    # 1024, 1, 60, 60 sensor map
-    local_mapss = local_mapss.reshape((num_step*num_env, fix_num_channel, local_map_width, local_map_width))    # in 1024, 3, 60, 60 ped map
+    sensor_maps = sensor_maps.reshape(num_step*num_env, time_sequence, 1, local_map_width, local_map_width)                    # 1024, 4, 1, 60, 60 sensor map
+    local_mapss = local_mapss.reshape((num_step*num_env, time_sequence, fix_num_channel, local_map_width, local_map_width))    # 1024, 4, 3, 60, 60 ped maps
     
 
     for update in range(epoch):   # 0, 1

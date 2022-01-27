@@ -869,26 +869,53 @@ class baseline_ours_LM_Policy(nn.Module):
         super(baseline_ours_LM_Policy, self).__init__()
         self.logstd = nn.Parameter(torch.zeros(action_space))      
         
-        self.act_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))   # lidar+ped features
-        self.act_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.act_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_sens1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_grp1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vx1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vy1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
         
-        self.act_fc1 = nn.Linear(64*7*7, 512)
-        self.act_fc2 =  nn.Linear(512+2+2, 512)
-        self.act_fc3 =  nn.Linear(512, 512)
+        self.act_fea_sens2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_grp2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vx2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vy2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        
+        self.act_fea_sens3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_grp3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vx3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_vy3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+
+        
+        self.act_fc1 = nn.Linear(3136*4, 3136)           # CNN Flatten
+        self.act_fc2 = nn.Linear(3136, 512)           # CNN Flatten
+        self.act_fc3 =  nn.Linear(512+2+2, 512)         # Concat
+        self.act_fc4 =  nn.Linear(512, 512)
         
         self.actor1 = nn.Linear(512, 1)
         self.actor2 = nn.Linear(512, 1)
         
         ######### critic ############3
-                
-        self.crt_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))   # lidar+ped features
-        self.crt_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.crt_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_sens1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))   # 여기서 in_chanels은 time sequence
+        self.crt_fea_grp1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vx1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vy1 = nn.Conv2d(in_channels = 3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
         
-        self.crt_fc1 = nn.Linear(64*7*7, 512)
-        self.crt_fc2 = nn.Linear(512+2+2, 512)
-        self.crt_fc3 =  nn.Linear(512, 512)
+        self.crt_fea_sens2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_grp2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vx2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vy2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        
+        self.crt_fea_sens3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_grp3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vx3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_vy3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+
+        
+        self.crt_fc1 = nn.Linear(3136*4, 3136)           # CNN Flatten
+        self.crt_fc2 = nn.Linear(3136, 512)           # CNN Flatten
+        self.crt_fc3 =  nn.Linear(512+2+2, 512)         # Concat
+        self.crt_fc4 =  nn.Linear(512, 512)        
+
+
         
         self.critic = nn.Linear(512, 1)
         
@@ -900,30 +927,45 @@ class baseline_ours_LM_Policy(nn.Module):
             returns value estimation, action, log_action_prob
         """
          # action
-        #print(x.shape)      # 1, 3, 512                                    # 128, 3, 512   (Batch size=128)
-        #print(goal.shape)   # 1, 2                                         # 128, 2
-        #print(speed.shape)  # 1, 2                                         # 128, 2
-        #print(local_maps.shape)  # 1, 3, 60, 60    B, C, W, H              # 128, 3, 60, 60
-        #print(sensor_map.shape)  # 1, 1, 60, 60                            # 128, 1, 60, 60
+        #print(x.shape)      # 1, 3, 512                                                   # 128, 3, 512   (Batch size=128)
+        #print(goal.shape)   # 1, 2                                                        # 128, 2
+        #print(speed.shape)  # 1, 2                                                        # 128, 2
+        #print(local_maps.shape)  # 1, 4, 3, 60, 60    B, S, C, W, H                        # 128, 4, 3, 60, 60
+        #print(sensor_map.shape)  # 1, 4, 1, 60, 60    B, S, C, W, H                        # 128, 4, 1, 60, 60
         
-        concat_features = torch.cat([sensor_map,local_maps],dim=1)
-        #print('콘챗 핏쳐:',concat_features.shape)    # sensor map + ped maps => 1+3, 60, 60
-        ace = F.relu(self.act_fea_conv1(concat_features))    # (1, 32, 60, 60)
-        ace = F.max_pool2d(ace, 2)     # (1,32,30,30)
-        ace = F.relu(self.act_fea_conv2(ace))    # (1, 32, 60, 60)
-        ace = F.max_pool2d(ace, 2)     # (1,32,15,15)
-        ace = F.relu(self.act_fea_conv3(ace))    # (1, 64, 15, 15)
-        ace = F.max_pool2d(ace, 2)     # (1,64,7,7)
         
-        ace = ace.view(ace.shape[0], -1)   # (1, 3136)
-        ace = F.relu(self.act_fc1(ace))    # (1, 512)
+        sens = F.max_pool2d(F.relu(self.act_fea_sens1(sensor_map[:,:,0,:,:])), 2)   # 1,32, 30, 30
+        grp = F.max_pool2d(F.relu(self.act_fea_grp1(local_maps[:,:,0,:,:])), 2)
+        vx = F.max_pool2d(F.relu(self.act_fea_vx1(local_maps[:,:,1,:,:])), 2)
+        vy = F.max_pool2d(F.relu(self.act_fea_vy1(local_maps[:,:,2,:,:])), 2)
+        
+        sens = F.max_pool2d(F.relu(self.act_fea_sens2(sens)), 2)   # 1,32, 15, 15
+        grp = F.max_pool2d(F.relu(self.act_fea_grp2(grp)), 2)      # 
+        vx = F.max_pool2d(F.relu(self.act_fea_vx2(vx)), 2)
+        vy = F.max_pool2d(F.relu(self.act_fea_vy2(vy)), 2)
+        
+        sens = F.max_pool2d(F.relu(self.act_fea_sens3(sens)), 2)   # 1,64, 7, 7
+        grp = F.max_pool2d(F.relu(self.act_fea_grp3(grp)), 2)      # 
+        vx = F.max_pool2d(F.relu(self.act_fea_vx3(vx)), 2)
+        vy = F.max_pool2d(F.relu(self.act_fea_vy3(vy)), 2)
+        
+        sens = sens.view(sens.shape[0],-1)
+        grp = grp.view(grp.shape[0],-1)
+        vx = vx.view(vx.shape[0],-1)
+        vy = vy.view(vy.shape[0],-1)
+        
+        ace = torch.cat([sens,grp,vx,vy],dim=-1)     # 1, 12544
+        ace = F.relu(self.act_fc1(ace))     # 1, 3136
+        ace = F.relu(self.act_fc2(ace))
         
         ace = torch.cat((ace, goal, speed),dim = -1)   # (1, 516)
-        ace = F.relu(self.act_fc2(ace))
-        ace = F.relu(self.act_fc3(ace))    # (1, 512)
-        #print(ace.shape)
-
+        ace = F.relu(self.act_fc3(ace))
+        ace = F.relu(self.act_fc4(ace))    # (1, 512)
         
+        
+        #print(sens.shape, grp.shape, vx.shape, vy.shape, ace.shape)
+        
+
 
         mean1 = torch.sigmoid(self.actor1(ace))   # 0~1, linear vel
         mean2 = torch.tanh(self.actor2(ace))      # -1~1, angular rot
@@ -937,21 +979,35 @@ class baseline_ours_LM_Policy(nn.Module):
 
         #---------------------------------------------------------------------#
         # value
-        ace_c = F.relu(self.crt_fea_conv1(concat_features))    # (1, 32, 60, 60)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,30,30)
-        ace_c = F.relu(self.crt_fea_conv2(ace_c))    # (1, 32, 60, 60)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,15,15)
-        ace_c = F.relu(self.crt_fea_conv3(ace_c))    # (1, 64, 15, 15)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,64,7,7)
         
+        sens_c = F.max_pool2d(F.relu(self.crt_fea_sens1(sensor_map[:,:,0,:,:])), 2)   # 1,32, 30, 30
+        grp_c = F.max_pool2d(F.relu(self.crt_fea_grp1(local_maps[:,:,0,:,:])), 2)
+        vx_c = F.max_pool2d(F.relu(self.crt_fea_vx1(local_maps[:,:,1,:,:])), 2)
+        vy_c = F.max_pool2d(F.relu(self.crt_fea_vy1(local_maps[:,:,2,:,:])), 2)
         
-        ace_c = ace_c.view(ace_c.shape[0], -1)   # (1, 3136)
+        sens_c = F.max_pool2d(F.relu(self.crt_fea_sens2(sens_c)), 2)   # 1,32, 15, 15
+        grp_c = F.max_pool2d(F.relu(self.crt_fea_grp2(grp_c)), 2)      # 
+        vx_c = F.max_pool2d(F.relu(self.crt_fea_vx2(vx_c)), 2)
+        vy_c = F.max_pool2d(F.relu(self.crt_fea_vy2(vy_c)), 2)
         
-        ace_c = F.relu(self.crt_fc1(ace_c))    # (1, 512)
+        sens_c = F.max_pool2d(F.relu(self.crt_fea_sens3(sens_c)), 2)   # 1,64, 7, 7
+        grp_c = F.max_pool2d(F.relu(self.crt_fea_grp3(grp_c)), 2)      # 
+        vx_c = F.max_pool2d(F.relu(self.crt_fea_vx3(vx_c)), 2)
+        vy_c = F.max_pool2d(F.relu(self.crt_fea_vy3(vy_c)), 2)
+        
+        sens_c = sens_c.view(sens_c.shape[0],-1)
+        grp_c = grp_c.view(grp_c.shape[0],-1)
+        vx_c = vx_c.view(vx_c.shape[0],-1)
+        vy_c = vy_c.view(vy_c.shape[0],-1)
+        
+        ace_c = torch.cat([sens_c,grp_c,vx_c,vy_c],dim=-1)     # 1, 12544
+        ace_c = F.relu(self.crt_fc1(ace_c))     # 1, 3136
+        ace_c = F.relu(self.crt_fc2(ace_c))
         
         ace_c = torch.cat((ace_c, goal, speed),dim = -1)   # (1, 516)
-        ace_c = F.relu(self.crt_fc2(ace_c))
-        ace_c = F.relu(self.crt_fc3(ace_c))    # (1, 512)
+        ace_c = F.relu(self.crt_fc3(ace_c))
+        ace_c = F.relu(self.crt_fc4(ace_c))    # (1, 512)
+
         
         
         v = self.critic(ace_c)

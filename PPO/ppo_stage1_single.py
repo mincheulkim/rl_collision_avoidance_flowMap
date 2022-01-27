@@ -134,7 +134,11 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         
         LM = np.zeros((1, 60, 60))
         Sensor_map = np.zeros((1,60,60))               # 220124
-        if policy_list == 'baseline_LM' or policy_list == 'baseline_ours_LM':
+        ped_map = np.zeros((3,60,60))
+        if policy_list =='baseline_ours_LM':
+            Sensor_map =deque([Sensor_map, Sensor_map, Sensor_map])
+            LM_stack = deque([ped_map, ped_map, ped_map])
+        elif policy_list == 'baseline_LM':
             LM_stack = np.zeros((3,60,60))
         else:
             LM_stack = deque([LM,LM,LM,LM,LM,LM,LM,LM])    # 220105
@@ -203,12 +207,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             elif policy_list=='baseline_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list=='baseline_ours_LM':
-                v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
+                v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
             
-            #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)
+            #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
 
             # distribute and execute actions robot and humans
@@ -339,7 +343,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 elif policy_list=='baseline_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list=='baseline_ours_LM':  # LM: 60x60    # 211214
-                    last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
+                    last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, Sensor_map=Sensor_map, LM_stack=LM_stack, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
