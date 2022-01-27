@@ -863,6 +863,110 @@ class baseline_LM_Policy(nn.Module):
         return v, logprob, dist_entropy
 
 
+# 220124 
+class baseline_ours_LM_Policy(nn.Module):
+    def __init__(self, frames, action_space):
+        super(baseline_ours_LM_Policy, self).__init__()
+        self.logstd = nn.Parameter(torch.zeros(action_space))      
+        
+        self.act_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))   # lidar+ped features
+        self.act_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.act_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        
+        self.act_fc1 = nn.Linear(64*7*7, 512)
+        self.act_fc2 =  nn.Linear(512+2+2, 512)
+        self.act_fc3 =  nn.Linear(512, 512)
+        
+        self.actor1 = nn.Linear(512, 1)
+        self.actor2 = nn.Linear(512, 1)
+        
+        ######### critic ############3
+                
+        self.crt_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))   # lidar+ped features
+        self.crt_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
+        self.crt_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
+        
+        self.crt_fc1 = nn.Linear(64*7*7, 512)
+        self.crt_fc2 = nn.Linear(512+2+2, 512)
+        self.crt_fc3 =  nn.Linear(512, 512)
+        
+        self.critic = nn.Linear(512, 1)
+        
+        
+        
+
+    def forward(self, x, goal, speed, sensor_map, local_maps):
+        """
+            returns value estimation, action, log_action_prob
+        """
+         # action
+        #print(x.shape)      # 1, 3, 512                                    # 128, 3, 512   (Batch size=128)
+        #print(goal.shape)   # 1, 2                                         # 128, 2
+        #print(speed.shape)  # 1, 2                                         # 128, 2
+        #print(local_maps.shape)  # 1, 3, 60, 60    B, C, W, H              # 128, 3, 60, 60
+        #print(sensor_map.shape)  # 1, 1, 60, 60                            # 128, 1, 60, 60
+        
+        concat_features = torch.cat([sensor_map,local_maps],dim=1)
+        #print('콘챗 핏쳐:',concat_features.shape)    # sensor map + ped maps => 1+3, 60, 60
+        ace = F.relu(self.act_fea_conv1(concat_features))    # (1, 32, 60, 60)
+        ace = F.max_pool2d(ace, 2)     # (1,32,30,30)
+        ace = F.relu(self.act_fea_conv2(ace))    # (1, 32, 60, 60)
+        ace = F.max_pool2d(ace, 2)     # (1,32,15,15)
+        ace = F.relu(self.act_fea_conv3(ace))    # (1, 64, 15, 15)
+        ace = F.max_pool2d(ace, 2)     # (1,64,7,7)
+        
+        ace = ace.view(ace.shape[0], -1)   # (1, 3136)
+        ace = F.relu(self.act_fc1(ace))    # (1, 512)
+        
+        ace = torch.cat((ace, goal, speed),dim = -1)   # (1, 516)
+        ace = F.relu(self.act_fc2(ace))
+        ace = F.relu(self.act_fc3(ace))    # (1, 512)
+        #print(ace.shape)
+
+        
+
+        mean1 = torch.sigmoid(self.actor1(ace))   # 0~1, linear vel
+        mean2 = torch.tanh(self.actor2(ace))      # -1~1, angular rot
+        mean = torch.cat((mean1, mean2), dim=-1)
+        logstd = self.logstd.expand_as(mean)    # mean처럼 [2,] 즉 [[0,0]]으로 확장한다
+        std = torch.exp(logstd)     # [[1,1]]
+        action = torch.normal(mean, std)
+
+        # action prob on log scale
+        logprob = log_normal_density(action, mean, std=std, log_std=logstd)
+
+        #---------------------------------------------------------------------#
+        # value
+        ace_c = F.relu(self.crt_fea_conv1(concat_features))    # (1, 32, 60, 60)
+        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,30,30)
+        ace_c = F.relu(self.crt_fea_conv2(ace_c))    # (1, 32, 60, 60)
+        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,15,15)
+        ace_c = F.relu(self.crt_fea_conv3(ace_c))    # (1, 64, 15, 15)
+        ace_c = F.max_pool2d(ace_c, 2)     # (1,64,7,7)
+        
+        
+        ace_c = ace_c.view(ace_c.shape[0], -1)   # (1, 3136)
+        
+        ace_c = F.relu(self.crt_fc1(ace_c))    # (1, 512)
+        
+        ace_c = torch.cat((ace_c, goal, speed),dim = -1)   # (1, 516)
+        ace_c = F.relu(self.crt_fc2(ace_c))
+        ace_c = F.relu(self.crt_fc3(ace_c))    # (1, 512)
+        
+        
+        v = self.critic(ace_c)
+
+        return v, action, logprob, mean
+
+    def evaluate_actions(self, x, goal, speed, action, sensor_maps, local_maps):
+        v, _, _, mean = self.forward(x, goal, speed, sensor_maps, local_maps)   # TODO sensor_maps 활용
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
+        # evaluate
+        logprob = log_normal_density(action, mean, log_std=logstd, std=std)
+        dist_entropy = 0.5 + 0.5 * math.log(2 * math.pi) + logstd
+        dist_entropy = dist_entropy.sum(-1).mean()
+        return v, logprob, dist_entropy
 
 
 

@@ -465,7 +465,7 @@ class StageWorld():
         '''
         
         # 220124
-        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM' or policy_list=='depth_LM' or policy_list=='baseline_LM':
+        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM' or policy_list=='depth_LM' or policy_list=='baseline_LM' or policy_list=='baseline_ours_LM':
             reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
         elif policy_list == '':
             reward = reward_g + reward_c + reward_w
