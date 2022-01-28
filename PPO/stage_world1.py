@@ -328,7 +328,13 @@ class StageWorld():
         return self.goal_point
 
     def get_local_goal(self):
+        
+        
+
         [x, y, theta] = self.get_self_stateGT()   # robot state
+        
+        #theta += np.pi*3/2   # 220128 erase me!!
+
         [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)

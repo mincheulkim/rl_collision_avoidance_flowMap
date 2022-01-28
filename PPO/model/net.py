@@ -866,99 +866,102 @@ class baseline_LM_Policy(nn.Module):
 class ours_LM_Policy(nn.Module):
     def __init__(self, frames, action_space):
         super(ours_LM_Policy, self).__init__()
-        self.logstd = nn.Parameter(torch.zeros(action_space))      
-        
-        self.act_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.act_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.act_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
-        
-        self.act_fc1 = nn.Linear(64*7*7, 512)
-        self.act_fc2 =  nn.Linear(512+2+2, 512)
-        self.act_fc3 =  nn.Linear(512, 512)
-        
-        self.actor1 = nn.Linear(512, 1)
-        self.actor2 = nn.Linear(512, 1)
-        
-        ######### critic ############3
-                
-        self.crt_fea_conv1 = nn.Conv2d(in_channels = 1+3, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.crt_fea_conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size=(3,3), padding=(1,1))
-        self.crt_fea_conv3 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size=(3,3), padding=(1,1))
-        
-        self.crt_fc1 = nn.Linear(64*7*7, 512)
-        self.crt_fc2 = nn.Linear(512+2+2, 512)
-        self.crt_fc3 =  nn.Linear(512, 512)
-        
-        self.critic = nn.Linear(512, 1)
-        
-        
-        
+        self.logstd = nn.Parameter(torch.zeros(action_space))
 
-    def forward(self, x, goal, speed, sensor_map, local_maps):
+        self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.act_fc1 = nn.Linear(128*32, 256)
+        self.act_fc2 =  nn.Linear(256+2+2+256, 128)
+        self.actor1 = nn.Linear(128, 1)
+        self.actor2 = nn.Linear(128, 1)
+        
+        self.act_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.act_fea_conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.act_lm_fc1 = nn.Linear(15*15*32, 512)
+        self.act_lm_fc2 = nn.Linear(512, 256)
+        
+        # critic
+        self.crt_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_fea_conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_lm_fc1 = nn.Linear(15*15*32, 512)
+        self.crt_lm_fc2 = nn.Linear(512, 256)
+
+        self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
+        self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.crt_fc1 = nn.Linear(128*32, 256)
+        self.crt_fc2 = nn.Linear(256+2+2+256, 128)
+        self.critic = nn.Linear(128, 1)
+        
+        
+        
+    def forward(self, x, goal, speed, sensor_map, local_maps, pedestrian_list):
         """
             returns value estimation, action, log_action_prob
         """
-         # action
-        #print(x.shape)      # 1, 3, 512                                    # 128, 3, 512   (Batch size=128)
-        #print(goal.shape)   # 1, 2                                         # 128, 2
-        #print(speed.shape)  # 1, 2                                         # 128, 2
-        #print(local_maps.shape)  # 1, 3, 60, 60    B, C, W, H              # 128, 3, 60, 60
-        #print(sensor_map.shape)  # 1, 1, 60, 60                            # 128, 1, 60, 60
-        
-        concat_features = torch.cat([sensor_map,local_maps],dim=1)
-        #print('콘챗 핏쳐:',concat_features.shape)    # sensor map + ped maps => 1+3, 60, 60
-        ace = F.relu(self.act_fea_conv1(concat_features))    # (1, 32, 60, 60)
-        ace = F.max_pool2d(ace, 2)     # (1,32,30,30)
-        ace = F.relu(self.act_fea_conv2(ace))    # (1, 32, 60, 60)
-        ace = F.max_pool2d(ace, 2)     # (1,32,15,15)
-        ace = F.relu(self.act_fea_conv3(ace))    # (1, 64, 15, 15)
-        ace = F.max_pool2d(ace, 2)     # (1,64,7,7)
-        
-        ace = ace.view(ace.shape[0], -1)   # (1, 3136)
-        ace = F.relu(self.act_fc1(ace))    # (1, 512)
-        
-        ace = torch.cat((ace, goal, speed),dim = -1)   # (1, 516)
-        ace = F.relu(self.act_fc2(ace))
-        ace = F.relu(self.act_fc3(ace))    # (1, 512)
+        # action
+
+        # print(x.shape)
+        # print(goal.shape)
+        # print(speed.shape)
+        #print(pedestrian_list.shape)
+        #print(local_maps.shape)
+        ace = F.relu(self.act_fea_conv1(local_maps))   # 1, 32, 60, 60
+        ace = F.max_pool2d(ace, 2)    # 1, 32, 60, 60
+        ace = F.relu(self.act_fea_conv2(ace))   # 1, 32, 60, 60
+        ace = F.max_pool2d(ace, 2)    # 1, 32, 15, 15
+        ace = ace.view(ace.shape[0], -1)
+        ace = F.relu(self.act_lm_fc1(ace))
+        ace = F.relu(self.act_lm_fc2(ace))   # 1,256
+
         #print(ace.shape)
-
         
 
-        mean1 = torch.sigmoid(self.actor1(ace))   # 0~1, linear vel
-        mean2 = torch.tanh(self.actor2(ace))      # -1~1, angular rot
+        a = F.relu(self.act_fea_cv1(x))
+        a = F.relu(self.act_fea_cv2(a))
+        a = a.view(a.shape[0], -1)
+        a = F.relu(self.act_fc1(a))
+
+        #a = torch.cat((a, goal, speed), dim=-1)
+        a = torch.cat((a, goal, speed, ace), dim=-1)
+        a = F.relu(self.act_fc2(a))
+        #mean1 = F.sigmoid(self.actor1(a))
+        #mean2 = F.tanh(self.actor2(a))
+        mean1 = torch.sigmoid(self.actor1(a))
+        mean2 = torch.tanh(self.actor2(a))
         mean = torch.cat((mean1, mean2), dim=-1)
-        logstd = self.logstd.expand_as(mean)    # mean처럼 [2,] 즉 [[0,0]]으로 확장한다
-        std = torch.exp(logstd)     # [[1,1]]
+
+        logstd = self.logstd.expand_as(mean)
+        std = torch.exp(logstd)
         action = torch.normal(mean, std)
 
         # action prob on log scale
         logprob = log_normal_density(action, mean, std=std, log_std=logstd)
-
+        
         #---------------------------------------------------------------------#
+
         # value
-        ace_c = F.relu(self.crt_fea_conv1(concat_features))    # (1, 32, 60, 60)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,30,30)
-        ace_c = F.relu(self.crt_fea_conv2(ace_c))    # (1, 32, 60, 60)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,32,15,15)
-        ace_c = F.relu(self.crt_fea_conv3(ace_c))    # (1, 64, 15, 15)
-        ace_c = F.max_pool2d(ace_c, 2)     # (1,64,7,7)
+        ace_c = F.relu(self.crt_fea_conv1(local_maps))   # 1, 32, 60, 60
+        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 60, 60
+        ace_c = F.relu(self.crt_fea_conv2(ace_c))   # 1, 32, 60, 60
+        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 15, 15
+        ace_c = ace_c.view(ace_c.shape[0], -1)
+        ace_c = F.relu(self.crt_lm_fc1(ace_c))
+        ace_c = F.relu(self.crt_lm_fc2(ace_c))   # 1,256
         
         
-        ace_c = ace_c.view(ace_c.shape[0], -1)   # (1, 3136)
-        
-        ace_c = F.relu(self.crt_fc1(ace_c))    # (1, 512)
-        
-        ace_c = torch.cat((ace_c, goal, speed),dim = -1)   # (1, 516)
-        ace_c = F.relu(self.crt_fc2(ace_c))
-        ace_c = F.relu(self.crt_fc3(ace_c))    # (1, 512)
-        
-        
-        v = self.critic(ace_c)
+        v = F.relu(self.crt_fea_cv1(x))
+        v = F.relu(self.crt_fea_cv2(v))
+        v = v.view(v.shape[0], -1)
+        v = F.relu(self.crt_fc1(v))
+        #v = torch.cat((v, goal, speed), dim=-1)
+        v = torch.cat((v, goal, speed, ace_c), dim=-1)
+        v = F.relu(self.crt_fc2(v))
+        v = self.critic(v)
 
         return v, action, logprob, mean
 
-    def evaluate_actions(self, x, goal, speed, action, sensor_maps, local_maps):
-        v, _, _, mean = self.forward(x, goal, speed, sensor_maps, local_maps)   # TODO sensor_maps 활용
+    def evaluate_actions(self, x, goal, speed, action, sensor_maps, local_maps, pedestrian_list):
+        v, _, _, mean = self.forward(x, goal, speed, sensor_maps, local_maps, pedestrian_list)   # TODO sensor_maps 활용
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
         # evaluate

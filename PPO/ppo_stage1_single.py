@@ -210,12 +210,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             elif policy_list=='baseline_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list=='ours_LM':
-                v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
+                v, a, logprob, scaled_action, Sensor_map, LM_stack, pedestrian_list =generate_action_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list=='baseline_ours_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
+            #print(pedestrian_list.shape)
             
             #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
@@ -224,7 +225,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(scaled_action, i)
-                    env.control_vel_specific([0.8,0], i)
+                    #env.control_vel_specific([0.8,0], i)
                 else:
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
@@ -349,7 +350,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 elif policy_list=='baseline_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list=='ours_LM':  # LM: 60x60    # 211214
-                    last_v_r, _, _, _, _, _ = generate_action_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
+                    last_v_r, _, _, _, _, _, _ = generate_action_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list=='baseline_ours_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, Sensor_map=Sensor_map, LM_stack=LM_stack, mode=test_policy)
                 else:
@@ -466,17 +467,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         
                 elif policy_list =='ours_LM':
                     
-                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, Sensor_map, LM_stack))   # 211214
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v, Sensor_map, LM_stack, pedestrian_list))   # 211214
 
                     memory_size += 1
 
                     if len(buff) > HORIZON - 1:
-                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, sensor_map_batch, local_maps_batch = \
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch = \
                             transform_buffer_ours_LM(buff=buff)
 
                         t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
                                                                 last_value=last_v_r, dones=d_batch, lam=LAMDA)
-                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, sensor_map_batch, local_maps_batch)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch)
                         
 
                         ppo_update_stage1_ours_LM(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
