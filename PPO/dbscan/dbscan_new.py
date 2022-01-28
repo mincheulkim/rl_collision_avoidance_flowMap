@@ -37,7 +37,6 @@ class DBSCAN_new(object):
     def __init__(self,x, y,epsilon,minpts):   # x: pose_list  y: poly_speed_list of humans
         # The number of input dataset
         self.n = len(x)
-        #print('x:',x.shape)
         # Euclidean distance
         p, q = np.meshgrid(np.arange(self.n), np.arange(self.n))   # 격자 그리드 만들기
         self.dist = np.sqrt(np.sum(((x[p] - x[q])**2),2))
@@ -92,12 +91,15 @@ class DBSCAN_new(object):
     def grouping(self, position_array, velocity_array):
         
         pos = 2.0
-        ori = 45
-        vel = 1.0
+        #ori = 45
+        ori = 60
+        #vel = 1.0
+        vel = 1.5
         params = {'position_threshold': pos,
                     'orientation_threshold': ori / 180.0 * np.pi,
                     'velocity_threshold': vel,
-                    'velocity_ignore_threshold': 0.3}
+                    #'velocity_ignore_threshold': 0.3}
+                    'velocity_ignore_threshold': 0.05}
 
         num_people = len(position_array)
         vel_orientation_array = []

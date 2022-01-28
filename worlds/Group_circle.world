@@ -127,14 +127,14 @@ agent( pose [-6.00 -6.00 0.00 45.00] color "yellow")  # human4
 agent( pose [-5.50 -5.50 0.00 45.00] color "yellow")  # human5
 
 # Group 2: 3 humans
-#agent( pose [-5.00 5.00 0.00 315.00] color "black")    # human6, Leader
-#agent( pose [-6.00 5.00 0.00 315.00] color "black")    # human7
-#agent( pose [-5.00 6.00 0.00 315.00] color "black")    # human8
+agent( pose [-5.00 5.00 0.00 315.00] color "black")    # human6, Leader
+agent( pose [-6.00 5.00 0.00 315.00] color "black")    # human7
+agent( pose [-5.00 6.00 0.00 315.00] color "black")    # human8
 
 
 # Group 3: 2 humans
-#agent( pose [7.00 0.00 0.00 225.00] color "blue")     # human9
-#agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10
+agent( pose [7.00 0.00 0.00 225.00] color "blue")     # human9
+agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10
 
 # Group 4: 3 humans
 #agent( pose [0.00 0.00 0.00 225.00] color "green")
