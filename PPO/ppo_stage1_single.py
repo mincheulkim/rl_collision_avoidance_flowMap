@@ -28,25 +28,25 @@ from dbscan.dbscan_new import DBSCAN_new
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
 #MAX_EPISODES = 5000   # For Train    5000
-MAX_EPISODES = 100     # For Test
+MAX_EPISODES = 5000     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
-
-HORIZON = 1024    # v3            # 220111 TODO as 2048
+HORIZON=1024*3
+#HORIZON = 1024    # v3            # 220111 TODO as 2048
 #HORIZON = 512
 
 GAMMA = 0.99
 LAMDA = 0.95
-#BATCH_SIZE = 1024   # oriignal
-BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
+BATCH_SIZE = 1024   # oriignal
+#BATCH_SIZE = 128   # is small batch is good? 64?   # 220105 메모리 모잘라서 1024/32 = 32   
 #BATCH_SIZE = 32
 #TODO SGD style learning에서는 매개변수가 작을수록 더 잘된다고 하네...
 
 EPOCH = 2
 COEFF_ENTROPY = 5e-4
-#CLIP_VALUE = 0.1
-CLIP_VALUE = 0.2
+CLIP_VALUE = 0.1
+#CLIP_VALUE = 0.2
 NUM_ENV = 1     # worlds/Group_circle.world
 OBS_SIZE = 512
 ACT_SIZE = 2

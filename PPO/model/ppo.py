@@ -864,12 +864,12 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
                     #print(i, 1/num_grp_dist_array[index[i-1]])
                 # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                 elif j==1: # vel x
-                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)+1
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)+1
                     #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
                 elif j==2: # vel y
-                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
-                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)+1
+                    local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                    #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)+1
                     #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
         local_maps.append(local_map.tolist())
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
@@ -1606,7 +1606,8 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
     
     sensor_maps = sensor_maps.reshape(num_step*num_env, 1, local_map_width, local_map_width)                    # 1024, 1, 60, 60 sensor map
     local_mapss = local_mapss.reshape((num_step*num_env, fix_num_channel, local_map_width, local_map_width))    # in 1024, 3, 60, 60 ped map
-    pedestrian_lists = pedestrian_lists.reshape((num_step*num_env, 11,7))
+    #pedestrian_lists = pedestrian_lists.reshape((num_step*num_env, 11,7))
+    pedestrian_lists = pedestrian_lists.reshape((num_step*num_env, pedestrian_lists.shape[2],7))  # 220119 debug
     
 
     for update in range(epoch):   # 0, 1
@@ -1640,8 +1641,8 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
             sampled_targets = sampled_targets.view(-1, 1)
             value_loss = F.mse_loss(new_value, sampled_targets)
 
-            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
-            #loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
+            #loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

@@ -890,6 +890,7 @@ class ours_LM_Policy(nn.Module):
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
         self.crt_fc2 = nn.Linear(256+2+2+256, 128)
+        
         self.critic = nn.Linear(128, 1)
         
         
@@ -906,9 +907,11 @@ class ours_LM_Policy(nn.Module):
         #print(pedestrian_list.shape)
         #print(local_maps.shape)
         ace = F.relu(self.act_fea_conv1(local_maps))   # 1, 32, 60, 60
-        ace = F.max_pool2d(ace, 2)    # 1, 32, 60, 60
+        #ace = F.max_pool2d(ace, 2)    # 1, 32, 60, 60
+        ace = F.avg_pool2d(ace, 2)    # 1, 32, 60, 60
         ace = F.relu(self.act_fea_conv2(ace))   # 1, 32, 60, 60
-        ace = F.max_pool2d(ace, 2)    # 1, 32, 15, 15
+        #ace = F.max_pool2d(ace, 2)    # 1, 32, 15, 15
+        ace = F.avg_pool2d(ace, 2)    # 1, 32, 15, 15
         ace = ace.view(ace.shape[0], -1)
         ace = F.relu(self.act_lm_fc1(ace))
         ace = F.relu(self.act_lm_fc2(ace))   # 1,256
@@ -941,9 +944,11 @@ class ours_LM_Policy(nn.Module):
 
         # value
         ace_c = F.relu(self.crt_fea_conv1(local_maps))   # 1, 32, 60, 60
-        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 60, 60
+        #ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 60, 60
+        ace_c = F.avg_pool2d(ace_c, 2)    # 1, 32, 60, 60
         ace_c = F.relu(self.crt_fea_conv2(ace_c))   # 1, 32, 60, 60
-        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 15, 15
+        #ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 15, 15
+        ace_c = F.avg_pool2d(ace_c, 2)    # 1, 32, 15, 15
         ace_c = ace_c.view(ace_c.shape[0], -1)
         ace_c = F.relu(self.crt_lm_fc1(ace_c))
         ace_c = F.relu(self.crt_lm_fc2(ace_c))   # 1,256
