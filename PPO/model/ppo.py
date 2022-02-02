@@ -148,7 +148,7 @@ def transform_buffer_baseline_LM(buff):   # 211214
 
 def transform_buffer_ours_LM(buff):   # 211214
     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
-    v_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch = [], [], [], [], [], [], [], [], [], [], []
+    v_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch, grp_ped_map_list_batch, to_go_goal_batch = [], [], [], [], [], [], [], [], [], [], [], [], []
     #v_batch = [], [], [], [], [], [], [], []
     s_temp, goal_temp, speed_temp = [], [], []
 
@@ -173,6 +173,8 @@ def transform_buffer_ours_LM(buff):   # 211214
 
         local_maps_batch.append(e[7])  # 211214  # 220105  (2048,8,1,3,60,60)
         pedestrian_list_batch.append(e[8])
+        grp_ped_map_list_batch.append(e[9])
+        to_go_goal_batch.append(e[10])
 
 
     
@@ -187,8 +189,10 @@ def transform_buffer_ours_LM(buff):   # 211214
     sensor_map_batch=np.asarray(sensor_map_batch)
     local_maps_batch = np.asarray(local_maps_batch)
     pedestrian_list_batch=np.asarray(pedestrian_list_batch)
-    print('local map shape:',local_maps_batch.shape,'ped batch:',pedestrian_list_batch.shape)
-    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch
+    grp_ped_map_list_batch = np.asarray(grp_ped_map_list_batch)
+    to_go_goal_batch = np.asarray(to_go_goal_batch)
+    print('local map shape:',local_maps_batch.shape,'ped batch:',pedestrian_list_batch.shape, 'grp_map batch:',grp_ped_map_list_batch.shape)
+    return s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch, sensor_map_batch, local_maps_batch, pedestrian_list_batch, grp_ped_map_list_batch, to_go_goal_batch
 
 def transform_buffer_baseline_ours_LM(buff):   # 211214
     s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, \
@@ -726,7 +730,7 @@ def generate_action_baseline_LM(env, state_list, pose_list, velocity_list, polic
     return v, a, logprob, scaled_action, sensor_map, local_maps   # local_map = np.ndarray type, shape=(60,60)
 
 # 220128
-def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, mode=False):   # 211130
+def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, index, to_go_goal, mode=False):   # 211130
     s_list, goal_list, speed_list = [], [], []
     for i in state_list:
         s_list.append(i[0])
@@ -737,13 +741,14 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
     pedestrain_list = np.zeros((pose_list.shape[0], 7))   # 11,7   # px,py,vx,vy,grp,visible
     #print(pedestrain_list.shape)
     
-    
+
 
 
     s_list = np.asarray(s_list)
     goal_list = np.asarray(goal_list)
     speed_list = np.asarray(speed_list)
     
+    to_go_goal = np.asarray(to_go_goal)
     
     robot_rot = pose_list[0,2]
     pose_list = np.asarray(pose_list[:,0:2]) 
@@ -815,27 +820,71 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
         labels = dbscan_new.grouping(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list))
         #print('새거:',labels)
         idx = labels
-    
-    
     row,axis= np.where(pedestrain_list[:,4:5]!=0.)
-    #print(row)
 
-        
-    
     for indexx, i in enumerate(row):
         #print('뉴맵:',i,pedestrain_list[i,:])
         pedestrain_list[i,5]=labels[indexx]+1
         
-    #print('페드맵:',pedestrain_list)
-
-        
-        #if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-        
     
-
     
-
+    #print(np.array(ped_map_list).shape)          # 20, 3, 60, 60
+    
+    #max_num_group = np.int(np.max(i[5]))   # 만약 그룹이 두개면 2, 한개면 1
+    
     local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
+    ped_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # 3, 60, 60
+    grp_ped_map_list = []
+    
+
+
+    # 220121 그룹별 평균 거리 계산   
+    #print(pedestrain_list)
+    num_grp_mod_x = np.zeros(shape=(int(np.max(pedestrain_list[:,5]))))
+    num_grp_mod_y = np.zeros(shape=(int(np.max(pedestrain_list[:,5]))))
+    num_grp_vx = np.zeros(shape=(int(np.max(pedestrain_list[:,5]))))
+    num_grp_vy = np.zeros(shape=(int(np.max(pedestrain_list[:,5]))))
+    num_grp_cnt = np.zeros(shape=(int(np.max(pedestrain_list[:,5]))))
+    #print(num_grp_mod_x)
+    
+    for idx, ped in enumerate(pedestrain_list):
+        if pedestrain_list[idx,6] != 0:
+            num_grp_mod_x[int(pedestrain_list[idx,5]-1)]+=pedestrain_list[idx,0]
+            num_grp_mod_y[int(pedestrain_list[idx,5]-1)]+=pedestrain_list[idx,1]
+            num_grp_vx[int(pedestrain_list[idx,5]-1)]+=pedestrain_list[idx,2]
+            num_grp_vy[int(pedestrain_list[idx,5]-1)]+=pedestrain_list[idx,3]
+            num_grp_cnt[int(pedestrain_list[idx,5]-1)]+=1
+
+    #print(num_grp_mod_x, num_grp_mod_y, num_grp_vx, num_grp_cnt)
+    for idx, i in enumerate(num_grp_cnt):
+        num_grp_mod_x[idx]=num_grp_mod_x[idx]/num_grp_cnt[idx]
+        num_grp_mod_y[idx]=num_grp_mod_y[idx]/num_grp_cnt[idx]
+        num_grp_vx[idx]=num_grp_vx[idx]/num_grp_cnt[idx]
+        num_grp_vy[idx]=num_grp_vy[idx]/num_grp_cnt[idx]
+        
+    #print(num_grp_mod_x, num_grp_mod_y, num_grp_vx, num_grp_vy)
+
+    for j in range(3):  # grp, vel_x,vel_y
+        for index, (mod_x, mod_y, vx, vy) in enumerate(zip(num_grp_mod_x,num_grp_mod_y,num_grp_vx, num_grp_vy)):
+            #print(index, mod_x, mod_y, vx, vy)
+            mod_diff_x = np.floor((mod_x+3)/cell_size)
+            mod_diff_y = np.ceil((map_size-mod_y)/cell_size)
+            
+            if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size):
+                if j==0:   # grp idx    
+                    ped_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1
+                elif j==1: # vel x
+                    ped_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=vx
+                elif j==2: # vel y
+                    ped_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=vy
+        grp_ped_map_list.append(ped_map.tolist())
+        ped_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # 3, 60, 60
+
+    
+    
+
+                
+    
     for j in range(3):  # grp, vel_x,vel_y
         for i, pose in enumerate(pose_list):
             diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
@@ -851,7 +900,6 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
             #print('modx,y:',mod_diff_x,mod_diff_y)
                         
             diff_vel = speed_poly_list - speed_poly_list[0]
-            #print('index max:',index)
             
             if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
                 if j==0:   # grp idx    
@@ -884,6 +932,21 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
     
     pedestrain_list = [pedestrain_list]
     pedestrain_list = np.array(pedestrain_list)
+    
+    grp_ped_map_list = [grp_ped_map_list]     # 1, 1(no hum)~4, 3, 60, 60       # batch, grp_idx_num + 허수=20, channel, vx, vy
+    grp_ped_map_list = np.array(grp_ped_map_list)
+    #print(grp_ped_map_list.shape)   # 1, 3, 60, 60
+    #print(local_maps.shape)         # 1, 3, 60, 60
+    
+    
+    '''
+    fit_grp_num = 10
+    empty_ped_map = np.zeros((1, 1, 3, 60, 60))
+    if grp_ped_map_list.shape[1] != fit_grp_num:
+        for i in range(fit_grp_num-grp_ped_map_list.shape[1]):
+            grp_ped_map_list = np.append(grp_ped_map_list, empty_ped_map, axis=1)
+    #print(grp_ped_map_list.shape)     # 1, 10, 3, 60, 60     B, 0(fake) + 1~3(grp idx) + 0s(whole), chan, h, w
+    '''
 
 
     np.set_printoptions(threshold=np.inf)
@@ -894,34 +957,94 @@ def generate_action_ours_LM(env, state_list, pose_list, velocity_list, policy, a
     sensor_map_torch = Variable(torch.from_numpy(sensor_map)).float().cuda()    # 1, 60, 60)
     local_maps_torch = Variable(torch.from_numpy(local_maps)).float().cuda()    # (3,60,60)   B, C, W, H
     pedestrain_list_torch = Variable(torch.from_numpy(pedestrain_list)).float().cuda() 
+    grp_ped_map_list_torch = Variable(torch.from_numpy(grp_ped_map_list)).float().cuda()
+    to_go_goal_torch = Variable(torch.from_numpy(to_go_goal)).float().cuda()
     
-    v, a, logprob, mean = policy(s_list, goal_list, speed_list, sensor_map_torch, local_maps_torch, pedestrain_list_torch)
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list, sensor_map_torch, local_maps_torch, pedestrain_list_torch, grp_ped_map_list_torch, to_go_goal_torch)
     v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
     mean_v = mean.data.cpu().numpy()
     
     scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
     if mode==True:
         scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
-
+        
+    
+        
+    # Occupancy map 도시
+    #print(pedestrain_list)              # 5: grp idx, 6: 존재여부(1)
+    
     '''
-    hsv=cv2.resize(local_maps[0][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    map_float = np.array(map1)/10.0
+    cv2.imshow('obs',map1)
+    cv2.waitKey(1)
+    '''
+#220202 new
+    '''
+    hsv=cv2.resize(grp_ped_map_list[0][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
     cv2.imshow('grp',hsv)
     cv2.waitKey(1)
     
+    hsv=cv2.resize(grp_ped_map_list[0][1], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grpx',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][2], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grpy',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(local_maps[0][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('LM',hsv)
+    cv2.waitKey(1)
+    
     hsv=cv2.resize(local_maps[0][1], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
-    cv2.imshow('vx',hsv)
+    cv2.imshow('LMx',hsv)
     cv2.waitKey(1)
     
     hsv=cv2.resize(local_maps[0][2], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('LMy',hsv)
+    cv2.waitKey(1)
+    '''
+
+    '''
+    #220202 new
+    hsv=cv2.resize(grp_ped_map_list[0][0][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grp0',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][1][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grp1',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][2][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grp2',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][3][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grp3',hsv)
+    cv2.waitKey(1)
+    '''
+    
+    '''
+    # OLD
+    hsv=cv2.resize(grp_ped_map_list[0][0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('grp',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][1], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+    cv2.imshow('vx',hsv)
+    cv2.waitKey(1)
+    
+    hsv=cv2.resize(grp_ped_map_list[0][2], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
     cv2.imshow('vy',hsv)
     cv2.waitKey(1)
     '''
+    
     
     #print(pedestrain_list)
     
     
 
-    return v, a, logprob, scaled_action, sensor_map, local_maps, pedestrain_list   # local_map = np.ndarray type, shape=(60,60)
+    return v, a, logprob, scaled_action, sensor_map, local_maps, pedestrain_list, grp_ped_map_list   # local_map = np.ndarray type, shape=(60,60)
 
 
 
@@ -1587,10 +1710,11 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
                coeff_entropy=0.02, clip_value=0.2,
                num_step=2048, num_env=1, frames=3, obs_size=512, act_size=2):     # num_step = 1000, batch_size=1024
     #obss, goals, speeds, actions, logprobs, targets, values, rewards, advs = memory
-    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, sensor_maps, local_mapss, pedestrian_lists = memory
+    obss, goals, speeds, actions, logprobs, targets, values, rewards, advs, sensor_maps, local_mapss, pedestrian_lists, grp_ped_map_list, to_go_goal = memory
 
     advs = (advs - advs.mean()) / advs.std()
-    print('ppo_update_stage1_ours_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'sensormaps:',sensor_maps.shape, 'local mapss.shape:',local_mapss.shape, 'pedlist.shape:',pedestrian_lists.shape)
+    
+    print('ppo_update_stage1_ours_LM():',obss.shape, goals.shape, speeds.shape, actions.shape, logprobs.shape, targets.shape, values.shape, rewards.shape, advs.shape, 'sensormaps:',sensor_maps.shape, 'local mapss.shape:',local_mapss.shape, 'pedlist.shape:',pedestrian_lists.shape, 'grp_ped_map_list.shape:',grp_ped_map_list.shape, to_go_goal.shape)
                                                                                         # in (2048, 1, 8, 3, 60, 60)   -> (2048, 8, 3, 60, 60)
 
     obss = obss.reshape((num_step*num_env, frames, obs_size))    # (3072, 1, 3, 512) -> reshape as 3072(num_step=HORIZON) * 1(num_env), 3, 512
@@ -1608,6 +1732,8 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
     local_mapss = local_mapss.reshape((num_step*num_env, fix_num_channel, local_map_width, local_map_width))    # in 1024, 3, 60, 60 ped map
     #pedestrian_lists = pedestrian_lists.reshape((num_step*num_env, 11,7))
     pedestrian_lists = pedestrian_lists.reshape((num_step*num_env, pedestrian_lists.shape[2],7))  # 220119 debug
+    grp_ped_map_list = grp_ped_map_list.reshape((num_step*num_env, fix_num_channel, local_map_width, local_map_width))
+    to_go_goal = to_go_goal.reshape((num_step*num_env, 2))
     
 
     for update in range(epoch):   # 0, 1
@@ -1626,9 +1752,11 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
             sampled_sensor_maps = Variable(torch.from_numpy(sensor_maps[index])).float().cuda()  # 220124
             sampled_local_maps = Variable(torch.from_numpy(local_mapss[index])).float().cuda()  # 211214
             sampled_pedestrian_lists = Variable(torch.from_numpy(pedestrian_lists[index])).float().cuda()
+            sampled_grp_ped_map_list = Variable(torch.from_numpy(grp_ped_map_list[index])).float().cuda()
+            sampled_to_go_goal = Variable(torch.from_numpy(to_go_goal[index])).float().cuda()
 
 
-            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_sensor_maps, sampled_local_maps, sampled_pedestrian_lists)
+            new_value, new_logprob, dist_entropy = policy.evaluate_actions(sampled_obs, sampled_goals, sampled_speeds, sampled_actions, sampled_sensor_maps, sampled_local_maps, sampled_pedestrian_lists, sampled_grp_ped_map_list, sampled_to_go_goal)
             
             sampled_logprobs = sampled_logprobs.view(-1, 1)
             ratio = torch.exp(new_logprob - sampled_logprobs)
@@ -1641,8 +1769,8 @@ def ppo_update_stage1_ours_LM(policy, optimizer, batch_size, memory, epoch,    #
             sampled_targets = sampled_targets.view(-1, 1)
             value_loss = F.mse_loss(new_value, sampled_targets)
 
-            #loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
-            loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
+            loss = policy_loss + 20 * value_loss - coeff_entropy * dist_entropy
+            #loss = policy_loss + 0.5 * value_loss - coeff_entropy * dist_entropy
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

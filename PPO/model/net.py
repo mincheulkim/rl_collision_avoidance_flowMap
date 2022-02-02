@@ -871,52 +871,87 @@ class ours_LM_Policy(nn.Module):
         self.act_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.act_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.act_fc1 = nn.Linear(128*32, 256)
-        self.act_fc2 =  nn.Linear(256+2+2+256, 128)
+        self.act_fc2 =  nn.Linear(256+2+2+128+128, 128)
         self.actor1 = nn.Linear(128, 1)
         self.actor2 = nn.Linear(128, 1)
         
-        self.act_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
-        self.act_fea_conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
-        self.act_lm_fc1 = nn.Linear(15*15*32, 512)
-        self.act_lm_fc2 = nn.Linear(512, 256)
+        self.act_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=(3,3), stride=1, padding=1)
+        self.act_fea_conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.act_lm_fc1 = nn.Linear(15*15*32, 256)
+        self.act_lm_fc2 = nn.Linear(256, 128)
+        
+        self.act_fea_conv1_v2 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=(3,3), stride=1, padding=1)
+        self.act_fea_conv2_v2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.act_lm_fc1_v2 = nn.Linear(15*15*32, 256)
+        self.act_lm_fc2_v2 = nn.Linear(256, 128)
         
         # critic
-        self.crt_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
-        self.crt_fea_conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
-        self.crt_lm_fc1 = nn.Linear(15*15*32, 512)
-        self.crt_lm_fc2 = nn.Linear(512, 256)
-
         self.crt_fea_cv1 = nn.Conv1d(in_channels=frames, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.crt_fea_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.crt_fc1 = nn.Linear(128*32, 256)
-        self.crt_fc2 = nn.Linear(256+2+2+256, 128)
-        
+        self.crt_fc2 = nn.Linear(256+2+2+128+128, 128)     
         self.critic = nn.Linear(128, 1)
+   
+        
+        self.crt_fea_conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_fea_conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_lm_fc1 = nn.Linear(15*15*32, 256)
+        self.crt_lm_fc2 = nn.Linear(256, 128)
+        
+        self.crt_fea_conv1_v2 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_fea_conv2_v2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3), stride=1, padding=1)
+        self.crt_lm_fc1_v2 = nn.Linear(15*15*32, 256)
+        self.crt_lm_fc2_v2 = nn.Linear(256, 128)
         
         
         
-    def forward(self, x, goal, speed, sensor_map, local_maps, pedestrian_list):
+        
+    def forward(self, x, goal, speed, sensor_map, local_maps, pedestrian_list, grp_ped_map_list, to_go_goal):
         """
             returns value estimation, action, log_action_prob
         """
-        # action
-
         # print(x.shape)
         # print(goal.shape)
         # print(speed.shape)
-        #print(pedestrian_list.shape)
-        #print(local_maps.shape)
-        ace = F.relu(self.act_fea_conv1(local_maps))   # 1, 32, 60, 60
-        #ace = F.max_pool2d(ace, 2)    # 1, 32, 60, 60
-        ace = F.avg_pool2d(ace, 2)    # 1, 32, 60, 60
+        #print(pedestrian_list.shape)      # 1, 11, 7       1024, 11, 7
+        #print(sensor_map.shape)           # 1, 1, 60, 60
+        #print('LM:',local_maps.shape)              # 1, 3, 60, 60        -(Batch)->  1024, 3, 60, 60
+        #print('GRP:',grp_ped_map_list.shape)       # 1, 3, 60, 60        -(Batch)->  1024, 3, 60, 60
+        #print(to_go_goal, to_go_goal.shape)
+        
+        
+        ace = F.relu(self.act_fea_conv1(local_maps))   # 1, 3, 60, 60 -> 1, 32, 60, 60
+        #print('policy:',ace.shape)
+        ace = F.max_pool2d(ace, 2)    # 1, 32, 60, 60
         ace = F.relu(self.act_fea_conv2(ace))   # 1, 32, 60, 60
-        #ace = F.max_pool2d(ace, 2)    # 1, 32, 15, 15
-        ace = F.avg_pool2d(ace, 2)    # 1, 32, 15, 15
+        ace = F.max_pool2d(ace, 2)    # 1, 32, 15, 15
         ace = ace.view(ace.shape[0], -1)
         ace = F.relu(self.act_lm_fc1(ace))
         ace = F.relu(self.act_lm_fc2(ace))   # 1,256
-
-        #print(ace.shape)
+        
+        ace_v2 = F.relu(self.act_fea_conv1_v2(grp_ped_map_list))   # 1, 3, 60, 60 -> 1, 32, 60, 60
+        ace_v2 = F.max_pool2d(ace_v2, 2)    # 1, 32, 60, 60
+        ace_v2 = F.relu(self.act_fea_conv2_v2(ace_v2))   # 1, 32, 60, 60
+        ace_v2 = F.max_pool2d(ace_v2, 2)    # 1, 32, 15, 15
+        ace_v2 = ace_v2.view(ace.shape[0], -1)
+        ace_v2 = F.relu(self.act_lm_fc1_v2(ace_v2))
+        ace_v2 = F.relu(self.act_lm_fc2_v2(ace_v2))   # 1,256
+        
+        #if pedestrian_list[:,:,6]==1:
+        #    print(pedestrian_list)
+        #print(pedestrian_list[:,:,6])    # tensor([[0., 1., 1., 1., 0., 1., 0., 0., 0., 0., 0.]]   # 1, 11  -(Batch)-> 1024, 11
+        #print(torch.max(pedestrian_list[:,:,5]))  # 디폴트:0,  증가 1,2,3
+        
+        # 220202
+        # variable input 생성 from grp_index  # 1, 10, 3, 60, 60 
+        '''
+        num_grp_map = torch.max(pedestrian_list[:,:,5]).detach().cpu()
+        num_grp_map = int(num_grp_map)
+        var_grp_map_input = grp_ped_map_list[:,0:num_grp_map, :, :, :]    # 1, 0(default)~3, 3, 60, 60   -(Batch)-> [1024, 4, 3, 60, 60]
+        #print(var_grp_map_input.shape)              
+        x = self.phi.forward(var_grp_map_input)
+        print(x.shape)
+        '''
         
 
         a = F.relu(self.act_fea_cv1(x))
@@ -925,7 +960,12 @@ class ours_LM_Policy(nn.Module):
         a = F.relu(self.act_fc1(a))
 
         #a = torch.cat((a, goal, speed), dim=-1)
-        a = torch.cat((a, goal, speed, ace), dim=-1)
+        
+        #print(speed, goal, to_go_goal)
+        #a = torch.cat((a, goal, speed, ace, ace_v2), dim=-1)
+        #print(goal, to_go_goal, goal.shape, to_go_goal.shape)
+        a = torch.cat((a, to_go_goal, speed, ace, ace_v2), dim=-1)   # 220202 새로운 접근. poly goal x,y대신 골까지 거리, 가야하는 heading넣어줌
+        
         a = F.relu(self.act_fc2(a))
         #mean1 = F.sigmoid(self.actor1(a))
         #mean2 = F.tanh(self.actor2(a))
@@ -943,15 +983,24 @@ class ours_LM_Policy(nn.Module):
         #---------------------------------------------------------------------#
 
         # value
+        
         ace_c = F.relu(self.crt_fea_conv1(local_maps))   # 1, 32, 60, 60
-        #ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 60, 60
-        ace_c = F.avg_pool2d(ace_c, 2)    # 1, 32, 60, 60
+        #print('critic:',ace_c.shape)
+        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 60, 60
         ace_c = F.relu(self.crt_fea_conv2(ace_c))   # 1, 32, 60, 60
-        #ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 15, 15
-        ace_c = F.avg_pool2d(ace_c, 2)    # 1, 32, 15, 15
+        ace_c = F.max_pool2d(ace_c, 2)    # 1, 32, 15, 15
         ace_c = ace_c.view(ace_c.shape[0], -1)
         ace_c = F.relu(self.crt_lm_fc1(ace_c))
-        ace_c = F.relu(self.crt_lm_fc2(ace_c))   # 1,256
+        ace_c = F.relu(self.crt_lm_fc2(ace_c))   # 1,256.
+        
+        ace_c_v2 = F.relu(self.crt_fea_conv1_v2(grp_ped_map_list))   # 1, 32, 60, 60
+        ace_c_v2 = F.max_pool2d(ace_c_v2, 2)    # 1, 32, 60, 60
+        ace_c_v2 = F.relu(self.crt_fea_conv2_v2(ace_c_v2))   # 1, 32, 60, 60
+        ace_c_v2 = F.max_pool2d(ace_c_v2, 2)    # 1, 32, 15, 15
+        ace_c_v2 = ace_c_v2.view(ace_c_v2.shape[0], -1)
+        ace_c_v2 = F.relu(self.crt_lm_fc1_v2(ace_c_v2))
+        ace_c_v2 = F.relu(self.crt_lm_fc2_v2(ace_c_v2))   # 1,256
+        
         
         
         v = F.relu(self.crt_fea_cv1(x))
@@ -959,14 +1008,17 @@ class ours_LM_Policy(nn.Module):
         v = v.view(v.shape[0], -1)
         v = F.relu(self.crt_fc1(v))
         #v = torch.cat((v, goal, speed), dim=-1)
-        v = torch.cat((v, goal, speed, ace_c), dim=-1)
+        
+        #v = torch.cat((v, goal, speed, ace_c, ace_v2), dim=-1)
+        v = torch.cat((v, to_go_goal, speed, ace_c, ace_v2), dim=-1)
+        
         v = F.relu(self.crt_fc2(v))
         v = self.critic(v)
 
         return v, action, logprob, mean
 
-    def evaluate_actions(self, x, goal, speed, action, sensor_maps, local_maps, pedestrian_list):
-        v, _, _, mean = self.forward(x, goal, speed, sensor_maps, local_maps, pedestrian_list)   # TODO sensor_maps 활용
+    def evaluate_actions(self, x, goal, speed, action, sensor_maps, local_maps, pedestrian_list, grp_ped_map_list, to_go_goal):
+        v, _, _, mean = self.forward(x, goal, speed, sensor_maps, local_maps, pedestrian_list, grp_ped_map_list, to_go_goal)   # TODO sensor_maps 활용
         logstd = self.logstd.expand_as(mean)
         std = torch.exp(logstd)
         # evaluate
