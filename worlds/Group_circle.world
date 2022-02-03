@@ -3,8 +3,8 @@ show_clock_interval 10000
 resolution 0.2
 threads 16
 # -1: for maximum run time
-#speedup 20
-speedup 5
+speedup 20
+#speedup 5
 #speedup 1
 #speedup -1
 

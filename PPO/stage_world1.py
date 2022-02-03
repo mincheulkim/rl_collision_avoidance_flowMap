@@ -1,4 +1,6 @@
 import time
+
+from sympy import re
 import rospy
 import copy
 import tf
@@ -62,12 +64,10 @@ class StageWorld():
         #self.num_human = 14      # 
         #self.num_human = 22     # 220111(+14)
         
-        
         self.groups = [0, 1, 2, 3, 4, 5]
         #self.groups = [0, 1, 2, 3]
         #self.groups = [0, 1, 2, 3, 4]       # 220110
         #self.groups = [0, 1, 2, 3, 4, 5]   # 220111
-        
         
         self.human_list=[[0],[1],[2],[3],[4],[5]]
         #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
@@ -484,6 +484,260 @@ class StageWorld():
         '''
         #print('reward:',reward)
         return reward, terminate, result   # float, T or F(base), description
+    
+    def boundary_dist(self, velocity, rel_ang, laser_flag, const=0.354163):
+        # Parameters from Rachel Kirby's thesis
+        #front_coeff = 1.0
+        front_coeff = 2.0
+        side_coeff = 2.0 / 3.0
+        rear_coeff = 0.5
+        safety_dist = 0.5
+        velocity_x = velocity[0]
+        velocity_y = velocity[1]
+
+        velocity_magnitude = np.sqrt(velocity_x ** 2 + velocity_y ** 2)
+        variance_front = max(0.5, front_coeff * velocity_magnitude)
+        variance_side = side_coeff * variance_front
+        variance_rear = rear_coeff * variance_front
+
+        rel_ang = rel_ang % (2 * np.pi)
+        flag = int(np.floor(rel_ang / (np.pi / 2)))
+        if flag == 0:
+            prev_variance = variance_front
+            next_variance = variance_side
+        elif flag == 1:
+            prev_variance = variance_rear
+            next_variance = variance_side
+        elif flag == 2:
+            prev_variance = variance_rear
+            next_variance = variance_side
+        else:
+            prev_variance = variance_front
+            next_variance = variance_side
+
+        dist = np.sqrt(const / ((np.cos(rel_ang) ** 2 / (2 * prev_variance)) + (np.sin(rel_ang) ** 2 / (2 * next_variance))))
+        dist = max(safety_dist, dist)
+
+        # Offset pedestrian radius
+        if laser_flag:
+            dist = dist - 0.5 + 1e-9
+
+        return dist
+
+    
+    def draw_social_shapes(self, position, velocity, laser_flag, const=0.35):
+        # This function draws social group shapes
+        # given the positions and velocities of the pedestrians.
+
+        total_increments = 20 # controls the resolution of the blobs
+        quater_increments = total_increments / 4
+        angle_increment = 2 * np.pi / total_increments
+
+        # Draw a personal space for each pedestrian within the group
+        contour_points = []
+        for i in range(len(position)):
+            center_x = position[i][0]
+            center_y = position[i][1]
+            velocity_x = velocity[i][0]
+            velocity_y = velocity[i][1]
+            velocity_angle = np.arctan2(velocity_y, velocity_x)
+
+            # Draw four quater-ovals with the axis determined by front, side and rear "variances"
+            # The overall shape contour does not have discontinuities.
+            for j in range(total_increments):
+
+                rel_ang = angle_increment * j
+                value = self.boundary_dist(velocity[i], rel_ang, laser_flag, const)
+                addition_angle = velocity_angle + rel_ang
+                x = center_x + np.cos(addition_angle) * value
+                y = center_y + np.sin(addition_angle) * value
+                contour_points.append((x, y))
+                #print('컨투어 포인트:',j,x,y)
+
+        # Get the convex hull of all the personal spaces
+        convex_hull_vertices = []
+        hull = ConvexHull(np.array(contour_points))
+        for i in hull.vertices:
+            hull_vertice = (contour_points[i][0], contour_points[i][1])
+            convex_hull_vertices.append(hull_vertice)
+
+        return convex_hull_vertices
+
+
+    def draw_all_social_spaces(self, gp_labels, positions, velocities, laser_flag, const=None):
+        all_vertices = []
+        all_labels = np.unique(gp_labels)
+        for curr_label in all_labels:
+            group_positions = []
+            group_velocities = []
+            for i, l in enumerate(gp_labels):
+                if l == curr_label:
+                    group_positions.append(positions[i])
+                    group_velocities.append(velocities[i])
+            if const == None:
+                vertices = self.draw_social_shapes(group_positions, group_velocities, laser_flag)
+            else:
+                vertices = self.draw_social_shapes(group_positions, group_velocities, laser_flag, 
+                                                    const)
+            all_vertices.append(vertices)
+        return all_vertices       # 0, 1, 2, 3번그룹
+    
+    
+    
+    def get_reward_and_terminate_corl(self, t, scaled_action, policy_list, pedestrian_list):   # t is increased 1, but initializezd 1 when terminate=True
+        terminate = False
+        laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
+        [x, y, theta] = self.get_self_stateGT()     # "updated" current state
+        [v, w] = self.get_self_speedGT()            # updated current velocity
+        self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
+        # Propotional Reward
+        self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
+        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
+        reward_c = 0  # collision penalty
+        reward_w = 0  # too much rotation penalty
+        result = 0
+        is_crash = self.get_crash_state()   # return self.is_crashed
+
+        if self.distance < self.goal_size:  # success reward
+            terminate = True
+            reward_g = 15
+            result = 'Reach Goal'
+
+        if is_crash == 1:                   # collision penalty
+            terminate = True
+            reward_c = -15.
+            result = 'Crashed(ROS)'
+        
+        min_dist_rrr = 10.0   # 220119
+        # 220119 Collision check by rel.dist around 360 degree
+        pose_list_np = np.array(self.pose_list)
+        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
+            
+        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
+        kkk = self.get_min_lidar_dist()
+        penalty_lidar = 0.
+        if kkk <= 1.0:
+            penalty_lidar = (-1. + kkk)/10
+        
+        if np.abs(w) >  1.05:               # rotation penalty
+            reward_w = -0.1 * np.abs(w)
+
+        # 211221 add a penalty for going backwoards
+        if scaled_action[0]<0:
+            r_back = -0.45 * np.abs(scaled_action[0])
+        else:
+            r_back = 0
+
+        if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
+            terminate = True      
+            result = 'Time out'
+        
+        #print(pedestrian_list[1][6])
+        # GRP
+        indiv_labels=[]                
+        grp_labels=[]
+        positions = []
+        velocities = []
+        
+        for idx, ped in enumerate(pedestrian_list):
+            if pedestrian_list[idx][6] != 0:
+                #print(pedestrian_list[idx])
+                indiv_label = int(pedestrian_list[idx][4])
+                grp_label = int(pedestrian_list[idx][5])
+                position = [pedestrian_list[idx][0],pedestrian_list[idx][1]]
+                velocity = [pedestrian_list[idx][2],pedestrian_list[idx][3]]
+                indiv_labels.append(indiv_label)
+                grp_labels.append(grp_label)
+                positions.append(position)
+                velocities.append(velocity)
+
+        #print(indiv_labels)    # [6, 8]    [1, 2, 3, 5, 9]
+        #print(grp_labels)      # [1, 1]    [1, 3, 1, 1, 2]
+        #print(positions)       # [[1,1],[2,2]]    [[2.8896498104205963, 2.6215839730271973], [0.5328502413870305, 1.8637225827143853], [2.2420605229240325, 3.9390001662482153], [2.7590289592251427, 1.4688141316473313], [1.3278307894609154, 1.2985722552877585]]
+        #print(velocities)      # [[0.2,0.2],[0.2,0.2]]   [[-0.511329087694693, -0.5343655529166533], [-0.6367084601515689, -0.4843576537760276], [-0.3653859186755444, -0.512861404743211], [-0.549097788376088, -0.47435513775756494], [-0.3493583111982035, 0.33289796577453096]]
+
+        # 1. Individual Drawing
+        indiv_space=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
+        #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
+        indiv_space=np.array(indiv_space)
+
+        
+        for i in range(indiv_space.shape[0]):
+            indiv_space_vertices = np.array(indiv_space[i])
+            plt.plot(indiv_space_vertices[:,0],indiv_space_vertices[:,1])
+        
+        # 2. Group Drawing
+        grp_space=self.draw_all_social_spaces(grp_labels, positions, velocities, False)
+        #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
+        #print(grp_space)
+        grp_space=np.array(grp_space)
+
+        
+        for i in range(grp_space.shape[0]):
+            grp_space_vertices = np.array(grp_space[i])
+            plt.plot(grp_space_vertices[:,0],grp_space_vertices[:,1])
+            
+        #plt.axis([-3, 3, 0, 6])    
+        #plt.show()
+        
+        #print('---------------')
+        
+        #print(indiv_space.shape)      # (num_of_indiv, vertice numbers, (pos))   3, 20, 2
+        
+        # 개인별 리워드
+        reward_ind_list = []
+        # [1,2,3,4]    # 개인별로 sum
+        for i in range(indiv_space.shape[0]):
+            #print('야:',i, indiv_space[i])
+            dist = np.linalg.norm(indiv_space[i], axis=1)
+            #print(dist, np.min(dist))
+            reward_ind_list.append(np.min(dist))
+        #print(indiv_labels)
+        #print('인디 리워드 리스트:', reward_ind_list)
+        
+        safe_ind_dist = 1
+        reward_ind_sum=0.
+        for i in reward_ind_list:
+            reward_ind = i-safe_ind_dist
+            if reward_ind >=0:
+                pass
+            else:
+                reward_ind_sum += reward_ind
+        #print('인디뷰주얼 리워듸',reward_ind_list)
+        #print('인디비쥬얼 리워드 섬:', reward_ind_sum)
+
+        # 그룹 리워드
+        reward_grp_list = []
+        # [1,1,1,2]    # 개인별로 sum
+        for i in range(grp_space.shape[0]):
+            #print('야:',i, indiv_space[i])
+            dist = np.linalg.norm(grp_space[i], axis=1)
+            #print(dist, np.min(dist))
+            reward_grp_list.append(np.min(dist))
+        #print(grp_labels)
+        #print('그룹 리웓 리스트:', reward_grp_list)
+        
+        reward_grp_sum=0.
+        safe_grp_dist = 1
+        for i in reward_grp_list:
+            reward_grp = i-safe_grp_dist
+            if reward_grp >=0:
+                pass
+            else:
+                reward_grp_sum += reward_grp
+        #print('그룹 리워드 리스트:',reward_grp_list)
+        #print('그룹 리워드 섬:',reward_grp_sum)
+
+        
+
+        #reward = reward_g + reward_c + reward_w
+        # OURS reward
+        reward = reward_g + reward_c + reward_w + reward_grp_sum
+
+        return reward, terminate, result   # float, T or F(base), description
+    
+    
+    
 
     def reset_pose(self):
         random_pose = self.generate_random_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose

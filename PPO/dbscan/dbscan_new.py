@@ -91,8 +91,9 @@ class DBSCAN_new(object):
     def grouping(self, position_array, velocity_array):
         
         pos = 2.0
-        #ori = 45
-        ori = 60
+        #pos = 1.5
+        ori = 45
+        #ori = 60
         #vel = 1.0
         vel = 1.5
         params = {'position_threshold': pos,

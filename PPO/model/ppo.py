@@ -271,6 +271,91 @@ def generate_action(env, state_list, policy, action_bound, mode=False):
     
     return v, a, logprob, scaled_action
 
+def generate_action_corl(env, state_list, pose_list, velocity_list, policy, action_bound, mode=False):
+
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
+
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+
+
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+
+
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+
+    mean_v = mean.data.cpu().numpy()
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+    
+    robot_rot = pose_list[0,2]
+    pose_list = np.asarray(pose_list[:,0:2]) 
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+
+    
+    pedestrain_list = np.zeros((pose_list.shape[0], 7))   # 11,7   # px,py,vx,vy,grp,visible
+    
+    robot_rot += np.pi*3/2   # 220125
+    
+    visible_ped_pose_list = []
+    visible_ped_poly_vel_list = []    
+    
+    diff_pose = pose_list-pose_list[0]
+    diff_v = speed_poly_list - speed_poly_list[0]
+
+    pose_encoding= np.zeros((pose_list.shape[0]))
+    
+    for i, (pose,vel) in enumerate(zip(diff_pose, diff_v)):
+        diff = pose
+        diff_v = vel
+        dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+        dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+        dvx_rot = diff_v[0]*np.cos(robot_rot)+diff_v[1]*np.sin(robot_rot)
+        dvy_rot = -diff_v[0]*np.sin(robot_rot)+diff_v[1]*np.cos(robot_rot)
+        pedestrain_list[i,0]=dx_rot
+        pedestrain_list[i,1]=dy_rot
+        pedestrain_list[i,2]=dvx_rot
+        pedestrain_list[i,3]=dvy_rot
+        
+        # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+        mod_diff_x = dx_rot
+        mod_diff_y = dy_rot
+
+        if np.abs(mod_diff_x)<=3.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
+            inn=True
+            visible_ped_pose_list.append([mod_diff_x, mod_diff_y])
+            visible_ped_poly_vel_list.append([dvx_rot,dvy_rot])
+            pose_encoding[i]=i
+            pedestrain_list[i,4]=i # init grp index
+            pedestrain_list[i,5]=i # init grp index
+            pedestrain_list[i,6]=1 # visible human
+
+    if visible_ped_poly_vel_list != [] and visible_ped_poly_vel_list != []:
+        dbscan_new = DBSCAN_new(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list),2,2)
+        labels = dbscan_new.grouping(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list))
+        idx = labels
+    row,axis= np.where(pedestrain_list[:,4:5]!=0.)
+
+    for indexx, i in enumerate(row):
+        pedestrain_list[i,5]=labels[indexx]+1
+        
+    #pedestrain_list = [pedestrain_list]
+    pedestrain_list = np.array(pedestrain_list)
+        
+
+
+    return v, a, logprob, scaled_action, pedestrain_list
+
 def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, mode=False):   # 211130
     
     s_list, goal_list, speed_list = [], [], []

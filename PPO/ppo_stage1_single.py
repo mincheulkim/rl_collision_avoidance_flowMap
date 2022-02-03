@@ -18,10 +18,10 @@ from mpi4py import MPI #test
 from torch.optim import Adam #test
 from collections import deque #test
 
-from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy, depth_LM_Policy, baseline_LM_Policy, baseline_ours_LM_Policy, ours_LM_Policy
+from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy, depth_LM_Policy, baseline_LM_Policy, baseline_ours_LM_Policy, ours_LM_Policy, CORLPolicy
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM, transform_buffer_baseline_LM, ppo_update_stage1_baseline_LM, ppo_update_stage1_baseline_ours_LM, transform_buffer_baseline_ours_LM, ppo_update_stage1_ours_LM, transform_buffer_ours_LM
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM, generate_action_baseline_ours_LM, generate_action_ours_LM
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM, generate_action_baseline_ours_LM, generate_action_ours_LM, generate_action_corl
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
@@ -58,7 +58,7 @@ DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 #policy_list = 'baseline_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = 'baseline_ours_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = 'ours_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
@@ -235,10 +235,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 v, a, logprob, scaled_action, Sensor_map, LM_stack, pedestrian_list, grp_ped_map_list =generate_action_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, to_go_goal=to_go_goal, mode=test_policy)
             elif policy_list=='baseline_ours_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
+            elif policy_list == 'corl':
+                v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
-            #print(pedestrian_list.shape)
+            #print(pedestrian_list, pedestrian_list.shape)
             
             #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
@@ -322,7 +324,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # get informtion
-            r, terminal, result = env.get_reward_and_terminate(step, scaled_action, policy_list)   # 211221 for backward penalty 
+            if policy_list == 'corl':
+                r, terminal, result = env.get_reward_and_terminate_corl(step, scaled_action, policy_list, pedestrian_list)   # 211221 for backward penalty 
+            else:
+                r, terminal, result = env.get_reward_and_terminate(step, scaled_action, policy_list)   # 211221 for backward penalty 
             ep_reward += r
             global_step += 1
 
@@ -375,6 +380,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     last_v_r, _, _, _, _, _, _, _ = generate_action_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, to_go_goal=to_go_goal, mode=test_policy)
                 elif policy_list=='baseline_ours_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, Sensor_map=Sensor_map, LM_stack=LM_stack, mode=test_policy)
+                elif policy_list == 'corl':
+                    last_v_r, _, _, _, _ = generate_action_corl(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
@@ -556,7 +563,23 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         buff = []
                         global_update += 1
 
+                elif policy_list=='corl':
+                    buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
 
+                    memory_size += 1
+
+                    if len(buff) > HORIZON - 1:
+                        s_batch, goal_batch, speed_batch, a_batch, r_batch, d_batch, l_batch, v_batch = \
+                            transform_buffer(buff=buff)
+                        t_batch, advs_batch = generate_train_data(rewards=r_batch, gamma=GAMMA, values=v_batch,
+                                                                last_value=last_v_r, dones=d_batch, lam=LAMDA)
+                        memory = (s_batch, goal_batch, speed_batch, a_batch, l_batch, t_batch, v_batch, r_batch, advs_batch)
+                        ppo_update_stage1(policy=policy, optimizer=optimizer, batch_size=BATCH_SIZE, memory=memory,
+                                                epoch=EPOCH, coeff_entropy=COEFF_ENTROPY, clip_value=CLIP_VALUE, num_step=HORIZON,
+                                                num_env=1, frames=LASER_HIST,
+                                                obs_size=OBS_SIZE, act_size=ACT_SIZE)
+                        buff = []
+                        global_update += 1     
                 ############## original method ######################################################
                 else:
                     buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
@@ -716,6 +739,9 @@ if __name__ == '__main__':
         elif policy_list == 'baseline_ours_LM':   # 220124
             policy_path = 'policy'
             policy = baseline_ours_LM_Policy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'corl':
+            policy_path = 'policy'
+            policy = CORLPolicy(frames=LASER_HIST, action_space=2)
         else:
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)
