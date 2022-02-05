@@ -32,8 +32,8 @@ MAX_EPISODES = 5000     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
-#HORIZON=1024*3      # chuseok before
-HORIZON = 1024    # v3            # 220111 TODO as 2048
+HORIZON=1024*3      # chuseok before
+#HORIZON = 1024    # v3            # 220111 TODO as 2048
 #HORIZON = 512
 
 GAMMA = 0.99
@@ -58,7 +58,8 @@ DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 #policy_list = 'baseline_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = 'baseline_ours_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
@@ -120,8 +121,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         done_list = []
         for i in range(num_human):
             done_list.append(False)
-                    
-        rule = 'group_circle_crossing'  # crossing
+        
+        rule = env.rule            
+        #rule = 'group_circle_crossing'  # crossing
+        print(rule)
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
@@ -197,7 +200,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i, done in enumerate(done_list):
                 if done:
                     env.control_vel_specific((0,0),i)
-                    env.control_pose_specific((init_goals[i][0]+0.01,init_goals[i][1]+0.01,0), i)
+                    #env.control_pose_specific((init_goals[i][0]+0.01,init_goals[i][1]+0.01,0), i)
                     
             #print(robot_state[0][1], robot_state[0][2])
         
@@ -395,11 +398,17 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             
             
             # 220110 reset human pose when collision arise
+            # 사람끼리 충돌다면 현 위치에서 계산된 속도를 반대로 빼줘서 후진하듯이 피하는 느낌 # 220205
             for i, crash in enumerate(env.crash_list):
                 #print(i, crash, human_actions[i][1], human_actions[i][0])
                 if i != 0 and crash == 1:
-                    env.control_pose_specific(init_poses[i], i)
-                
+                    #print('고장난놈:',i,pose_list[i])
+                    anglss = np.arctan2(pose_list[i][1], pose_list[i][0])
+                    env.control_pose_specific([pose_list[i][0]-(speed_poly_list[i][0]/10),pose_list[i][1]-(speed_poly_list[i][1]/10),anglss], i)
+                    
+            
+            
+                            
             if env.index == 0 and not (step == 1 and terminal) and not_update_policy is not True:
                 ############## LM or stacekd LM ######################################################
                 if policy_list =='LM':
@@ -635,7 +644,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             diff_dist_length = np.linalg.norm(diff_dist, axis=1)
             #print(diff_dist_length)
             for i, dist in enumerate(diff_dist_length):
-                if dist < 0.15 and i != 0:
+                if dist < env.goal_size and i != 0:   # 0.5
                     done_list[i] = True
                     
             #print(done_list)
@@ -757,10 +766,10 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load model
-        file = policy_path + '/Stage1d'
-        #file = policy_path + '/Stage1'
-        file_tot = policy_path + '/Stage1_tot'
-        #file_tot = policy_path + '/Stage1_5_tot'
+        #file = policy_path + '/Stage1d'
+        file = policy_path + '/Stage1'
+        #file_tot = policy_path + '/Stage1_tot'
+        file_tot = policy_path + '/Stage1_5_tot'
         if os.path.exists(file):
             logger.info('####################################')
             logger.info('########Loading Model###############')

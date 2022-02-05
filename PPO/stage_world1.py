@@ -58,21 +58,40 @@ class StageWorld():
         self.init_pose = None
         self.flow_map = None  # 211026
         
-        # Initialize Groups and Humans  # 220103
-        self.num_human = 6        # VERY SIMPLE SCENE (5 circle cross individual)
-        #self.num_human = 11
-        #self.num_human = 14      # 
-        #self.num_human = 22     # 220111(+14)
+        self.time_limit = 750
         
-        self.groups = [0, 1, 2, 3, 4, 5]
-        #self.groups = [0, 1, 2, 3]
-        #self.groups = [0, 1, 2, 3, 4]       # 220110
-        #self.groups = [0, 1, 2, 3, 4, 5]   # 220111
+        # 1.Select scenario
+        self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3
+              
+        if self.scenario == 'GrpCorridor_h8_grp3':
+            self.rule = 'group_corridor_crossing'
+            self.num_human = 9        # Corridor, h8, grp2
+            self.groups = [0, 1, 2, 3]              # Corridor, h8, grp2 
+            self.human_list = [[0],[1,2,3],[4,5],[6,7,8]]        # Corridor, h8, grp2
+            self.time_limit = 500
+        elif self.scenario == 'CC_h5':
+            self.rule = 'group_circle_crossing'
+            self.num_human = 6        # Corridor, h8, grp2
+            self.groups = [0, 1, 2, 3, 4, 5]    # CC, h5
+            self.human_list = [[0],[1],[2],[3],[4],[5]]     # CC, h5
+        elif self.scenario == 'GrpCC_h10_grp3':
+            self.rule = 'group_circle_crossing'
+            self.num_human = 11       # GC, h10, grp3
+            self.groups = [0, 1, 2, 3]           # GC, h10, grp3
+            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]                  # GC, h10, grp3
+        elif self.scenario == 'GrpCC_h13_grp4':
+            self.rule = 'group_circle_crossing'
+            self.num_human = 14      # GC, h13, grp4          현재씬
+            self.groups = [0, 1, 2, 3, 4]       # GC, h13, grp4        현재씬
+            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]             # GC, h13, grp4       현재씬
+        elif self.scenario == 'GrpCC_h21_grp5':
+            self.rule = 'group_circle_crossing'
+            self.num_human = 22      # GC, h21, grp5
+            self.groups = [0, 1, 2, 3, 4, 5]    # GC, h21, grp5
+            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # GC, h21, grp5
+        else:
+            print('Wrong Scenario')
         
-        self.human_list=[[0],[1],[2],[3],[4],[5]]
-        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]
-        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]                               # 220110
-        #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # 220111
         
         # Define Subscriber
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
@@ -372,8 +391,6 @@ class StageWorld():
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
         reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
         #reward_g = (self.pre_distance - self.distance) * 1.5  # REWARD for moving forward, later reach goal reward(+15)
-        #if reward_g<0:
-        #    reward_g =0
         reward_c = 0  # collision penalty
         reward_w = 0  # too much rotation penalty
         result = 0
@@ -391,11 +408,11 @@ class StageWorld():
             #reward_c = -30.
             result = 'Crashed(ROS)'
         
-        min_dist_rrr = 10.0   # 220119
         # 220119 Collision check by rel.dist around 360 degree
+        
+        min_dist_rrr = 10.0   # 220119
         pose_list_np = np.array(self.pose_list)
         rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
-        '''
         # 220124 disabled for 더 높은 성공률 위해
         for i in rel_dist_list[1:]:
             min_dist = np.sqrt(i[0]**2+i[1]**2)
@@ -406,17 +423,7 @@ class StageWorld():
                 reward_c = -15.
                 result = 'Crashed(Compuatation)'
                 break
-        '''
-            
-        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
-        kkk = self.get_min_lidar_dist()
-        #print(kkk, min_dist_rrr)
-        penalty_lidar = 0.
-        if kkk <= 1.0:
-            penalty_lidar = (-1. + kkk)/10
         
-        # 220119. timestep penalty
-        #constant_penalty = -0.005
         
         '''
         # Lidar collsion check 211215
@@ -427,26 +434,34 @@ class StageWorld():
             reward_c = -15.
             result = 'Crashed(LIDAR)'
         '''
+    
+        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
+        kkk = self.get_min_lidar_dist()
+        #print(kkk, min_dist_rrr)
+        penalty_lidar = 0.
+        if kkk <= 1.0:
+            penalty_lidar = (-1. + kkk)/10
         
+        # 220119. timestep penalty
+        #constant_penalty = -0.005
+        
+        # ROTATION PENALTY       
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
             #reward_w = -0.45 * np.abs(w) **2
 
+        '''
         # 211221 add a penalty for going backwoards
         if scaled_action[0]<0:
             r_back = -0.45 * np.abs(scaled_action[0])
         else:
             r_back = 0
-
-        if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
-        #if t > 700:  # 220107
+        '''
+        #print(self.time_limit)
+        if t > self.time_limit:  # timeout check  220205 For Group corridor
+        #if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
             terminate = True      
             result = 'Time out'
-        
-        '''    # for future lidar collision penalty
-        if (self.scan_min > self.robot_radius[0]) and (self.scan_min < (self.lidar_danger+self.robot_radius[0])):
-            reward_ct = -0.25*((self.lidar_danger+self.robot_radius[0]) - self.scan_min)
-        '''            
         
         #print(idx, g_cluster[0], g_cluster)
         # 211231 compute distance from robot to convex hull of groups
@@ -478,11 +493,7 @@ class StageWorld():
         #reward = reward_g + reward_c + reward_w  # original befrom 220119
         #reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added
         #reward = reward_g + reward_c + reward_w + r_back # 211221   # raw policy에서 뒤로 갈때 페널티
-        '''
-        else:  # TODO time penalty
-            reward_t = -0.1
-        '''
-        #print('reward:',reward)
+
         return reward, terminate, result   # float, T or F(base), description
     
     def boundary_dist(self, velocity, rel_ang, laser_flag, const=0.354163):
@@ -590,6 +601,7 @@ class StageWorld():
         [x, y, theta] = self.get_self_stateGT()     # "updated" current state
         [v, w] = self.get_self_speedGT()            # updated current velocity
         self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
+        
         # Propotional Reward
         self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
         reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
@@ -608,27 +620,41 @@ class StageWorld():
             reward_c = -15.
             result = 'Crashed(ROS)'
         
-        min_dist_rrr = 10.0   # 220119
-        # 220119 Collision check by rel.dist around 360 degree
-        pose_list_np = np.array(self.pose_list)
-        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
-            
+        
+        '''
         # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
         kkk = self.get_min_lidar_dist()
         penalty_lidar = 0.
         if kkk <= 1.0:
             penalty_lidar = (-1. + kkk)/10
+        '''
         
+        
+        
+        min_dist_rrr = 10.0   # 220119
+        pose_list_np = np.array(self.pose_list)
+        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
+        # 220124 disabled for 더 높은 성공률 위해
+        for i in rel_dist_list[1:]:
+            min_dist = np.sqrt(i[0]**2+i[1]**2)
+            if min_dist < min_dist_rrr:
+                min_dist_rrr = min_dist
+            if min_dist < 0.6:
+                terminate = True
+                reward_c = -15.
+                result = 'Crashed(Compuatation)'
+                break
+
+        # ROTATION PENALTY        
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
-        # 211221 add a penalty for going backwoards
-        if scaled_action[0]<0:
-            r_back = -0.45 * np.abs(scaled_action[0])
-        else:
-            r_back = 0
 
-        if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
+        # STATIC TIME PENALTY            
+        reward_static_time = -0.01
+
+        if t > self.time_limit:  # timeout check  220205 For Group corridor
+        #if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
             terminate = True      
             result = 'Time out'
         
@@ -677,10 +703,8 @@ class StageWorld():
             grp_space_vertices = np.array(grp_space[i])
             plt.plot(grp_space_vertices[:,0],grp_space_vertices[:,1])
             
-        #plt.axis([-3, 3, 0, 6])    
+        plt.axis([-3, 3, 0, 6])    
         #plt.show()
-        
-        #print('---------------')
         
         #print(indiv_space.shape)      # (num_of_indiv, vertice numbers, (pos))   3, 20, 2
         
@@ -718,21 +742,22 @@ class StageWorld():
         #print('그룹 리웓 리스트:', reward_grp_list)
         
         reward_grp_sum=0.
-        safe_grp_dist = 1
+        safe_grp_dist = 2
         for i in reward_grp_list:
             reward_grp = i-safe_grp_dist
             if reward_grp >=0:
                 pass
             else:
                 reward_grp_sum += reward_grp
-        #print('그룹 리워드 리스트:',reward_grp_list)
         #print('그룹 리워드 섬:',reward_grp_sum)
 
-        
 
-        #reward = reward_g + reward_c + reward_w
-        # OURS reward
-        reward = reward_g + reward_c + reward_w + reward_grp_sum
+        
+        
+        # OURS final reward
+        reward = reward_g + reward_c + reward_w    # baseline reward
+        #reward = reward_g + reward_c + reward_w + reward_grp_sum # + reward_static_time
+        #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
 
         return reward, terminate, result   # float, T or F(base), description
     
@@ -1035,8 +1060,16 @@ class StageWorld():
                     init_pose_list.append([px,py,theta])
                     init_goal_list.append([gx,gy])
                     
-        elif rule == 'square_crossing':   #         Rule square_crossing: generate start/goal position at two sides of y-axis
-            pass
+        elif rule == 'group_corridor_crossing':   #         Rule square_crossing: generate start/goal position at two sides of y-axis
+            init_pose_list=[[0,-8,np.pi/2],
+                            [-4,8,np.pi*3/2],[-2,8,np.pi*3/2],[-0,8,np.pi*3/2],
+                            [2,5,np.pi*3/2],[4,5,np.pi*3/2],
+                            [-1,11,np.pi*3/2],[0,11,np.pi*3/2],[1,11,np.pi*3/2]]
+            init_goal_list=[[0,8],
+                            [-4,-8],[-2,-8],[-0,-8],
+                            [2,-8],[4,-8],
+                            [-1,-11],[0,-11],[1,-11]]
+
         elif 'circle_crossing':
             pass
 

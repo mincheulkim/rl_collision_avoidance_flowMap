@@ -8,6 +8,8 @@ speedup 5
 #speedup 1
 #speedup -1
 
+#interval_sim 100 # simulation timestep in milliseconds
+
 
 define sicklaser ranger
 (
@@ -47,20 +49,21 @@ define floorplan model
   obstacle_return 1
 )
 
+# load an environment bitmap
 floorplan
 (
-  name "Group Circle"
-  size [22.000 22.000 0.800]            # floor size
+  name "Group_Corridor"
+  size [11.000 24.000 0.800]            # floor size
   pose [0.000 0.000 0.000 0.000]
-  bitmap "rink.png"
+  bitmap "corridor.png"
 )
 
 window
 (
-  size [799 800]         # (important) total window size
+  size [600 600]         # (important) total window size. in pixels
   
 # Camera options 
-  scale 35.000          
+  scale 35.000           # pixels per meter
   #center [-2.661  -1.640]
   center [ 0.000  0.000]
   #rotate [ 0.000  -32.000 ]
@@ -87,10 +90,13 @@ window
 define agent position
 (
   # actual size
-  size [0.4 0.4 0.4] # sizes from MobileRobots' web site
-  #size [0.380 0.380 0.220] # sizes from MobileRobots' web site
+  #size [0.4 0.4 0.4] # sizes from MobileRobots' web site
+  size [0.380 0.380 0.220] # sizes from MobileRobots' web site
 
   localization "gps"
+  #localization "odom"   # 220204 work?
+  
+  
   # the pioneer's center of rotation is offset from its center of area
   origin [0.000 0.000 0.000 0.000]
 
@@ -101,7 +107,7 @@ define agent position
   drive "diff"		 	# Differential steering model.
   obstacle_return 1           	# Can hit things.
   #ranger_return 0.500            	# reflects sonar beams
-  ranger_return 1.000            	# reflects sonar beams
+  ranger_return 1            	# 220204 what if?
   blob_return 1               	# Seen by blobfinders  
   fiducial_return 1           	# Seen as "1" fiducial finders
   sicklaser(
@@ -144,43 +150,29 @@ define human position
   # acceleration_bounds [-0.5 0.5 0 0 0 0 -90 90.0 ]
   )
 
+
+
 # for init fixed pose start
 # For robot(index=0)
 agent( pose [0.00 -8.00 0.00 90.00] name "robot" color "red")
 
 # Total 10 humans
 # Total 3 Groups
-# ref. Don't be Rude! Learning Group-aware Policies for Robot Navigation
-# Group 1: 5 humans
-agent( pose [-5.00 -5.00 0.00 45.00] color "cyan")   # human1, Leader
-agent( pose [-6.00 -5.00 0.00 45.00] color "yellow")  # human2
-agent( pose [-5.00 -6.00 0.00 45.00] color "yellow")  # human3
-agent( pose [-6.00 -6.00 0.00 45.00] color "yellow")  # human4
-agent( pose [-5.50 -5.50 0.00 45.00] color "yellow")  # human5
+# each group human come start from north to south
+# Group 1: 3 humans
+agent( pose [-4.00 8.00 0.00 270.00] color "yellow")   # human1, Leader
+agent( pose [-2.00 8.00 0.00 270.00] color "yellow")  # human2
+agent( pose [-0.00 8.00 0.00 270.00] color "yellow")  # human3
 
-# Group 2: 3 humans
-agent( pose [-5.00 5.00 0.00 315.00] color "black")    # human6, Leader
-agent( pose [-6.00 5.00 0.00 315.00] color "black")    # human7
-agent( pose [-5.00 6.00 0.00 315.00] color "black")    # human8
+# Group 2: 2 humans
+agent( pose [2.00 5.00 0.00 270.00] color "black")    # human4, Leader
+agent( pose [4.00 5.00 0.00 270.00] color "black")    # human5
 
 
 # Group 3: 2 humans
-agent( pose [7.00 0.00 0.00 225.00] color "blue")     # human9
-agent( pose [8.00 0.00 0.00 225.00] color "blue")     # human10
+agent( pose [-1.00 11.00 0.00 270.00] color "blue")     # human6
+agent( pose [0.00 11.00 0.00 270.00] color "blue")     # human7
+agent( pose [1.00 11.00 0.00 270.00] color "blue")     # human8
 
-# Group 4: 3 humans
-agent( pose [0.00 0.00 0.00 225.00] color "green")
-agent( pose [0.00 1.00 0.00 225.00] color "green")
-agent( pose [1.00 0.00 0.00 225.00] color "green")
-
-# Group 5: 8 humans
-#agent( pose [4.00 4.00 0.00 225.00])
-#agent( pose [4.00 5.00 0.00 225.00])
-#agent( pose [4.00 3.00 0.00 225.00])
-#agent( pose [3.00 3.00 0.00 225.00])
-#agent( pose [3.00 4.00 0.00 225.00])
-#agent( pose [0.00 6.00 0.00 225.00])
-#agent( pose [1.00 6.00 0.00 225.00])
-#agent( pose [-1.00 6.00 0.00 225.00])
 
 

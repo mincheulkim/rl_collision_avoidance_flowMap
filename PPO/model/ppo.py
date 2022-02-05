@@ -1425,7 +1425,7 @@ def generate_action_human_groups(env, pose_list, goal_global_list, num_env):
     return scaled_action
 
 def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_visible, grp_list):   # 211221    
-    human_max_speed = 1.0
+    human_max_speed = 0.8
     p_list = []
     scaled_action = []
     scaled_position = []
@@ -1442,6 +1442,7 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             hv = goal_global_list[i] - p_list[i] 
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
             prefv=hv/hs if hs >human_max_speed else hv
+            prefv *= human_max_speed
             initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
         # ROLLBACK
         # 2. group #################################
@@ -1485,7 +1486,11 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         for i in range(num_env):  # i=0, 1,2,3,4        
             hv = goal_global_list[i] - p_list[i] 
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+            #print(i,'hs:',hs, human_max_speed)
             prefv=hv/hs if hs >human_max_speed else hv
+            #print(i,'prefv:',prefv)
+            prefv *= human_max_speed
+            #print(i,'after_prefv:',prefv)
             initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
         
         groupss = copy.deepcopy(grp_list)          # 220119
