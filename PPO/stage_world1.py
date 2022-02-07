@@ -60,8 +60,12 @@ class StageWorld():
         
         self.time_limit = 750
         
+        # 0. scanning method
+        self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
+        
         # 1.Select scenario
         self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3
+        #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -739,10 +743,10 @@ class StageWorld():
             #print(dist, np.min(dist))
             reward_grp_list.append(np.min(dist))
         #print(grp_labels)
-        #print('그룹 리웓 리스트:', reward_grp_list)
+        #print('그룹 라벨:',grp_labels,'그룹 리웓 리스트:', reward_grp_list)
         
         reward_grp_sum=0.
-        safe_grp_dist = 2
+        safe_grp_dist = 2.
         for i in reward_grp_list:
             reward_grp = i-safe_grp_dist
             if reward_grp >=0:
@@ -753,10 +757,8 @@ class StageWorld():
 
 
         
-        
         # OURS final reward
-        reward = reward_g + reward_c + reward_w    # baseline reward
-        #reward = reward_g + reward_c + reward_w + reward_grp_sum # + reward_static_time
+        reward = reward_g + reward_c + reward_w + reward_grp_sum# + reward_static_time
         #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
 
         return reward, terminate, result   # float, T or F(base), description

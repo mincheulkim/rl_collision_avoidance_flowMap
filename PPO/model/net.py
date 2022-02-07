@@ -109,6 +109,12 @@ class CORLPolicy(nn.Module):
         self.crt_fc1 = nn.Linear(128*32, 256)
         self.crt_fc2 = nn.Linear(256+2+2, 128)
         self.critic = nn.Linear(128, 1)
+        
+        # nn.Conv2d(in_channels=3, out_channels=64, kenel_size=5, stride=2, padding=1)
+        # nn.Conv2d(in_channels=64, out_channels=64, kenel_size=5, stride=1, padding=1)
+        # nn.Conv2d(in_channel=64, out_channel=32, kenel_size=3, stride=2, padding=1)
+        # nn.Linear(?, 512)
+        # nn.Linear(512, 256)
 
     def forward(self, x, goal, speed):
         """

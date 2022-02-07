@@ -13,6 +13,7 @@ import cv2
 import copy
 
 from dbscan.dbscan_new import DBSCAN_new
+from dbscan.hdbscan_new import HDBSCAN_new
 
 
 
@@ -271,7 +272,7 @@ def generate_action(env, state_list, policy, action_bound, mode=False):
     
     return v, a, logprob, scaled_action
 
-def generate_action_corl(env, state_list, pose_list, velocity_list, policy, action_bound, mode=False):
+def generate_action_corl(env, state_list, pose_list, velocity_list, policy, action_bound, clustering, mode=False):
 
     s_list, goal_list, speed_list = [], [], []
     for i in state_list:
@@ -332,23 +333,46 @@ def generate_action_corl(env, state_list, pose_list, velocity_list, policy, acti
         mod_diff_y = dy_rot
 
         if np.abs(mod_diff_x)<=3.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
-            inn=True
-            visible_ped_pose_list.append([mod_diff_x, mod_diff_y])
-            visible_ped_poly_vel_list.append([dvx_rot,dvy_rot])
+            #print(mod_diff_x,mod_diff_y,dvx_rot,dvy_rot)
+            #print(i,'의 포즈:',[mod_diff_x,mod_diff_y])
+            xx=copy.deepcopy(mod_diff_x)
+            yy=copy.deepcopy(mod_diff_y)
+            vx=copy.deepcopy(dvx_rot)
+            vy=copy.deepcopy(dvy_rot)
+            visible_ped_pose_list.append([xx, yy])
+            visible_ped_poly_vel_list.append([vx,vy])
             pose_encoding[i]=i
             pedestrain_list[i,4]=i # init grp index
             pedestrain_list[i,5]=i # init grp index
             pedestrain_list[i,6]=1 # visible human
+            #print(i,'인서트 후 리스트:',visible_ped_pose_list,visible_ped_poly_vel_list)
+    #print('페드 포드:',visible_ped_pose_list,'페도벨:',visible_ped_poly_vel_list)
+    
+    
 
-    if visible_ped_poly_vel_list != [] and visible_ped_poly_vel_list != []:
-        dbscan_new = DBSCAN_new(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list),2,2)
-        labels = dbscan_new.grouping(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list))
+    if visible_ped_pose_list != [] and visible_ped_poly_vel_list != []:
+        if clustering=='DBSCAN':
+        # original DBSCAN_new  before 220207
+            dbscan_new = DBSCAN_new(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list),2,2)
+            labels = dbscan_new.grouping(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list))
+            #print('라벨:',labels)   # e.g. [0,1,1]
+        # after HDBSCAN* 220708
+        elif clustering == 'HDBSCAN':
+            hdbscan_new = HDBSCAN_new(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list),2,2)
+            
+            labels = hdbscan_new.grouping(np.array(visible_ped_pose_list), np.array(visible_ped_poly_vel_list))
+            #print('라벨:',labels)   # e.g. [0,1,1]
+        else:
+            print('clustering error')
         idx = labels
-    row,axis= np.where(pedestrain_list[:,4:5]!=0.)
-
+    row,axis= np.where(pedestrain_list[:,4:5]!=0.)   # init_grp_index is not 0
+    
+    
+    
     for indexx, i in enumerate(row):
-        pedestrain_list[i,5]=labels[indexx]+1
+        pedestrain_list[i,5]=labels[indexx]+1   # 식별된 그룹 labels [0,0,1] -> [1,1,2] in row_num in pedestrain_list
         
+    
     #pedestrain_list = [pedestrain_list]
     pedestrain_list = np.array(pedestrain_list)
         

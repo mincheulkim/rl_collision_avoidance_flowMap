@@ -27,8 +27,8 @@ from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
-#MAX_EPISODES = 5000   # For Train    5000
-MAX_EPISODES = 5000     # For Test
+MAX_EPISODES = 5000   # For Train    5000
+#MAX_EPISODES = 100     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
@@ -56,30 +56,29 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-#policy_list = 'baseline_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-#policy_list = 'baseline_ours_LM'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
 not_update_policy = False
+#not_update_policy = True
 
 
 # For fixed Randomization  211230
 import random
 
-#if test_policy:
-'''
-print('TEST(EVALUATION) MODE')
-SEED = 1234  # for training
-#SEED = 4321 # for test
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-torch.cuda.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-'''
+if test_policy:
+
+    print('TEST(EVALUATION) MODE')
+    SEED = 1234  # for training
+    #SEED = 4321 # for test
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+
 
 
 
@@ -124,7 +123,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         
         rule = env.rule            
         #rule = 'group_circle_crossing'  # crossing
-        print(rule)
+        print('시나리오:',rule)
+        if policy_list == 'corl':
+            print('클러스터링 방법:;',env.clustering_method)
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
@@ -239,7 +240,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             elif policy_list=='baseline_ours_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list == 'corl':
-                v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, mode=test_policy)
+                v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
@@ -384,7 +385,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 elif policy_list=='baseline_ours_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, Sensor_map=Sensor_map, LM_stack=LM_stack, mode=test_policy)
                 elif policy_list == 'corl':
-                    last_v_r, _, _, _, _ = generate_action_corl(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, mode=test_policy)
+                    last_v_r, _, _, _, _ = generate_action_corl(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
 
