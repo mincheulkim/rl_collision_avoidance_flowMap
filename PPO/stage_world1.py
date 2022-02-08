@@ -64,8 +64,9 @@ class StageWorld():
         self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
         
         # 1.Select scenario
-        self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3
-        #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3
+        #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -73,6 +74,15 @@ class StageWorld():
             self.groups = [0, 1, 2, 3]              # Corridor, h8, grp2 
             self.human_list = [[0],[1,2,3],[4,5],[6,7,8]]        # Corridor, h8, grp2
             self.time_limit = 500
+        
+        elif self.scenario == 'GrpCross_h14_grp4':
+            self.rule = 'group_cross_crossing'
+            self.num_human = 15        # Corridor, h8, grp2
+            self.groups = [0, 1, 2, 3, 4]    # CC, h5
+            self.human_list = [[0],[1,2,3,4],[5,6,7],[8,9,10,11,12],[13,14]]     # CC, h5
+            self.time_limit = 500
+            
+            
         elif self.scenario == 'CC_h5':
             self.rule = 'group_circle_crossing'
             self.num_human = 6        # Corridor, h8, grp2
@@ -85,9 +95,9 @@ class StageWorld():
             self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10]]                  # GC, h10, grp3
         elif self.scenario == 'GrpCC_h13_grp4':
             self.rule = 'group_circle_crossing'
-            self.num_human = 14      # GC, h13, grp4          현재씬
-            self.groups = [0, 1, 2, 3, 4]       # GC, h13, grp4        현재씬
-            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]             # GC, h13, grp4       현재씬
+            self.num_human = 14      # GC, h13, grp4          
+            self.groups = [0, 1, 2, 3, 4]       # GC, h13, grp4        
+            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13]]             # GC, h13, grp4       
         elif self.scenario == 'GrpCC_h21_grp5':
             self.rule = 'group_circle_crossing'
             self.num_human = 22      # GC, h21, grp5
@@ -1071,6 +1081,17 @@ class StageWorld():
                             [-4,-8],[-2,-8],[-0,-8],
                             [2,-8],[4,-8],
                             [-1,-11],[0,-11],[1,-11]]
+        elif rule == 'group_cross_crossing':
+            init_pose_list=[[0,-8,np.pi/2],
+                            [-16,1.4,0],[-15.5,0.7,0],[-15.5,-0.7,0],[-16.0, -1.4, 0],
+                            [-8.0,0,0],[-8.0,-1.0,0],[-7.0,-1.0,0],
+                            [9.2,0.7,np.pi],[8.0,0.0,np.pi],[8.7,-0.6,np.pi],[9.0,-1.2,np.pi],[10.0,0.0,np.pi],
+                            [13.0,1.6,np.pi],[13.2,1.0,np.pi]]
+            init_goal_list=[[0,8],
+                            [16,-1.4],[16.0,-0.7],[16.0,0.7],[16.0, 1.4],
+                            [16.0,0],[16.0,1.0],[16.0,1.0],
+                            [-16.2,-0.7],[-16.0,0.0],[-16.7,0.6],[-16.0,1.2],[-16.5,0.0],
+                            [-16.0,-1.6],[-16.2,-1.0]]
 
         elif 'circle_crossing':
             pass

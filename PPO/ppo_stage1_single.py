@@ -253,7 +253,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(scaled_action, i)
-                    #env.control_vel_specific([0.8,0], i)
+                    #env.control_vel_specific([0.0,0], i)
                 else:
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
@@ -403,9 +403,20 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             for i, crash in enumerate(env.crash_list):
                 #print(i, crash, human_actions[i][1], human_actions[i][0])
                 if i != 0 and crash == 1:
-                    #print('고장난놈:',i,pose_list[i])
+                    #print('고장난놈:',i,pose_list[i],'의 속도:',speed_poly_list[i],'의 골:',goal_global_list[i])
                     anglss = np.arctan2(pose_list[i][1], pose_list[i][0])
-                    env.control_pose_specific([pose_list[i][0]-(speed_poly_list[i][0]/10),pose_list[i][1]-(speed_poly_list[i][1]/10),anglss], i)
+                    diff = goal_global_list[i]-pose_list[i][:2]
+                    diff_mag = np.linalg.norm(diff)
+                    diff = diff / diff_mag
+                    #print('딥:',diff)
+                    dx = np.random.rand(2)
+                
+                    #env.control_vel_specific([-diff[0]*2,-diff[1]*2], i)
+                    
+                    env.control_pose_specific([pose_list[i][0]-(dx[0]/10),pose_list[i][1]-(dx[1]/10),anglss+np.pi], i)
+                    #env.control_pose_specific([pose_list[i][0]-(diff[0]/10),pose_list[i][1]-(diff[1]/10),anglss], i)
+                    #env.control_pose_specific([pose_list[i][0]-(0.1),pose_list[i][1]-(0.1),anglss], i)
+                    
                     
             
             
