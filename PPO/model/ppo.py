@@ -1448,7 +1448,7 @@ def generate_action_human_groups(env, pose_list, goal_global_list, num_env):
     
     return scaled_action
 
-def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_visible, grp_list):   # 211221    
+def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_visible, grp_list, scenario):   # 211221    
     human_max_speed = 0.8
     p_list = []
     scaled_action = []
@@ -1473,17 +1473,23 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         groups = grp_list          # 220118
 
         # 3. assign obstacles
-        #obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
-        #obs = [[-3,-3,3,-3],[3,-3,3,3],[3,3,-3,3],[-3,3,-3,-3]]
-        obs = [[2.5,20,3,3],[2.5,20,-3,-3],[-2.5,-20,3,3],[-2.5,-20,-3,-3],[2.5,2.5,-3,-15],[2.5,2.5,3,15],[-2.5,-2.5,-3,-15],[-2.5,-2.5,3,15]]   # x1,x2,y1,y2
+
         psf_sim = None
         
-        # 4. initiate simulator
-        psf_sim = psf.Simulator(
-                initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
-                #initial_state, groups=groups, obstacles=obs, config_file="./pysocialforce/config/example.toml"
-                # TOML doesn't work. modify directly pysocialforce/scene.py
+        if scenario == 'GrpCross_h14_grp4':
+            obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2        
+            psf_sim = psf.Simulator(
+            initial_state, groups=groups, obstacles=obs, config_file="./pysocialforce/config/example.toml"
             )
+        else:
+            psf_sim = psf.Simulator(
+            initial_state, groups=groups, obstacles=None, config_file="./pysocialforce/config/example.toml"
+            # TOML doesn't work. modify directly pysocialforce/scene.py
+            )
+        
+
+        # 4. initiate simulator
+
         # do 1 updates
         psf_sim.step(n=1)
         ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
@@ -1529,12 +1535,15 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
                 group_d[i]=group_d[i]-1
             groups_ex_human.append(group_d)
             
-        #obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
+        if scenario == 'GrpCross_h14_grp4':
+            obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
         
-        psf_sim = psf.Simulator(
-                initial_state[1:], groups=groups_ex_human, obstacles=None, config_file="./pysocialforce/config/example.toml"
-                #initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
-            )
+            psf_sim = psf.Simulator(
+                initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
+                )
+        else:
+            psf_sim = psf.Simulator(initial_state[1:], groups=groups_ex_human, obstacles=None, config_file="./pysocialforce/config/example.toml"
+                )
         # do 1 updates
         psf_sim.step(n=1)
         ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau

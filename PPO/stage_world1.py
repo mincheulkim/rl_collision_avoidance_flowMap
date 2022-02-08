@@ -61,12 +61,14 @@ class StageWorld():
         self.time_limit = 750
         
         # 0. scanning method
-        self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
+        #self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
+        self.clustering_method = 'HDBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
         
         # 1.Select scenario
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
-        self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
