@@ -510,7 +510,7 @@ class StageWorld():
         # 220124
         if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM' or policy_list=='depth_LM' or policy_list=='baseline_LM' or policy_list=='baseline_ours_LM' or policy_list=='ours_LM':
             reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
-        elif policy_list == '':
+        elif policy_list == '' or policy_list =='ORCA':
             reward = reward_g + reward_c + reward_w
         #reward = reward_g + reward_c + reward_w  # original befrom 220119
         #reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added

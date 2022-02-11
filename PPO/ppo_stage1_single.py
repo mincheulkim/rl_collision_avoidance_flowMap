@@ -56,8 +56,9 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
@@ -179,7 +180,10 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly_list =np.array(speed_poly_list)
                         
             # generate humans action
-            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible, grp_list=env.human_list, scenario=env.scenario)
+            if policy_list == 'ORCA':
+                human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=True, grp_list=env.human_list, scenario=env.scenario)
+            else:
+                human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible, grp_list=env.human_list, scenario=env.scenario)
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -249,12 +253,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
 
-            # distribute and execute actions robot and humans
-            for i in range(num_human):
-                if i==0:
-                    env.control_vel_specific(scaled_action, i)
-                    #env.control_vel_specific([0.0,0], i)
-                else:
+            if policy_list == 'ORCA':
+                for i in range(num_human):
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
                     diff = angles - pose_list[i,2]
@@ -270,6 +270,28 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     scaled_action = (length, diff)   
                     
                     env.control_vel_specific(scaled_action, i)
+            else:
+                # distribute and execute actions robot and humans
+                for i in range(num_human):
+                    if i==0:
+                        env.control_vel_specific(scaled_action, i)
+                        #env.control_vel_specific([0.0,0], i)
+                    else:
+                        angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
+                        #diff = angles - rot   # problem
+                        diff = angles - pose_list[i,2]
+                        # fix SF rotational issus 211222
+                        if diff<=-np.pi:
+                                #diff = np.pi+(angles-np.pi)-rot
+                                diff = (2*np.pi)+diff
+                        elif diff>np.pi:
+                                #diff = -np.pi-(np.pi+angles)-rot
+                                diff = diff - (2*np.pi)
+                        
+                        length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
+                        scaled_action = (length, diff)   
+                        
+                        env.control_vel_specific(scaled_action, i)
                     
             # rate.sleep()
             rospy.sleep(0.001)
@@ -763,11 +785,14 @@ if __name__ == '__main__':
         elif policy_list == 'corl':
             policy_path = 'policy'
             policy = CORLPolicy(frames=LASER_HIST, action_space=2)
+        elif policy_list == 'ORCA':
+            policy_path = 'policy'
+            policy = CNNPolicy(frames=LASER_HIST, action_space=2)
         else:
             policy_path = 'policy'
             # policy = MLPPolicy(obs_size, act_size)
             policy = CNNPolicy(frames=LASER_HIST, action_space=2)
-        print(policy)
+        print('폴리시:',policy_list, policy)
         policy.cuda()
 
         opt = Adam(policy.parameters(), lr=LEARNING_RATE)
