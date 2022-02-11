@@ -58,16 +58,22 @@ class StageWorld():
         self.init_pose = None
         self.flow_map = None  # 211026
         
-        self.time_limit = 750
+        #self.time_limit = 750  # before 220210
+        self.time_limit = 500   # after 220210
         
         # 0. scanning method
-        #self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
-        self.clustering_method = 'HDBSCAN' # 'DBSCAN' befor 220207 or 'HDBSCAN'
+        #self.clustering_method = 'DBSCAN' # 'DBSCAN' befor 220207
+        self.clustering_method = 'HDBSCAN' # 'HDBSCAN' after 220207
         
         # 1.Select scenario
+        ##Simple scenario
+        #self.scenario = 'CC_h5' 
+        ## Narrow corrido
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        ## Group Circle Cross
         #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        ## Group Cross Cross(십자)
         #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
               
         if self.scenario == 'GrpCorridor_h8_grp3':
@@ -665,10 +671,6 @@ class StageWorld():
         if np.abs(w) >  1.05:               # rotation penalty
             reward_w = -0.1 * np.abs(w)
 
-
-        # STATIC TIME PENALTY            
-        reward_static_time = -0.01
-
         if t > self.time_limit:  # timeout check  220205 For Group corridor
         #if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
             terminate = True      
@@ -703,10 +705,11 @@ class StageWorld():
         #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
         indiv_space=np.array(indiv_space)
 
-        
+        '''
         for i in range(indiv_space.shape[0]):
             indiv_space_vertices = np.array(indiv_space[i])
             plt.plot(indiv_space_vertices[:,0],indiv_space_vertices[:,1])
+        '''
         
         # 2. Group Drawing
         grp_space=self.draw_all_social_spaces(grp_labels, positions, velocities, False)
@@ -714,12 +717,13 @@ class StageWorld():
         #print(grp_space)
         grp_space=np.array(grp_space)
 
-        
+        '''
         for i in range(grp_space.shape[0]):
             grp_space_vertices = np.array(grp_space[i])
             plt.plot(grp_space_vertices[:,0],grp_space_vertices[:,1])
             
         plt.axis([-3, 3, 0, 6])    
+        '''
         #plt.show()
         
         #print(indiv_space.shape)      # (num_of_indiv, vertice numbers, (pos))   3, 20, 2
@@ -759,6 +763,7 @@ class StageWorld():
         
         reward_grp_sum=0.
         safe_grp_dist = 2.
+        grp_coefficient = 0.1
         for i in reward_grp_list:
             reward_grp = i-safe_grp_dist
             if reward_grp >=0:
@@ -768,10 +773,10 @@ class StageWorld():
         #print('그룹 리워드 섬:',reward_grp_sum)
 
 
-        
+        reward_grp_sum *= grp_coefficient
         # OURS final reward
         reward = reward_g + reward_c + reward_w + reward_grp_sum# + reward_static_time
-        #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
+        print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
 
         return reward, terminate, result   # float, T or F(base), description
     
@@ -1084,12 +1089,12 @@ class StageWorld():
                             [2,-8],[4,-8],
                             [-1,-11],[0,-11],[1,-11]]
         elif rule == 'group_cross_crossing':
-            init_pose_list=[[0,-8,np.pi/2],
+            init_pose_list=[[0,-9,np.pi/2],
                             [-16,1.4,0],[-15.5,0.7,0],[-15.5,-0.7,0],[-16.0, -1.4, 0],
-                            [-8.0,0,0],[-8.0,-1.0,0],[-7.0,-1.0,0],
-                            [9.2,0.7,np.pi],[8.0,0.0,np.pi],[8.7,-0.6,np.pi],[9.0,-1.2,np.pi],[10.0,0.0,np.pi],
+                            [-5.0,0,0],[-5.0,-1.0,0],[-4.0,-1.0,0],
+                            [6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[6.0,-1.2,np.pi],[7.0,0.0,np.pi],
                             [13.0,1.6,np.pi],[13.2,1.0,np.pi]]
-            init_goal_list=[[0,8],
+            init_goal_list=[[0,9],
                             [16,-1.4],[16.0,-0.7],[16.0,0.7],[16.0, 1.4],
                             [16.0,0],[16.0,1.0],[16.0,1.0],
                             [-16.2,-0.7],[-16.0,0.0],[-16.7,0.6],[-16.0,1.2],[-16.5,0.0],
