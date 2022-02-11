@@ -68,17 +68,17 @@ not_update_policy = False
 # For fixed Randomization  211230
 import random
 
-if test_policy:
-
-    print('TEST(EVALUATION) MODE')
-    SEED = 1234  # for training
-    #SEED = 4321 # for test
-    random.seed(SEED)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    torch.backends.cudnn.deterministic = True
-
+#if test_policy:
+'''
+print('TEST(EVALUATION) MODE')
+SEED = 1234  # for training
+#SEED = 4321 # for test
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+torch.backends.cudnn.deterministic = True
+'''
 
 
 
