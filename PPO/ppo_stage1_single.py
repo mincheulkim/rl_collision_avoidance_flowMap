@@ -21,7 +21,7 @@ from collections import deque #test
 from model.net import MLPPolicy, CNNPolicy, LM_Policy, stacked_LM_Policy, concat_LM_Policy, depth_LM_Policy, baseline_LM_Policy, baseline_ours_LM_Policy, ours_LM_Policy, CORLPolicy
 from stage_world1 import StageWorld #test
 from model.ppo import ppo_update_stage1, generate_train_data, ppo_update_stage1_stacked_LM, ppo_update_stage1_LM, transform_buffer_baseline_LM, ppo_update_stage1_baseline_LM, ppo_update_stage1_baseline_ours_LM, transform_buffer_baseline_ours_LM, ppo_update_stage1_ours_LM, transform_buffer_ours_LM
-from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM, generate_action_baseline_ours_LM, generate_action_ours_LM, generate_action_corl
+from model.ppo import generate_action, generate_action_human, generate_action_human_groups, generate_action_human_sf, generate_action_LM, generate_action_stacked_LM, generate_action_concat_LM, generate_action_depth_LM, generate_action_baseline_LM, generate_action_baseline_ours_LM, generate_action_ours_LM, generate_action_corl, generate_action_orca
 from model.ppo import transform_buffer, transform_buffer_stacked_LM # 211214 #test
 from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
@@ -180,10 +180,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             speed_poly_list =np.array(speed_poly_list)
                         
             # generate humans action
-            if policy_list == 'ORCA':
-                human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=True, grp_list=env.human_list, scenario=env.scenario)
-            else:
-                human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible, grp_list=env.human_list, scenario=env.scenario)
+            human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible, grp_list=env.human_list, scenario=env.scenario)
             
             # 211228  DBSCAN group clustering
             pose_list_dbscan = pose_list[1:, :-1]
@@ -245,6 +242,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
             elif policy_list == 'corl':
                 v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
+            elif policy_list == 'ORCA':
+                v, a, logprob, scaled_action, pedestrian_list=generate_action_orca(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, goal_global_list=goal_global_list, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
@@ -253,25 +252,44 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
 
+            # distribute and execute actions robot and humans
+            
             if policy_list == 'ORCA':
                 for i in range(num_human):
-                    angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
-                    #diff = angles - rot   # problem
-                    diff = angles - pose_list[i,2]
-                    # fix SF rotational issus 211222
-                    if diff<=-np.pi:
-                            #diff = np.pi+(angles-np.pi)-rot
-                            diff = (2*np.pi)+diff
-                    elif diff>np.pi:
-                            #diff = -np.pi-(np.pi+angles)-rot
-                            diff = diff - (2*np.pi)
-                    
-                    length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
-                    scaled_action = (length, diff)   
-                    
-                    env.control_vel_specific(scaled_action, i)
+                    if i==0:
+                        angles = np.arctan2(scaled_action[i][1], scaled_action[i][0])     # 
+                        #diff = angles - rot   # problem
+                        diff = angles - pose_list[i,2]
+                        # fix SF rotational issus 211222
+                        if diff<=-np.pi:
+                                #diff = np.pi+(angles-np.pi)-rot
+                                diff = (2*np.pi)+diff
+                        elif diff>np.pi:
+                                #diff = -np.pi-(np.pi+angles)-rot
+                                diff = diff - (2*np.pi)
+                        
+                        length = np.sqrt([scaled_action[i][0]**2+scaled_action[i][1]**2])
+                        scaled_action = (length, diff)   
+                        #print('조정액션:', scaled_action)
+                        env.control_vel_specific(scaled_action, i)
+                    else:
+                        angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
+                        #diff = angles - rot   # problem
+                        diff = angles - pose_list[i,2]
+                        # fix SF rotational issus 211222
+                        if diff<=-np.pi:
+                                #diff = np.pi+(angles-np.pi)-rot
+                                diff = (2*np.pi)+diff
+                        elif diff>np.pi:
+                                #diff = -np.pi-(np.pi+angles)-rot
+                                diff = diff - (2*np.pi)
+                        
+                        length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
+                        scaled_action = (length, diff)   
+                        
+                        env.control_vel_specific(scaled_action, i)
             else:
-                # distribute and execute actions robot and humans
+            
                 for i in range(num_human):
                     if i==0:
                         env.control_vel_specific(scaled_action, i)

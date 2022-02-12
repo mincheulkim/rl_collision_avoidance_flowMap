@@ -380,6 +380,134 @@ def generate_action_corl(env, state_list, pose_list, velocity_list, policy, acti
 
     return v, a, logprob, scaled_action, pedestrain_list
 
+# 220212
+def generate_action_orca(env, state_list, pose_list, velocity_list, policy, action_bound, clustering, goal_global_list, mode=False):
+    
+    s_list, goal_list, speed_list = [], [], []
+    for i in state_list:
+        s_list.append(i[0])
+        goal_list.append(i[1])
+        speed_list.append(i[2])
+
+    s_list = np.asarray(s_list)
+    goal_list = np.asarray(goal_list)
+    speed_list = np.asarray(speed_list)
+
+
+    s_list = Variable(torch.from_numpy(s_list)).float().cuda()
+    goal_list = Variable(torch.from_numpy(goal_list)).float().cuda()
+    speed_list = Variable(torch.from_numpy(speed_list)).float().cuda()
+
+
+    v, a, logprob, mean = policy(s_list, goal_list, speed_list)
+    v, a, logprob = v.data.cpu().numpy(), a.data.cpu().numpy(), logprob.data.cpu().numpy()
+
+    mean_v = mean.data.cpu().numpy()
+    scaled_action = np.clip(a[0], a_min=action_bound[0], a_max=action_bound[1])
+    if mode==True:
+        scaled_action = np.clip(mean_v[0], a_min=action_bound[0], a_max=action_bound[1])
+        
+    
+    robot_rot = pose_list[0,2]
+    pose_list = np.asarray(pose_list[:,0:2]) 
+    speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+
+    
+    pedestrain_list = np.zeros((pose_list.shape[0], 7))   # 11,7   # px,py,vx,vy,grp,visible
+    
+    robot_rot += np.pi*3/2   # 220125
+    
+    visible_ped_pose_list = []
+    visible_ped_poly_vel_list = []    
+    
+    diff_pose = pose_list-pose_list[0]
+    diff_v = speed_poly_list - speed_poly_list[0]
+
+    pose_encoding= np.zeros((pose_list.shape[0]))
+    
+    for i, (pose,vel) in enumerate(zip(diff_pose, diff_v)):
+        diff = pose
+        diff_v = vel
+        dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+        dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+        dvx_rot = diff_v[0]*np.cos(robot_rot)+diff_v[1]*np.sin(robot_rot)
+        dvy_rot = -diff_v[0]*np.sin(robot_rot)+diff_v[1]*np.cos(robot_rot)
+        pedestrain_list[i,0]=dx_rot
+        pedestrain_list[i,1]=dy_rot
+        pedestrain_list[i,2]=dvx_rot
+        pedestrain_list[i,3]=dvy_rot
+        
+        # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+        mod_diff_x = dx_rot
+        mod_diff_y = dy_rot
+
+        if np.abs(mod_diff_x)<=3.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
+            #print(mod_diff_x,mod_diff_y,dvx_rot,dvy_rot)
+            #print(i,'의 포즈:',[mod_diff_x,mod_diff_y])
+            xx=copy.deepcopy(mod_diff_x)
+            yy=copy.deepcopy(mod_diff_y)
+            vx=copy.deepcopy(dvx_rot)
+            vy=copy.deepcopy(dvy_rot)
+            visible_ped_pose_list.append([xx, yy])
+            visible_ped_poly_vel_list.append([vx,vy])
+            pose_encoding[i]=i
+            pedestrain_list[i,4]=i # init grp index
+            pedestrain_list[i,5]=i # init grp index
+            pedestrain_list[i,6]=1 # visible human
+            #print(i,'인서트 후 리스트:',visible_ped_pose_list,visible_ped_poly_vel_list)
+    #print('페드 포드:',visible_ped_pose_list,'페도벨:',visible_ped_poly_vel_list)
+    #print('페데스틀안 리스트:',pedestrain_list)
+    #print(pedestrain_list[:,])
+    
+    # 211020 pose_list create        
+    p_list = []
+    for i in pose_list:
+        p_list.append(i)
+    p_list = np.asarray(p_list)
+        
+    row,axis= np.where(pedestrain_list[:,4:5]!=0.)   # init_grp_index is not 0
+    #print('row:',row,'axis:',axis)
+
+    orca_agent_list = []
+    orca_agent_list.append(0)
+    for i in row:        
+        orca_agent_list.append(i)
+    #print('orca agent list:',orca_agent_list)   # robot0 + 관측된 사람들 idx 1~
+    
+    orca_p_list = []
+    orca_goal_global_list = []
+    
+    for i in orca_agent_list:
+        orca_p_list.append(p_list[i])
+        orca_goal_global_list.append(goal_global_list[i])
+    #print('오르카 p list:',orca_p_list)
+    #print('오르카 골 글로벌 리스트:',orca_goal_global_list)
+    
+    sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
+    human_max_speed = 0.8
+    
+    for i in range(len(orca_p_list)):  # i=0, 1,2,3,4
+        sim.addAgent(tuple(p_list[i]))
+        hv = goal_global_list[i] - p_list[i] 
+        hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
+        #prefv=hv/hs if hs >1 else hv
+        prefv=hv/hs if hs >human_max_speed else hv
+        prefv *= human_max_speed
+        sim.setAgentPrefVelocity(i, tuple(prefv))
+            
+    sim.doStep()
+
+    scaled_action = []       
+    for i in range(len(orca_p_list)):  # num_env=3,  i=0, 1,2
+        scaled_action.append(sim.getAgentVelocity(i))
+
+    #pedestrain_list = [pedestrain_list]
+    pedestrain_list = np.array(pedestrain_list)
+        
+    #print('스케일드 액숀!',scaled_action)
+
+    return v, a, logprob, scaled_action, pedestrain_list
+
 def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, mode=False):   # 211130
     
     s_list, goal_list, speed_list = [], [], []
