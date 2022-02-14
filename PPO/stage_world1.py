@@ -72,9 +72,11 @@ class StageWorld():
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         ## Group Circle Cross
         #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
-        self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        #self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         ## Group Cross Cross(십자)
         #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        # Group Station (역, 아래입구 as main, NW 입구 as 상행, NE 입구 as 하행), Main->NE or NW, NE -> Main, NW -< Main
+        self.scenario = 'GrpStation_h22_grp4'
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -111,6 +113,13 @@ class StageWorld():
             self.num_human = 22      # GC, h21, grp5
             self.groups = [0, 1, 2, 3, 4, 5]    # GC, h21, grp5
             self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # GC, h21, grp5
+            
+        elif self.scenario == 'GrpStation_h22_grp4':
+            self.rule = 'group_station_crossing'
+            self.num_human = 23   
+            self.groups = [0, 1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]    # station, h22, group 2+2+2
+            #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10,11],[12,13,14,15],[16,17,18],[19,20,21,22]]   # GC, h21, grp5
+            self.human_list=[[0],[1],[2],[3],[4],[5],[6],[7],[8],[9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22]]
         else:
             print('Wrong Scenario')
         
@@ -776,7 +785,7 @@ class StageWorld():
         reward_grp_sum *= grp_coefficient
         # OURS final reward
         reward = reward_g + reward_c + reward_w + reward_grp_sum# + reward_static_time
-        print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
+        #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
 
         return reward, terminate, result   # float, T or F(base), description
     
@@ -1099,6 +1108,32 @@ class StageWorld():
                             [16.0,0],[16.0,1.0],[16.0,1.0],
                             [-16.2,-0.7],[-16.0,0.0],[-16.7,0.6],[-16.0,1.2],[-16.5,0.0],
                             [-16.0,-1.6],[-16.2,-1.0]]
+        elif rule == 'group_station_crossing':
+            init_pose_list=[[8,-6,np.pi/2],
+                            [-1,-11.0,np.pi/2],[0.0,-11.0,np.pi/2],[1.0,-11.0,np.pi/2],[-0.5, -11.5, np.pi/2],[0.5, -11.5, np.pi/2],
+                            [-1.0,-15.0,np.pi/2],[0.0,-15.0,np.pi/2],[1.0,-15.0,np.pi/2],
+                            [-5.0,11.0,np.pi/2*3],[-6.0,11.0,np.pi/2*3],[-5.0,12.0,np.pi/2*3],
+                            [-5.0,14.0,np.pi/2*3],[-6.0,14.0,np.pi/2*3],[-5, 15, np.pi/2*3],[-6, 15, np.pi/2*3],
+                            [5, 11, np.pi/2*3], [6, 11, np.pi/2*3], [5, 12, np.pi/2*3],
+                            [5, 14, np.pi/2*3], [6, 14, np.pi/2*3], [5, 15, np.pi/2*3], [6, 15, np.pi/2*3],
+                            ]
+            init_goal_list=[[-8,6],
+                            [-5,14.0],[-6.0,14.0],[5.0,15.0],[5, 15.0],[-5.0, 16.0], # M -> NW
+                            #[8.0,15.0],[9.0,15.0],[8.0,15.0], # M -> NE
+                            [7.0,6.0],[6.0,6.0],[8.0,6.0], # M -> NE
+                            [-1.0,-15.0],[0.0,-14.0],[1.0,-13.0],  # NW -> M
+                            [-2.0,-14.0],[-1.0,-14.0],[1, -14],[2, -14],  # NW -> M
+                            [-1.0,-15.0],[0.0,-13.0],[1.0,-15.0],   # NE -> M
+                            [-2.0,-14.0],[-1.0,-14.0],[1, -14],[2, -14],  # NE -> M
+                            ]
+            # 사람 골 재선정 
+            #px_list = np.array([-6,6])
+            #py_list = np.array([-6,6])
+            px = np.random.choice([-6,6], 1)
+            py = np.random.choice([-6,6], 1)
+            init_pose_list[0]=[px[0],py[0],np.pi/2]
+            init_goal_list[0]=[-px[0],-py[0]]
+
 
         elif 'circle_crossing':
             pass
