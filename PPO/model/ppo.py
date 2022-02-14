@@ -1603,9 +1603,37 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         # 3. assign obstacles
 
         psf_sim = None
-        
         if scenario == 'GrpCross_h14_grp4':
             obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2        
+            psf_sim = psf.Simulator(
+            initial_state, groups=groups, obstacles=obs, config_file="./pysocialforce/config/example.toml"
+            )
+        elif scenario == 'GrpStation_h22_grp4':
+            print('wlfkf')
+            obs = [[-2.7,-2.7,-1.5,1],  # 1st bar
+                   [-2.3,-2.3,-1.5,1],
+                   [-2.7,-2.3,-1.5,-1.5],
+                   [-2.7,-2.3,1,1],
+                   [-0.7,-0.7,-1.5,1],  # 2th bar
+                   [-0.3,-0.3,-1.5,1],
+                   [-0.7,-0.3,-1.5,-1.5],
+                   [-0.7,-0.3,1,1],
+                   [1.8,1.8,-1.5,1],  # 3th bar
+                   [1.3,1.3,-1.5,1],
+                   [1.3,1.8,-1.5,-1.5],
+                   [1.3,1.8,1,1],
+                   [3.7,3.7,-1.5,1],  # 4th bar
+                   [3.3,3.3,-1.5,1],
+                   [3.3,3.7,-1.5,-1.5],
+                   [3.3,3.7,1,1],
+                   [-10,-5,1,1],     # Leftbox upper
+                   [-5,-5,1,-1.5],      # Leftbox Side
+                   [-10,-5,-1.5,-1.5],     # Letbox under
+                   [6,10,1,1],     # rightbox upper
+                   [6,6,1,-1.5],     # Rightbox Side
+                   [6,10,-1.5,-1.6],     # Rightbox under 
+                   [-10,10,-8,-8]
+                   ]   # x1,x2,y1,y2        
             psf_sim = psf.Simulator(
             initial_state, groups=groups, obstacles=obs, config_file="./pysocialforce/config/example.toml"
             )
@@ -1644,7 +1672,9 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
 
         initial_state = np.zeros((num_env, 6))
 
-        for i in range(num_env):  # i=0, 1,2,3,4        
+        for i in range(num_env):  # i=0, 1,2,3,4  
+            #if i==6:
+            #    print(i,'번째의 골:',goal_global_list[i],'현재위치;',p_list[i])      
             hv = goal_global_list[i] - p_list[i] 
             hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
             #print(i,'hs:',hs, human_max_speed)
@@ -1653,6 +1683,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             prefv *= human_max_speed
             #print(i,'after_prefv:',prefv)
             initial_state[i, :]=np.array([p_list[i][0],p_list[i][1], prefv[0], prefv[1], goal_global_list[i][0],goal_global_list[i][1]])
+            #if i==6:
+            #    print(i,'의 상대골위치:',hv,'정규화속도:',prefv)
         
         groupss = copy.deepcopy(grp_list)          # 220119
 
@@ -1662,6 +1694,7 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             for i in range(len(group_d)):
                 group_d[i]=group_d[i]-1
             groups_ex_human.append(group_d)
+        #print(groups_ex_human)
             
         if scenario == 'GrpCross_h14_grp4':
             obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
@@ -1669,12 +1702,41 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             psf_sim = psf.Simulator(
                 initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
                 )
+        elif scenario == 'GrpStation_h22_grp4':
+            #print('지랄')
+            obs = [[-3.6,4.0,9,9],  # upper center
+                   [-2.5,2.5,8,8],
+                   [-2.7,-2.7,-1.5,1.5],  # 1st bar
+                   [-2.3,-2.3,-1.5,1.5],
+                   ##[-2.7,-2.3,-1.5,-1.5],
+                   ##[-2.7,-2.3,1,1],
+                   [0.2,0.2,-1.0,1.0],  # 2th bar
+                   [0.4,0.4,-1.0,1.0],
+                   ##[-0.7,-0.3,-1.5,-1.5],
+                   [0.1,0.5,-1.0,-1.0],
+                   [3.8,3.8,-1.0,1.0],  # 3th bar
+                   ##[1.3,1.3,-1.5,1],
+                   ##[1.3,1.8,-1.5,-1.5],
+                   [3.7,3,9.-1.0,-1.0],
+                   
+                   [-12,-5.0,1,1],     # Leftbox upper
+                   [-5.8,-5.8,0,-2],      # Leftbox Side
+                   #[-10,-5,-1.5,-1.5],     # Letbox under
+                   [6,13,1,1],     # rightbox upper
+                   [6,6,-0.7,0.7],     # Rightbox Side
+                   [6,14,-1,-1],     # Rightbox under
+                   [-12,-2.0,-10,-10],   # down door left
+                   [2.8,12.0,-10,-10]   # down door left
+                   ]   # x1,x2,y1,y2        
+            psf_sim = psf.Simulator(initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
+                )
         else:
             psf_sim = psf.Simulator(initial_state[1:], groups=groups_ex_human, obstacles=None, config_file="./pysocialforce/config/example.toml"
                 )
         # do 1 updates
         psf_sim.step(n=1)
         ped_states, group_states = psf_sim.get_states()    # sx, sy, vx, vy, gx, gy, tau
+        #print('페드 스테이트: ',ped_states)
 
         for i in range(num_env-1):
             vx = ped_states[1][i][2]
@@ -1682,6 +1744,8 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             scaled_action.append([vx,vy])
             scaled_position.append([ped_states[1][i][0],ped_states[1][i][1],0])
         scaled_action.insert(0,[0.0,0.0])     # 220119 for robot
+        scaled_position.append([0,-8,0])   # dummy
+        #print('6번째 속도:',scaled_action[6])
         return scaled_action, scaled_position    
 
 
