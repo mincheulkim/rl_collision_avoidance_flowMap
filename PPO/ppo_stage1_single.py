@@ -57,8 +57,8 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 #policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
-policy_list = 'ORCA'
+policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+#policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
@@ -70,6 +70,7 @@ not_update_policy = False
 import random
 
 #if test_policy:
+
 '''
 print('TEST(EVALUATION) MODE')
 SEED = 1234  # for training
@@ -450,10 +451,12 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     diff = diff / diff_mag
                     #print('딥:',diff)
                     dx = np.random.rand(2)
-                
-                    #env.control_vel_specific([-diff[0]*2,-diff[1]*2], i)
                     
-                    env.control_pose_specific([pose_list[i][0]-(dx[0]/10),pose_list[i][1]-(dx[1]/10),anglss+np.pi], i)
+                    #env.control_vel_specific([-diff[0]*2,-diff[1]*2], i)
+                    if env.scenario == 'GrpStation_h22_grp4':
+                        env.control_pose_specific([init_poses[i][0], init_poses[i][1], init_poses[i][2]],i)
+                    else:
+                        env.control_pose_specific([pose_list[i][0]-(dx[0]/10),pose_list[i][1]-(dx[1]/10),anglss+np.pi], i)
                     #env.control_pose_specific([pose_list[i][0]-(diff[0]/10),pose_list[i][1]-(diff[1]/10),anglss], i)
                     #env.control_pose_specific([pose_list[i][0]-(0.1),pose_list[i][1]-(0.1),anglss], i)
                     
