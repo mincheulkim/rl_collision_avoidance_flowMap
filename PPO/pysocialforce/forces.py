@@ -303,7 +303,8 @@ class ObstacleForce(Force):
 
     def _get_force(self):
         sigma = self.config("sigma", 0.2)
-        threshold = self.config("threshold", 0.2) + self.peds.agent_radius
+        #threshold = self.config("threshold", 0.2) + self.peds.agent_radius
+        threshold = self.config("threshold", 0.1) + self.peds.agent_radius
         force = np.zeros((self.peds.size(), 2))
         if len(self.scene.get_obstacles()) == 0:
             return force
@@ -320,4 +321,6 @@ class ObstacleForce(Force):
             directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / sigma)
             force[i] = np.sum(directions[dist_mask], axis=0)
 
-        return force * self.factor
+        return force * self.factor 
+        #return force * self.factor * 0.8
+        #return force * self.factor * 0.5

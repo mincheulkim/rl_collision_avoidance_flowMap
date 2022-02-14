@@ -14,8 +14,8 @@ class PedState:
         #self.step_width = config("step_width", 0.4)  # How long it will see? 기존 default
         self.step_width = config("step_width", 0.5)  # 220107 slight evasiable
         #self.step_width = config("step_width", 1.0)   # 더 잘 피하지만, 응집력은 약해짐
-        #self.agent_radius = config("agent_radius", 0.35)
-        self.agent_radius = config("agent_radius", 1.0)
+        self.agent_radius = config("agent_radius", 0.35)
+        #self.agent_radius = config("agent_radius", 1.0)
         #self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
         self.max_speed_multiplier = config("max_speed_multiplier", 0.8)   # control Max speed
 

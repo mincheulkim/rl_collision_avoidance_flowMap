@@ -2,8 +2,8 @@ title = "Social Force Config File"
 
 [scene]
 enable_group = false
-#agent_radius = 0.35
-agent_radius = 1.0   # 211222
+agent_radius = 0.35   # back to 220214 for station scenario
+#agent_radius = 1.0   # 211222
 step_width = 0.25
 # the maximum speed doesn't exceed 1.3x initial speed
 #max_speed_multiplier = 1.3
@@ -28,7 +28,8 @@ n = 2
 n_prime = 3
 
 [obstacle_force]
-factor = 10.0
+#factor = 10.0
+factor = 3.0
 # the standard deviation of obstacle force
 sigma = 0.2
 # threshold to trigger this force
