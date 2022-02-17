@@ -790,6 +790,127 @@ class StageWorld():
         return reward, terminate, result   # float, T or F(base), description
     
     
+    # individual score 220217
+    def get_reward_and_terminate_corl_ind(self, t, scaled_action, policy_list, pedestrian_list):   # t is increased 1, but initializezd 1 when terminate=True
+        terminate = False
+        laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
+        [x, y, theta] = self.get_self_stateGT()     # "updated" current state
+        [v, w] = self.get_self_speedGT()            # updated current velocity
+        self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
+        
+        # Propotional Reward
+        self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
+        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
+        reward_c = 0  # collision penalty
+        reward_w = 0  # too much rotation penalty
+        result = 0
+        is_crash = self.get_crash_state()   # return self.is_crashed
+
+        if self.distance < self.goal_size:  # success reward
+            terminate = True
+            reward_g = 15
+            result = 'Reach Goal'
+
+        if is_crash == 1:                   # collision penalty
+            terminate = True
+            reward_c = -15.
+            result = 'Crashed(ROS)'
+        
+        
+        '''
+        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
+        kkk = self.get_min_lidar_dist()
+        penalty_lidar = 0.
+        if kkk <= 1.0:
+            penalty_lidar = (-1. + kkk)/10
+        '''
+        
+        
+        
+        min_dist_rrr = 10.0   # 220119
+        pose_list_np = np.array(self.pose_list)
+        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
+        # 220124 disabled for 더 높은 성공률 위해
+        for i in rel_dist_list[1:]:
+            min_dist = np.sqrt(i[0]**2+i[1]**2)
+            if min_dist < min_dist_rrr:
+                min_dist_rrr = min_dist
+            if min_dist < 0.6:
+                terminate = True
+                reward_c = -15.
+                result = 'Crashed(Compuatation)'
+                break
+
+        # ROTATION PENALTY        
+        if np.abs(w) >  1.05:               # rotation penalty
+            reward_w = -0.1 * np.abs(w)
+
+        if t > self.time_limit:  # timeout check  220205 For Group corridor
+        #if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
+            terminate = True      
+            result = 'Time out'
+        
+        #print(pedestrian_list[1][6])
+        # GRP
+        indiv_labels=[]                
+        grp_labels=[]
+        positions = []
+        velocities = []
+        
+        for idx, ped in enumerate(pedestrian_list):
+            if pedestrian_list[idx][6] != 0:
+                #print(pedestrian_list[idx])
+                indiv_label = int(pedestrian_list[idx][4])
+                grp_label = int(pedestrian_list[idx][5])
+                position = [pedestrian_list[idx][0],pedestrian_list[idx][1]]
+                velocity = [pedestrian_list[idx][2],pedestrian_list[idx][3]]
+                indiv_labels.append(indiv_label)
+                grp_labels.append(grp_label)
+                positions.append(position)
+                velocities.append(velocity)
+
+        #print(indiv_labels)    # [6, 8]    [1, 2, 3, 5, 9]
+        #print(grp_labels)      # [1, 1]    [1, 3, 1, 1, 2]
+        #print(positions)       # [[1,1],[2,2]]    [[2.8896498104205963, 2.6215839730271973], [0.5328502413870305, 1.8637225827143853], [2.2420605229240325, 3.9390001662482153], [2.7590289592251427, 1.4688141316473313], [1.3278307894609154, 1.2985722552877585]]
+        #print(velocities)      # [[0.2,0.2],[0.2,0.2]]   [[-0.511329087694693, -0.5343655529166533], [-0.6367084601515689, -0.4843576537760276], [-0.3653859186755444, -0.512861404743211], [-0.549097788376088, -0.47435513775756494], [-0.3493583111982035, 0.33289796577453096]]
+
+        # 1. Individual Drawing
+        indiv_space=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
+        #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
+        indiv_space=np.array(indiv_space)
+
+        # 개인별 리워드
+        reward_ind_list = []
+        # [1,2,3,4]    # 개인별로 sum
+        for i in range(len(indiv_labels)):
+            #dist = np.linalg.norm(indiv_space[i], axis=1)
+            dist = np.sqrt(positions[i][0]**2+positions[i][1]**2)
+            reward_ind_list.append(np.min(dist))
+        #print(indiv_labels)
+        #print('로봇과 개인간 거리:', reward_ind_list)
+        
+        safe_ind_dist = 2    # 긃과 동일하게
+        reward_ind_sum=0.
+        for i in reward_ind_list:
+            reward_ind = i-safe_ind_dist
+            if reward_ind >=0:
+                pass
+            else:
+                reward_ind_sum += reward_ind
+        #print('인디뷰주얼 리워듸',reward_ind_list)
+        #print('인디비쥬얼 리워드 섬:', reward_ind_sum)
+        
+        ind_coefficient = 0.1
+        reward_ind_sum *= ind_coefficient
+        
+
+        # OURS final reward for individual
+        reward = reward_g + reward_c + reward_w + reward_ind_sum
+        #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_ind:',reward_ind_sum)
+
+        return reward, terminate, result   # float, T or F(base), description
+    
+    
     
 
     def reset_pose(self):

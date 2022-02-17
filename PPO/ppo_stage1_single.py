@@ -57,7 +57,8 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 #policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+policy_list = 'corl_ind'   # 220217
+#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 #policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
@@ -126,8 +127,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         rule = env.rule            
         #rule = 'group_circle_crossing'  # crossing
         print('시나리오:',rule)
-        if policy_list == 'corl':
-            print('클러스터링 방법:;',env.clustering_method)
+        if policy_list == 'corl' or policy_list == 'corl_ind':
+            print(policy_list,'의 클러스터링 방법:;',env.clustering_method)
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
@@ -241,7 +242,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 v, a, logprob, scaled_action, Sensor_map, LM_stack, pedestrian_list, grp_ped_map_list =generate_action_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, LM_stack=LM_stack, index=labels, to_go_goal=to_go_goal, mode=test_policy)
             elif policy_list=='baseline_ours_LM':
                 v, a, logprob, scaled_action, Sensor_map, LM_stack =generate_action_baseline_ours_LM(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, Sensor_map=Sensor_map, LM_stack=LM_stack, index=labels, mode=test_policy)
-            elif policy_list == 'corl':
+            elif policy_list == 'corl' or policy_list == 'corl_ind':
                 v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
             elif policy_list == 'ORCA':
                 v, a, logprob, scaled_action, pedestrian_list=generate_action_orca(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, goal_global_list=goal_global_list, mode=test_policy)
@@ -371,6 +372,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             # get informtion
             if policy_list == 'corl':
                 r, terminal, result = env.get_reward_and_terminate_corl(step, scaled_action, policy_list, pedestrian_list)   # 211221 for backward penalty 
+            elif policy_list == 'corl_ind':
+                r, terminal, result = env.get_reward_and_terminate_corl_ind(step, scaled_action, policy_list, pedestrian_list)   # 220217 
             else:
                 r, terminal, result = env.get_reward_and_terminate(step, scaled_action, policy_list)   # 211221 for backward penalty 
             ep_reward += r
@@ -425,7 +428,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                     last_v_r, _, _, _, _, _, _, _ = generate_action_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, LM_stack=LM_stack, to_go_goal=to_go_goal, mode=test_policy)
                 elif policy_list=='baseline_ours_LM':  # LM: 60x60    # 211214
                     last_v_r, _, _, _, _, _ = generate_action_baseline_ours_LM(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, index=labels, Sensor_map=Sensor_map, LM_stack=LM_stack, mode=test_policy)
-                elif policy_list == 'corl':
+                elif policy_list == 'corl' or policy_list == 'corl_ind':
                     last_v_r, _, _, _, _ = generate_action_corl(env=env, state_list=state_next_list_new, pose_list=pose_next_list, velocity_list=speed_poly_next_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
                 else:
                     last_v_r, _, _, _ = generate_action(env=env, state_list=state_next_list_new, policy=policy, action_bound=action_bound, mode=test_policy)
@@ -627,7 +630,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                         buff = []
                         global_update += 1
 
-                elif policy_list=='corl':
+                elif policy_list=='corl' or policy_list == 'corl_ind':
                     buff.append((robot_state, a, r_list_new, terminal_list_new, logprob, v))   # new
 
                     memory_size += 1
@@ -803,7 +806,7 @@ if __name__ == '__main__':
         elif policy_list == 'baseline_ours_LM':   # 220124
             policy_path = 'policy'
             policy = baseline_ours_LM_Policy(frames=LASER_HIST, action_space=2)
-        elif policy_list == 'corl':
+        elif policy_list == 'corl' or policy_list == 'corl_ind':  # 220217
             policy_path = 'policy'
             policy = CORLPolicy(frames=LASER_HIST, action_space=2)
         elif policy_list == 'ORCA':
