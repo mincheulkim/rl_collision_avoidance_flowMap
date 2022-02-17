@@ -381,7 +381,7 @@ def generate_action_corl(env, state_list, pose_list, velocity_list, policy, acti
     return v, a, logprob, scaled_action, pedestrain_list
 
 # 220212
-def generate_action_orca(env, state_list, pose_list, velocity_list, policy, action_bound, clustering, goal_global_list, mode=False):
+def generate_action_orca(env, state_list, pose_list, velocity_list, policy, action_bound, clustering, goal_global_list, policy_list, mode=False):
     
     s_list, goal_list, speed_list = [], [], []
     for i in state_list:
@@ -494,6 +494,17 @@ def generate_action_orca(env, state_list, pose_list, velocity_list, policy, acti
         prefv=hv/hs if hs >human_max_speed else hv
         prefv *= human_max_speed
         sim.setAgentPrefVelocity(i, tuple(prefv))
+
+    #print('폴리시 리스트:',policy_list)
+    if policy_list == 'GrpStation_h22_grp4':
+        o1 = sim.addObstacle([(-2.0,1.2),(-2.0,-1.6)])    # 왼쪽 개찰구
+        o1_1 = sim.addObstacle([(-3.8,-1.6),(-3.8, 1.2)])    # 왼쪽 개찰구
+        o2 = sim.addObstacle([(0.5,0.9),(0.5,-1.4),(1.2,-1.4),(1.2,0.9)])   # 중앙 개찰구
+        o3 = sim.addObstacle([(3.3,0.9),(3.3,-1.4),(4.1,-1.4),(4.1,0.9)])  # 오른쪽 개찰구
+        
+        o4 = sim.addObstacle([(-5,1),(-5, -1.2)])  # 왼쪽
+        o5 = sim.addObstacle([(6,1),(6, -1.2)])  # 오른쪽
+        sim.processObstacles()
             
     sim.doStep()
 

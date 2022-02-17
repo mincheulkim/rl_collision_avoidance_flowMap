@@ -57,9 +57,9 @@ LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
 #policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = 'corl_ind'   # 220217
+#policy_list = 'corl_ind'   # 220217
 #policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
-#policy_list = 'ORCA'
+policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
 #test_policy=True      # For test:True, For Train: False(default)
@@ -245,7 +245,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             elif policy_list == 'corl' or policy_list == 'corl_ind':
                 v, a, logprob, scaled_action, pedestrian_list=generate_action_corl(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, mode=test_policy)
             elif policy_list == 'ORCA':
-                v, a, logprob, scaled_action, pedestrian_list=generate_action_orca(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, goal_global_list=goal_global_list, mode=test_policy)
+                v, a, logprob, scaled_action, pedestrian_list=generate_action_orca(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, goal_global_list=goal_global_list, policy_list = env.scenario, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
             
