@@ -496,6 +496,7 @@ def generate_action_orca(env, state_list, pose_list, velocity_list, policy, acti
         sim.setAgentPrefVelocity(i, tuple(prefv))
 
     #print('폴리시 리스트:',policy_list)
+    #refer: https://github.com/sybrenstuvel/Python-RVO2/blob/master/README.md
     if policy_list == 'GrpStation_h22_grp4':
         o1 = sim.addObstacle([(-2.0,1.2),(-2.0,-1.6)])    # 왼쪽 개찰구
         o1_1 = sim.addObstacle([(-3.8,-1.6),(-3.8, 1.2)])    # 왼쪽 개찰구
