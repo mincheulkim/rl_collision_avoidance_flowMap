@@ -27,7 +27,8 @@ from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
-MAX_EPISODES = 5000   # For Train    5000
+#MAX_EPISODES = 5000   # For Train    5000
+MAX_EPISODES = 500   # For Train    5000
 #MAX_EPISODES = 100     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
@@ -56,9 +57,9 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = 'corl_ind'   # 220217
-#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 #policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
@@ -103,6 +104,7 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
     
     # 220121
     
+    best_reward = -999.0
 
     for id in range(MAX_EPISODES):
         terminal = False
@@ -721,6 +723,13 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             logger.info('########################## model saved when update {} times#########'
                         '################'.format(global_update))
             
+            if ep_reward > best_reward:
+                #torch.save(policy.state_dict(), policy_path + '/Stage1_best')
+                best_reward = ep_reward
+                torch.save(policy.state_dict(), policy_path + '/Stage1_best_{}'.format(best_reward))
+                logger.info('########################## model saved when got best reward : {} ##############'
+                            '################'.format(best_reward))
+            
         
         if result == 'Reach Goal':
             success_counter += 1     # 1 2 3
@@ -736,7 +745,6 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
             logger.info('Env %02d, Goal (%2.2f, %2.2f), Episode %04d, step(NavTime) %03d, Reward %-5.1f, Result %s, Cum.Mem: %05d, NavLength: %2.2f, minDist: %2.3f, numInclus: %03d, avg.suc.nav.time: %3.3f, avg.suc.nav.length: %3.3f, avg.suc.min_Dist: %2.3f, avg.suc.num_Inclu: %2.3f' % \
                     (env.index, env.goal_point[0], env.goal_point[1], id + 1, step, ep_reward, result, memory_size, nav_length, min_dist, num_inclusion, avg_success_nav_time/success_counter, avg_success_nag_length/success_counter, avg_success_min_dist/success_counter, avg_success_min_inclusion/success_counter))
             logger_cal.info(ep_reward)
-            
         
                 
 
