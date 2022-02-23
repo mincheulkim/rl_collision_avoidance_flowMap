@@ -27,8 +27,8 @@ from dbscan.dbscan import DBSCAN
 from dbscan.dbscan_new import DBSCAN_new
 
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
-#MAX_EPISODES = 5000   # For Train    5000
-MAX_EPISODES = 500   # For Train    5000
+MAX_EPISODES = 5000   # For Train    5000
+#MAX_EPISODES = 500   # For Train    5000
 #MAX_EPISODES = 100     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
@@ -57,9 +57,9 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = 'corl_ind'   # 220217
-policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 #policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
