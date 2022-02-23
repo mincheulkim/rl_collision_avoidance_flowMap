@@ -56,8 +56,8 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
-policy_list = 'corl_ind'   # 220217
+policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = 'corl_ind'   # 220217
 #policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 #policy_list = 'ORCA'
 robot_visible = False           # 220118
@@ -712,7 +712,8 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
         ###### while문 끝 ######
         #####save policy and logger##############################################################################################
         #if global_update != 0 and global_update % 5 == 0:
-        if global_update != 0 and global_update % 2 == 0:   # 211217
+        #if global_update != 0 and global_update % 2 == 0:   # 211217
+        if global_update != 0 and global_update % 1 == 0:   # 220222
             #torch.save(policy.state_dict(), policy_path + '/Stage1_{}'.format(global_update))
             torch.save(policy.state_dict(), policy_path + '/Stage1')
             #torch.save(policy, policy_path + '/Stage1_{}_tot'.format(global_update))
