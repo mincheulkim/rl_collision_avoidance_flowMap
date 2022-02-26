@@ -1,4 +1,5 @@
 # from GUNHEE
+from re import S
 import torch
 import logging
 import os
@@ -1613,10 +1614,10 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         groups = grp_list          # 220118
 
         # 3. assign obstacles
-
         psf_sim = None
         if scenario == 'GrpCross_h14_grp4':
-            obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2        
+            obs = [[1.5,20,3.5,3.5],[1.5,20,-3.5,-3.5],[-1.5,-20,3.5,3.5],[-1.5,-20,-3.5,-3.5],[1.5,1.5,-3.5,-15],[1.5,1.5,3.5,15],[-1.5,-1.5,-3.5,-15],[-1.5,-1.5,3.5,15]]   # x1,x2,y1,y2        
+            #obs= [[1.5,5.5,-2,-2],[1.5,1.5,-4,-2],[-6,-2,-2,-2],[-2,-2,-6,-2]]
             psf_sim = psf.Simulator(
             initial_state, groups=groups, obstacles=obs, config_file="./pysocialforce/config/example.toml"
             )
@@ -1709,8 +1710,9 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
         #print(groups_ex_human)
             
         if scenario == 'GrpCross_h14_grp4':
-            obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
-        
+            #obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
+            obs= [[3.5,5.5,-3,-3],[3.5,3.5,-5,-3],[-6,-3,-3,-3],[-3,-3,-5,-3]]
+
             psf_sim = psf.Simulator(
                 initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
                 )

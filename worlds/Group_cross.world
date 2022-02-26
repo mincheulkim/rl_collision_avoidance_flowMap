@@ -175,7 +175,7 @@ agent( pose [-4.00 -1.00 0.00 0.00] color "black")    # human5
 agent( pose [6.20 0.70 0.00 180.00] color "blue")     # human6
 agent( pose [5.00 0.0 0.00 180.00] color "blue")     # human7
 agent( pose [5.70 -0.60 0.00 180.00] color "blue")     # human8
-agent( pose [6.00 -1.20 0.00 180.00] color "blue")     # human8
+agent( pose [7.00 -1.20 0.00 180.00] color "blue")     # human8
 agent( pose [7.0 0.00 0.00 180.00] color "blue")     # human8
 
 # Group 4R: 2 humans

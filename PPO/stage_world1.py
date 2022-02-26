@@ -71,11 +71,11 @@ class StageWorld():
         ## Narrow corrido
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         ## Group Circle Cross
-        self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h15_grp4'     # 0222 for test
         ## Group Cross Cross(십자)
-        #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         # Group Station (역, 아래입구 as main, NW 입구 as 상행, NE 입구 as 하행), Main->NE or NW, NE -> Main, NW -< Main
         #self.scenario = 'GrpStation_h22_grp4'
               
@@ -89,8 +89,10 @@ class StageWorld():
         elif self.scenario == 'GrpCross_h14_grp4':
             self.rule = 'group_cross_crossing'
             self.num_human = 15        # Corridor, h8, grp2
+            #self.num_human = 14        # Corridor, h8, grp2
             self.groups = [0, 1, 2, 3, 4]    # CC, h5
             self.human_list = [[0],[1,2,3,4],[5,6,7],[8,9,10,11,12],[13,14]]     # CC, h5
+            #self.human_list = [[0],[1,2,3,4],[5,6,7],[8,9,10,11],[12,13]]     # CC, h5
             self.time_limit = 500
             
             
@@ -1231,12 +1233,14 @@ class StageWorld():
             init_pose_list=[[0,-9,np.pi/2],
                             [-16,1.4,0],[-15.5,0.7,0],[-15.5,-0.7,0],[-16.0, -1.4, 0],
                             [-5.0,0,0],[-5.0,-1.0,0],[-4.0,-1.0,0],
-                            [6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[6.0,-1.2,np.pi],[7.0,0.0,np.pi],
+                            [6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,-1.2,np.pi],[7.0,0.0,np.pi],
+                            #[6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,0.0,np.pi],
                             [13.0,1.6,np.pi],[13.2,1.0,np.pi]]
             init_goal_list=[[0,9],
                             [16,-1.4],[16.0,-0.7],[16.0,0.7],[16.0, 1.4],
                             [16.0,0],[16.0,1.0],[16.0,1.0],
                             [-16.2,-0.7],[-16.0,0.0],[-16.7,0.6],[-16.0,1.2],[-16.5,0.0],
+                            #[-16.2,-0.7],[-16.0,0.0],[-16.7,0.6],[-16.5,0.0],
                             [-16.0,-1.6],[-16.2,-1.0]]
         elif rule == 'group_station_crossing':
             init_pose_list=[[8,-6,np.pi/2],

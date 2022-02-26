@@ -174,8 +174,8 @@ agent( pose [6.00 5.00 0.00 225.00] color "green")
 agent( pose [5.00 6.00 0.00 225.00] color "green")
 
 # Group 5: 8 humans
-#agent( pose [4.00 4.00 0.00 225.00])
-#agent( pose [4.00 5.00 0.00 225.00])
+agent( pose [4.00 4.00 0.00 225.00])
+agent( pose [4.00 5.00 0.00 225.00])
 #agent( pose [4.00 3.00 0.00 225.00])
 #agent( pose [3.00 3.00 0.00 225.00])
 #agent( pose [3.00 4.00 0.00 225.00])
