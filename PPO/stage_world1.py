@@ -77,7 +77,7 @@ class StageWorld():
         ## Group Cross Cross(십자)
         self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         # Group Station (역, 아래입구 as main, NW 입구 as 상행, NE 입구 as 하행), Main->NE or NW, NE -> Main, NW -< Main
-        #self.scenario = 'GrpStation_h22_grp4'
+        self.scenario = 'GrpStation_h22_grp4'
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -118,9 +118,9 @@ class StageWorld():
             self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13], [14,15,16,17,18,19,20,21]]   # GC, h21, grp5
         elif self.scenario == 'GrpCC_h15_grp4':
             self.rule = 'group_circle_crossing'
-            self.num_human = 16      # GC, h21, grp5
-            self.groups = [0, 1, 2, 3, 4]    # GC, h21, grp5
-            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13,14,15]]   # GC, h21, grp5
+            self.num_human = 22      # GC, h21, grp5
+            self.groups = [0, 1, 2, 3, 4, 5]    # GC, h21, grp5
+            self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10],[11,12,13, 14, 15]]   # GC, h21, grp5
             
         elif self.scenario == 'GrpStation_h22_grp4':
             self.rule = 'group_station_crossing'
