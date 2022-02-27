@@ -1711,7 +1711,7 @@ def generate_action_human_sf(env, pose_list, goal_global_list, num_env, robot_vi
             
         if scenario == 'GrpCross_h14_grp4':
             #obs = [[3.5,20,3.5,3.5],[3.5,20,-3.5,-3.5],[-3.5,-20,3.5,3.5],[-3.5,-20,-3.5,-3.5],[3.5,3.5,-3.5,-15],[3.5,3.5,3.5,15],[-3.5,-3.5,-3.5,-15],[-3.5,-3.5,3.5,15]]   # x1,x2,y1,y2
-            obs= [[3.5,5.5,-3,-3],[3.5,3.5,-5,-3],[-6,-3,-3,-3],[-3,-3,-5,-3]]
+            obs= [[3.5,5.5,-3,-3],[3.5,3.5,-5,-3],[-10,-3,-3,-3],[-3,-3,-5,-3],[-10,-3,3,3]]
 
             psf_sim = psf.Simulator(
                 initial_state[1:], groups=groups_ex_human, obstacles=obs, config_file="./pysocialforce/config/example.toml"
