@@ -579,7 +579,8 @@ class StageWorld():
         # This function draws social group shapes
         # given the positions and velocities of the pedestrians.
 
-        total_increments = 20 # controls the resolution of the blobs
+        #total_increments = 20 # controls the resolution of the blobs
+        total_increments = 80 # controls the resolution of the blobs  #0228
         quater_increments = total_increments / 4
         angle_increment = 2 * np.pi / total_increments
 
@@ -598,6 +599,7 @@ class StageWorld():
 
                 rel_ang = angle_increment * j
                 value = self.boundary_dist(velocity[i], rel_ang, laser_flag, const)
+                value *= 1.2  # 0228
                 addition_angle = velocity_angle + rel_ang
                 x = center_x + np.cos(addition_angle) * value
                 y = center_y + np.sin(addition_angle) * value
@@ -1232,8 +1234,10 @@ class StageWorld():
         elif rule == 'group_cross_crossing':
             init_pose_list=[[0,-9,np.pi/2],
                             [-16,1.4,0],[-15.5,0.7,0],[-15.5,-0.7,0],[-16.0, -1.4, 0],
-                            [-5.0,0,0],[-5.0,-1.0,0],[-4.0,-1.0,0],
-                            [6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,-1.2,np.pi],[7.0,0.0,np.pi],
+                            #[-5.0,0,0],[-5.0,-1.0,0],[-4.0,-1.0,0],
+                            [-5.0,0,0],[-5.0,-1.2,0],[-4.0,-1.2,0],  # 0228
+                            #[6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,-1.2,np.pi],[7.0,0.0,np.pi],
+                            [6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,-1.0,np.pi],[7.0,0.0,np.pi],   # 0228
                             #[6.2,0.7,np.pi],[5.0,0.0,np.pi],[5.7,-0.6,np.pi],[7.0,0.0,np.pi],
                             [13.0,1.6,np.pi],[13.2,1.0,np.pi]]
             init_goal_list=[[0,9],

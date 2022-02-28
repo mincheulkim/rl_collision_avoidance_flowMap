@@ -29,7 +29,7 @@ from dbscan.dbscan_new import DBSCAN_new
 # 에발류에이션  1.Max Episode 5000->500  2. test_policy False->True  3.SEED 1234 -> 4321
 MAX_EPISODES = 5000   # For Train    5000
 #MAX_EPISODES = 500   # For Train    5000
-#MAX_EPISODES = 100     # For Test
+#MAX_EPISODES = 200     # For Test
 LASER_BEAM = 512
 LASER_HIST = 3
 
