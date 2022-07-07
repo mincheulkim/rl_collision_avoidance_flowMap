@@ -1,3 +1,5 @@
+#### 220228 boundary_dist에서 velocity *= 1.2로 바꿨었음! 기존에는 1.0 (아예 없었음!!) performance에 미치는 영향!!
+
 import time
 
 from sympy import re
@@ -10,6 +12,8 @@ import numpy as np
 import lidar_to_grid_map as lg
 import matplotlib.pyplot as plt
 import cv2
+
+from matplotlib.pyplot import plot, draw, show
 
 
 from geometry_msgs.msg import Twist, Pose
@@ -71,8 +75,8 @@ class StageWorld():
         ## Narrow corrido
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         ## Group Circle Cross
-        self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
-        #self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
+        self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h15_grp4'     # 0222 for test
         ## Group Cross Cross(십자)
         #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
@@ -580,7 +584,7 @@ class StageWorld():
         # given the positions and velocities of the pedestrians.
 
         #total_increments = 20 # controls the resolution of the blobs
-        total_increments = 80 # controls the resolution of the blobs  #0228
+        total_increments = 80 # controls the resolution of the blobs  #0228 리포트때 480으로 함
         quater_increments = total_increments / 4
         angle_increment = 2 * np.pi / total_increments
 
@@ -599,7 +603,7 @@ class StageWorld():
 
                 rel_ang = angle_increment * j
                 value = self.boundary_dist(velocity[i], rel_ang, laser_flag, const)
-                value *= 1.2  # 0228
+                #value *= 1.2  # 0228 리포트때는 1.2배 함
                 addition_angle = velocity_angle + rel_ang
                 x = center_x + np.cos(addition_angle) * value
                 y = center_y + np.sin(addition_angle) * value
@@ -719,6 +723,22 @@ class StageWorld():
         #print(positions)       # [[1,1],[2,2]]    [[2.8896498104205963, 2.6215839730271973], [0.5328502413870305, 1.8637225827143853], [2.2420605229240325, 3.9390001662482153], [2.7590289592251427, 1.4688141316473313], [1.3278307894609154, 1.2985722552877585]]
         #print(velocities)      # [[0.2,0.2],[0.2,0.2]]   [[-0.511329087694693, -0.5343655529166533], [-0.6367084601515689, -0.4843576537760276], [-0.3653859186755444, -0.512861404743211], [-0.549097788376088, -0.47435513775756494], [-0.3493583111982035, 0.33289796577453096]]
 
+        ## 220303 HDBSCAN 결과 비쥬얼라이즈
+        #img = np.zeros([12,12,3])  # 20 x 20 
+        img = np.zeros([24,24,3])  # 20 x 20 
+        img[:,:,0]=0
+        img[:,:,1]=128
+        img[:,:,2]=0
+        for i in range(len(indiv_labels)):
+            img[23-int(positions[i][1]),int(positions[i][0]+12),0]=grp_labels[i]*25 /255.0
+            img[23-int(positions[i][1]),int(positions[i][0]+12),1]=grp_labels[i]*50 /255.0
+            img[23-int(positions[i][1]),int(positions[i][0]+12),2]=grp_labels[i]*75 /255.0
+        hsv = cv2.cvtColor(np.float32(img), cv2.COLOR_RGB2HSV)
+        hsv=cv2.resize(hsv, dsize=(240,240), interpolation=cv2.INTER_NEAREST)
+        #cv2.imshow('Group clutering result',hsv)    # gruop clustering result 보여주는 거 그룹 클러스터링 220420
+        #cv2.waitKey(1)
+
+
         # 1. Individual Drawing
         indiv_space=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
         #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
@@ -729,21 +749,62 @@ class StageWorld():
             indiv_space_vertices = np.array(indiv_space[i])
             plt.plot(indiv_space_vertices[:,0],indiv_space_vertices[:,1])
         '''
-        
+      
         # 2. Group Drawing
         grp_space=self.draw_all_social_spaces(grp_labels, positions, velocities, False)
         #kkk=self.draw_all_social_spaces(indiv_labels, positions, velocities, False)
         #print(grp_space)
         grp_space=np.array(grp_space)
-
-        '''
+        
+        
+        
+        plt.title("Social group zones")
+        
+        #### 0303 SGZ visualize!
+        plt.clf()
+        #print('grp::',grp_space.shape[0], 'grp_labels::',grp_labels)
+        plt.ion()  
         for i in range(grp_space.shape[0]):
+            #print(i,'번째의 그룹 라벨색:',grp_labels[i])
+            ddddd='black'
+            if i+1==0:
+                ddddd='blue'
+            elif i+1==1:
+                ddddd='orange'
+            elif i+1==2:
+                ddddd='green'
+            elif i+1==3:
+                ddddd='red'
+            else:
+                ddddd='black'
             grp_space_vertices = np.array(grp_space[i])
-            plt.plot(grp_space_vertices[:,0],grp_space_vertices[:,1])
+            plt.plot(grp_space_vertices[:,0],grp_space_vertices[:,1], color=ddddd)         
+        
+        for i in range(len(indiv_labels)):  # 개인 도시
+            #print(i,'번째의 indiv_labels:',indiv_labels[i],'그룹 라벨:',grp_labels[i])
+            ccccc='black'
+            if grp_labels[i]==0:
+                ccccc='blue'
+                plt.plot(positions[i][0],positions[i][1],'o', color='blue')
+            elif grp_labels[i]==1:
+                ccccc='orange'
+                plt.plot(positions[i][0],positions[i][1],'o', color='orange')
+                #print('오렌지 색칠')
+            elif grp_labels[i]==2:
+                ccccc='green'
+                plt.plot(positions[i][0],positions[i][1],'o', color='green')
+                #print('그린 색칠')
+            elif grp_labels[i]==3:
+                ccccc='red'
+                plt.plot(positions[i][0],positions[i][1],'o', color='red') 
+            else:
+                ccccc='black'
+                plt.plot(positions[i][0],positions[i][1],'o', color='black')
             
-        plt.axis([-3, 3, 0, 6])    
-        '''
-        #plt.show()
+        plt.axis([-7, 7, -1, 7])      # [-6, 6, 0, 6]
+        
+        #plt.show(block=False)
+
         
         #print(indiv_space.shape)      # (num_of_indiv, vertice numbers, (pos))   3, 20, 2
         
@@ -1271,6 +1332,8 @@ class StageWorld():
             py = np.random.choice([-6,6], 1)
             init_pose_list[0]=[px[0],py[0],np.pi/2]
             init_goal_list[0]=[-px[0],-py[0]]
+            #init_pose_list[0]=[6,-6,np.pi/2]  # 왜넣었지?
+            #init_goal_list[0]=[-6,6]
 
 
         elif 'circle_crossing':

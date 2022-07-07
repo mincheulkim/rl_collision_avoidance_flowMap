@@ -57,9 +57,9 @@ LEARNING_RATE = 5e-5
 LM_visualize = False    # True or False         # visualize local map(s)
 DBSCAN_visualize=False
 LIDAR_visualize = False    # 3 row(t-2, t-1, t), rows(512) => 3*512 2D Lidar Map  to see interval t=1 is available, what about interval t=5
-policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
+#policy_list = 'corl'      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021)]
 #policy_list = 'corl_ind'   # 220217
-#policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
+policy_list = ''      # select policy. [LM, stacked_LM, ''(2018), concat_LM(convLSTM), depth_LM(TODO), baseline_LM(IROS2021), baseline_ours_LM]
 #policy_list = 'ORCA'
 robot_visible = False           # 220118
 test_policy=False      # For test:True, For Train: False(default)
@@ -250,9 +250,9 @@ def run(comm, env, policy, policy_path, action_bound, optimizer):
                 v, a, logprob, scaled_action, pedestrian_list=generate_action_orca(env=env, state_list=robot_state, pose_list=pose_list, velocity_list=speed_poly_list, policy=policy, action_bound=action_bound, clustering=env.clustering_method, goal_global_list=goal_global_list, policy_list = env.scenario, mode=test_policy)
             else:
                 v, a, logprob, scaled_action=generate_action(env=env, state_list=robot_state, policy=policy, action_bound=action_bound, mode=test_policy)
-            
+                
             #print(pedestrian_list, pedestrian_list.shape)
-            
+
             #print(Sensor_map.shape, LM_stack.shape)       # (1, 1, 60,60)   (1,3,60,60)   # batch, channel, w, h
             #print(np.array(LM_stack).shape)              # (8,3,60,60)
 

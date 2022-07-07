@@ -16,6 +16,9 @@ import copy
 from dbscan.dbscan_new import DBSCAN_new
 from dbscan.hdbscan_new import HDBSCAN_new
 
+from numpy import dot
+from numpy.linalg import norm
+
 
 
 hostname = socket.gethostname()
@@ -333,7 +336,9 @@ def generate_action_corl(env, state_list, pose_list, velocity_list, policy, acti
         mod_diff_x = dx_rot
         mod_diff_y = dy_rot
 
-        if np.abs(mod_diff_x)<=3.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
+        #if np.abs(mod_diff_x)<=3.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
+        #if np.abs(mod_diff_x)<=6.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and i != 0:
+        if np.abs(mod_diff_x)<=6.0 and mod_diff_y>=0.0 and mod_diff_y <=6.0 and np.sqrt(mod_diff_x**2+mod_diff_y**2)<=6.0 and i != 0:
             #print(mod_diff_x,mod_diff_y,dvx_rot,dvy_rot)
             #print(i,'의 포즈:',[mod_diff_x,mod_diff_y])
             xx=copy.deepcopy(mod_diff_x)
@@ -485,16 +490,21 @@ def generate_action_orca(env, state_list, pose_list, velocity_list, policy, acti
     #print('오르카 골 글로벌 리스트:',orca_goal_global_list)
     
     sim = rvo2.PyRVOSimulator(1/60., 3, 5, 5, 5, 0.5, 1)  # 211108   # neighborDist, maxNeighbors, timeHorizon, TimeHorizonObst, radius, maxspeed
-    human_max_speed = 0.8
+    human_max_speed = 1.0 #0.8
     
-    for i in range(len(orca_p_list)):  # i=0, 1,2,3,4
-        sim.addAgent(tuple(p_list[i]))
-        hv = goal_global_list[i] - p_list[i] 
+    for i in range(len(orca_p_list)):  # i=0, 1,2,3,4   로봇 + Fov에 들어온 사람
+        #sim.addAgent(tuple(p_list[i]))
+        #hv = goal_global_list[i] - p_list[i] 
+        sim.addAgent(tuple(orca_p_list[i]))
+        hv = goal_global_list[i] - orca_p_list[i] 
         hs = np.linalg.norm(hv)     # 211027   get raw_scaled action from learned policy
         #prefv=hv/hs if hs >1 else hv
         prefv=hv/hs if hs >human_max_speed else hv
         prefv *= human_max_speed
         sim.setAgentPrefVelocity(i, tuple(prefv))
+    #print(orca_p_list)
+        
+    #sim.setAgentPrefVelocity(0, (0.5,0))
 
     #print('폴리시 리스트:',policy_list)
     #refer: https://github.com/sybrenstuvel/Python-RVO2/blob/master/README.md
@@ -513,12 +523,57 @@ def generate_action_orca(env, state_list, pose_list, velocity_list, policy, acti
     scaled_action = []       
     for i in range(len(orca_p_list)):  # num_env=3,  i=0, 1,2
         scaled_action.append(sim.getAgentVelocity(i))
+        #print(i, orca_p_list[i], orca_p_list[i]-orca_p_list[0])
 
     #pedestrain_list = [pedestrain_list]
     pedestrain_list = np.array(pedestrain_list)
+    
+    List1 = np.array(scaled_action)
+    List2 = np.array(scaled_action[0])
+    
+    #print('스케일드 액션:',scaled_action)
+    similarity_scores = List1.dot(List2)/ (np.linalg.norm(List1, axis=1) * np.linalg.norm(List2))
+    print(similarity_scores)
+    #print(orca_p_list)
+    
+    # 추가한 부분
+    for i in range(len(orca_p_list)):
+        '''
+        # Modification 0. original
+        pass
+        '''
+        '''
+        # Modification 1. relative distance 고려. 유사도 긍정적이면 attraction force, 그 외에는 모두 repulsion force
+        scaled_action[0] -= (orca_p_list[i] - orca_p_list[0]) * 0.5   # option 1 oscillation 심하지만 충돌은 x
+        if similarity_scores[i] > 0:
+            scaled_action[0] += (orca_p_list[i] - orca_p_list[0]) * 0.5   # option 1 oscillation 심하지만 충돌은 x
+        '''
         
-    #print('스케일드 액숀!',scaled_action)
-
+        
+        # Modification 2. 유사도 X 속도
+        print('시밀 스코어:',similarity_scores[i])
+        print('스케이 ㄹ액션:',scaled_action[i])
+        print(np.multiply(scaled_action[i],similarity_scores[i]))
+        scaled_action[0] += np.multiply(scaled_action[i],similarity_scores[i])
+        
+        
+        
+        #scaled_action[0] -= float([0,0]) * 0.5   # option 1 oscillation 심하지만 충돌은 x
+        #print(similarity_scores[i], scaled_action[i])
+        #score = float(similarity_scores[i])
+        #scaled_action[0] += score * scaled_action[i]
+        #print(orca_p_list[i] - orca_p_list[0])
+        
+        #print('why:',np.multiply(similarity_scores[i] * scaled_action[i]))
+        #scaled_action[0] += similarity_scores[i] * scaled_action[i]
+        #else:
+        #    scaled_action[0] -= (orca_p_list[i] - orca_p_list[0]) * 0.5   # option 1 oscillation 심하지만 충돌은 x
+    
+    
+    print('스케일 액션:',scaled_action[0])
+    scaled_action[0] *= 0.5   # original일때는 이부분 주석처리 해줘야 함.
+    print('스케일드 액숀!',scaled_action)
+    #scaled_action[0]=[1,0]
     return v, a, logprob, scaled_action, pedestrain_list
 
 def generate_action_LM(env, state_list, pose_list, velocity_list, policy, action_bound, LM_stack, mode=False):   # 211130
