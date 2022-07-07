@@ -57,6 +57,16 @@ tensorboard --logdir runs/
 ```
 
 
+## Implement
+1. start 3 windows
+2. every windows, move project_ws/src
+3. source devel/setup.bash
+4. [window 1] roscore
+5. [window 2] move src/rl_~~ folder ) rosrun stage_ros_add_~~ stageros worlds/~~~
+6. [window 3] move src/rl_~~/PPO ) python ppo_stage_single.py
+
+
+
 ## References
 
 ```
