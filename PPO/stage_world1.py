@@ -12,7 +12,6 @@ import numpy as np
 import lidar_to_grid_map as lg
 import matplotlib.pyplot as plt
 import cv2
-
 from matplotlib.pyplot import plot, draw, show
 
 
@@ -39,7 +38,6 @@ class StageWorld():
 
         self.pose_list = []
         self.speed_poly_list = []  # 220104
-        
         self.crash_list = []  # 220107
 
         self.beam_mum = beam_num   # 512
@@ -55,8 +53,8 @@ class StageWorld():
         self.map_size = np.array([8., 8.], dtype=np.float32)  # 20x20m
         self.goal_size = 0.5
 
-        self.robot_value = 10.
-        self.goal_value = 0.
+        self.robot_value = 10.   # ????
+        self.goal_value = 0.     # ????
         # self.reset_pose = None
 
         self.init_pose = None
@@ -74,10 +72,11 @@ class StageWorld():
         #self.scenario = 'CC_h5' 
         ## Narrow corrido
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
-        ## Group Circle Cross
+        ## Group Circle Cross(원)
+        self.scenario = 'GrpCC_h10_grp3'     # 써클, 그룹3, 10명
         #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
-        self.scenario = 'GrpCC_h10_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h15_grp4'     # 0222 for test
+        #self.scenario = 'GrpCC_h21_grp5'     # 써클, 그룹 5, 21명
         ## Group Cross Cross(십자)
         #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         # Group Station (역, 아래입구 as main, NW 입구 as 상행, NE 입구 as 하행), Main->NE or NW, NE -> Main, NW -< Main
@@ -158,19 +157,20 @@ class StageWorld():
         crash_mf = message_filters.ApproximateTimeSynchronizer(sub_crash_list, queue_size, delay, allow_headerless=True)
         crash_mf.registerCallback(self.crash_callback_mf)
 
+        self.is_dead = False
 
-        # -----------Publisher and Subscriber-------------
+        # -----------Publisher-------------
         cmd_vel_topic = 'robot_' + str(index) + '/cmd_vel'
         self.cmd_vel = rospy.Publisher(cmd_vel_topic, Twist, queue_size=10)
 
         cmd_pose_topic = 'robot_' + str(index) + '/cmd_pose'
         self.cmd_pose = rospy.Publisher(cmd_pose_topic, Pose, queue_size=2)
-
+        
+        # ---------Subscriber-----------------        
         object_state_topic = 'robot_' + str(index) + '/base_pose_ground_truth'
         self.object_state_sub = rospy.Subscriber(object_state_topic, Odometry, self.ground_truth_callback)    # input stage(argument), dataType, called function
 
         laser_topic = 'robot_' + str(index) + '/base_scan'
-
         self.laser_sub = rospy.Subscriber(laser_topic, LaserScan, self.laser_scan_callback)
 
         odom_topic = 'robot_' + str(index) + '/odom'
@@ -178,7 +178,6 @@ class StageWorld():
 
         crash_topic = 'robot_' + str(index) + '/is_crashed'
         self.check_crash = rospy.Subscriber(crash_topic, Int8, self.crash_callback)
-
 
         self.sim_clock = rospy.Subscriber('clock', Clock, self.sim_clock_callback)
         
@@ -202,8 +201,10 @@ class StageWorld():
 
 
         while self.scan is None or self.speed is None or self.state is None\
-                or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:
+                or self.speed_GT is None or self.state_GT is None or self.speed_poly is None:   # self.speed_poly는 내가 넣은듯?
+            #print(self.scan)  # CZwahn이 넣은거
             pass
+        
         rospy.sleep(1.)
         # # What function to call when you ctrl + c
         # rospy.on_shutdown(self.shutdown)
@@ -249,8 +250,8 @@ class StageWorld():
         v_x = GT_odometry.twist.twist.linear.x
         v_y = GT_odometry.twist.twist.linear.y
         v = np.sqrt(v_x**2 + v_y**2)
-        self.speed_GT = [v, GT_odometry.twist.twist.angular.z]
-        self.speed_poly = [v_x, v_y]
+        self.speed_GT = [v, GT_odometry.twist.twist.angular.z]   # added
+        self.speed_poly = [v_x, v_y]   # added
 
 
     def laser_scan_callback(self, scan):
@@ -258,6 +259,14 @@ class StageWorld():
                            scan.scan_time, scan.range_min, scan.range_max]
         self.scan = np.array(scan.ranges)
         self.laser_cb_num += 1
+        
+    def laser_dead_callback(self, dead_scan):   # no meaning?
+        self.scan_dead = np.array(dead_scan.ranges)
+        self.scan_dead[np.isnan(self.scan_dead)] = 0.6
+        self.scan_dead[np.isinf(self.scan_dead)] = 0.6
+        dead_scan_min = np.min(self.scan_dead)
+        if dead_scan_min < 0.6:
+            self.is_dead = True
 
 
     def odometry_callback(self, odometry):
@@ -278,18 +287,18 @@ class StageWorld():
     def get_self_speedGT(self):
         return self.speed_GT
     
-    def get_env_pose(self):
+    def get_env_pose(self):   # added
         return self.pose_list
 
-    def get_self_speed_poly(self):
+    def get_self_speed_poly(self):   # added
         return self.speed_poly
 
-    def get_self_state_rot(self):
+    def get_self_state_rot(self):   # added
         return self.state_GT[2]
 
     def get_laser_observation(self):
         scan = copy.deepcopy(self.scan)  # from laser_scan_callback   # self.scan = np.array(scan.ranges)
-        scan[np.isnan(scan)] = 6.0       # NaN or INF set 6
+        scan[np.isnan(scan)] = 6.0       # NaN or INF set 6    # CZwang은 10.0으로 함
         scan[np.isinf(scan)] = 6.0
         raw_beam_num = len(scan)
         sparse_beam_num = self.beam_mum   # 512
@@ -330,12 +339,10 @@ class StageWorld():
         cv2.imshow('image',hsv)
         cv2.waitKey(1)
         '''
-        
-
+    
         for x in range(int(sparse_beam_num / 2)):   # 256
             sparse_scan_left.append(scan[int(index)])
             index += step    # 1~256
-
 
         sparse_scan_right = []   # right scan
         index = raw_beam_num - 1.
@@ -346,22 +353,78 @@ class StageWorld():
 
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
-        scan_sparse = scan_sparse[::-1]    # 211115  fliped input
+        #scan_sparse = scan_sparse[::-1]    # 211115  fliped input    # 이거 내가 추가했던거 TODO 
 
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
+    
+    # 220711 from ppo.py. generate_action_baseline_LM()
+    def get_pedestrain_observation(self, pose_list, velocity_list):
+        # Build occupancy map
+        cell_size=1*0.5   # Resolution
+        map_size=6        # Lidar Sensor Arrange
+        local_maps = []
+        
+        pose_list = np.asarray(pose_list)
+        robot_rot = pose_list[0,2]
+        robot_rot += np.pi*3/2   # 220125   # from generate_action_corl
+    
+        
+        speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
+        
+        local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
+        
+        for j in range(3):  # pos, velx,vely
+            for i, pose in enumerate(pose_list):
+                diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+                #print('로봇 rot:',robot_rot)
+                # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
+                dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+                dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+                
+                diff_vel = speed_poly_list - speed_poly_list[0]
+                dvx_rot = diff_vel[0]*np.cos(robot_rot)+diff_vel[1]*np.sin(robot_rot)
+                dvy_rot = -diff_vel[0]*np.sin(robot_rot)+diff_vel[1]*np.cos(robot_rot)
+                
+                # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
+                # 현재 아래 mod_diff는 로봇 중심 정사각형(360도)로 볼수 있게 한거
+                mod_diff_x = np.floor((dx_rot+3)/cell_size)
+                #mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
+                mod_diff_y = np.ceil((map_size-dy_rot)/cell_size)
+                            
+                
+                #print('index max:',index)
+                
+                if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                    if j==0:   # grp idx    
+                        # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
+                        #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
+                        #print(index)
+                        #print(i,'번째 사람의 index:',index[i-1]+1 , num_grp_dist_array[index[i-1]])
+                        #print(i, 1/num_grp_dist_array[index[i-1]])
+                    # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
+                    elif j==1: # vel x
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                        #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
+                    elif j==2: # vel y
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                        #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
+            local_maps.append(local_map.tolist())
+            local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
+            
+        local_maps = np.array(local_maps) # 3,60,60
+        return local_maps
 
+    # ADDED
     def collision_laser_flag(self, r):
         scan = copy.deepcopy(self.scan)
         scan[np.isnan(scan)] = 6.0
         scan[np.isinf(scan)] = 6.0
-
         scan_min = np.min(scan)
-
         if scan_min <= r:
             self.is_collision = 1
         else:
             self.is_collision = 0
-
         self.scan_min = scan_min
         
     def get_min_lidar_dist(self):
@@ -370,8 +433,6 @@ class StageWorld():
         scan[np.isinf(scan)] = 6.0
         scan_min=np.min(scan)
         return scan_min
-        
-    
 
 
     def get_self_speed(self):
@@ -386,26 +447,19 @@ class StageWorld():
     def get_sim_time(self):
         return self.sim_time
 
-    def get_goal_point(self):  # 211102
+    def get_goal_point(self):  # 211102 ADDED
         return self.goal_point
+    
+    def get_sensor_map(self):  # ADDED
+        return self.map1
 
     def get_local_goal(self):
-        
-        
-
         [x, y, theta] = self.get_self_stateGT()   # robot state
-        
-        #theta += np.pi*3/2   # 220128 erase me!!
-
         [goal_x, goal_y] = self.goal_point        # robot generated goal(global)
         local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
         return [local_x, local_y]
     
-    def get_sensor_map(self):
-        return self.map1
-
-
     def reset_world(self):
         self.reset_stage()
         self.self_speed = [0.0, 0.0]
@@ -413,7 +467,7 @@ class StageWorld():
         self.step_r_cnt = 0.
         self.start_time = time.time()
         #rospy.sleep(0.5)
-        rospy.sleep(1.0)   # 211214
+        rospy.sleep(1.0)   # 211214 이게 원래 디폴트로 되어있던거임
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
@@ -424,120 +478,42 @@ class StageWorld():
         self.distance = copy.deepcopy(self.pre_distance)
 
     # TODO: Reward reshape: penalty for circuling around
-    def get_reward_and_terminate(self, t, scaled_action, policy_list):   # t is increased 1, but initializezd 1 when terminate=True
+    def get_reward_and_terminate(self, t):
         terminate = False
-        laser_scan = self.get_laser_observation()   # new laser scan(Because excuted action)
-        [x, y, theta] = self.get_self_stateGT()     # "updated" current state
-        [v, w] = self.get_self_speedGT()            # updated current velocity
-        self.pre_distance = copy.deepcopy(self.distance)   # previous distance to local goal
-        # Propotional Reward
-        self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)  # updated new distance to local goal after action
-        reward_g = (self.pre_distance - self.distance) * 2.5  # REWARD for moving forward, later reach goal reward(+15)  # original
-        #reward_g = (self.pre_distance - self.distance) * 1.5  # REWARD for moving forward, later reach goal reward(+15)
-        reward_c = 0  # collision penalty
-        reward_w = 0  # too much rotation penalty
+        laser_scan = self.get_laser_observation()
+        [x, y, theta] = self.get_self_stateGT()
+        [v, w] = self.get_self_speedGT()
+        self.pre_distance = copy.deepcopy(self.distance)
+        self.distance = np.sqrt((self.goal_point[0] - x) ** 2 + (self.goal_point[1] - y) ** 2)
+        reward_g = (self.pre_distance - self.distance) * 2.5
+        reward_c = 0
+        reward_w = 0
         result = 0
-        is_crash = self.get_crash_state()   # return self.is_crashed
+        is_crash = self.get_crash_state()
 
-        if self.distance < self.goal_size:  # success reward
+        if self.distance < self.goal_size:
             terminate = True
-            reward_g = 15
-            #reward_g = 35
+            reward_g = 5
             result = 'Reach Goal'
 
-        if is_crash == 1:                   # collision penalty
+        if is_crash == 1:
             terminate = True
-            reward_c = -15.
-            #reward_c = -30.
-            result = 'Crashed(ROS)'
-        
-        # 220119 Collision check by rel.dist around 360 degree
-        
-        min_dist_rrr = 10.0   # 220119
-        pose_list_np = np.array(self.pose_list)
-        rel_dist_list = pose_list_np[:,0:2]-pose_list_np[0,0:2]
-        # 220124 disabled for 더 높은 성공률 위해
-        for i in rel_dist_list[1:]:
-            min_dist = np.sqrt(i[0]**2+i[1]**2)
-            if min_dist < min_dist_rrr:
-                min_dist_rrr = min_dist
-            if min_dist < 0.6:
-                terminate = True
-                reward_c = -15.
-                result = 'Crashed(Compuatation)'
-                break
-        
-        
-        '''
-        # Lidar collsion check 211215
-        self.collision_laser_flag(r=0.4)
-        if self.is_collision==1:
-            #print(self.index, 'is_collision : ',self.is_collision, 'min_dist_LIDAR:',self.scan_min)
-            terminate = True
-            reward_c = -15.
-            result = 'Crashed(LIDAR)'
-        '''
-    
-        # 220119. 관측된 라이다 거리에 반비례해서 penalty linear하게 받게. for 충돌 회피. 1 = 0, 0.8 = 0.2, 0.6 = 0.4
-        kkk = self.get_min_lidar_dist()
-        #print(kkk, min_dist_rrr)
-        penalty_lidar = 0.
-        if kkk <= 1.0:
-            penalty_lidar = (-1. + kkk)/10
-        
-        # 220119. timestep penalty
-        #constant_penalty = -0.005
-        
-        # ROTATION PENALTY       
-        if np.abs(w) >  1.05:               # rotation penalty
-            reward_w = -0.1 * np.abs(w)
-            #reward_w = -0.45 * np.abs(w) **2
+            reward_c = -1.
+            result = 'Crashed'
 
-        '''
-        # 211221 add a penalty for going backwoards
-        if scaled_action[0]<0:
-            r_back = -0.45 * np.abs(scaled_action[0])
-        else:
-            r_back = 0
-        '''
-        #print(self.time_limit)
-        if t > self.time_limit:  # timeout check  220205 For Group corridor
-        #if t > 1000:  # timeout check  220119 after weekly. our가 TO 더 높게 나와서, 더 크게 줌
-            terminate = True      
+        if self.is_dead == 1:
+            terminate = True
+            reward_c = -1.
+            result = 'Crashed'
+
+        reward = reward_g + reward_c 
+
+        if t >= 1000 and (not is_crash or not self.is_dead) :
+            reward = -0.1 
+            terminate = True
             result = 'Time out'
-        
-        #print(idx, g_cluster[0], g_cluster)
-        # 211231 compute distance from robot to convex hull of groups
-        '''
-        dist_to_grp = np.zeros(len(g_cluster))
-        for j in range(len(g_cluster)):
-            #print(g_cluster[j], len(g_cluster[j][0]))
-            if len(g_cluster[j][0])==0 or len(g_cluster[j][0])==1:
-                print('zero or soely!')
-            elif len(g_cluster[j][0])==2:  # 2 humans                
-                dist_to_grp[j] = self.point_to_segment_dist(g_cluster[j][0][0][0],g_cluster[j][0][0][1],g_cluster[j][0][1][0],g_cluster[j][0][1][1], x, y)
-            else:       # more than 3
-                hull = ConvexHull(g_cluster[j][0])
-                dists = []
-                vert_pos = g_cluster[j][0][hull.vertices]
-                for i in range(len(vert_pos)-1):
-                    dists.append(self.point_to_segment_dist(vert_pos[i][0],vert_pos[i][1],vert_pos[i+1][0],vert_pos[i+1][1], x, y))
-                dist_to_grp[j] = min(dists)
-        collision_dist = 0.5
-        coll_grp = np.array([1 if (dist_to_grp[j] < collision_dist) else 0 for j in range(len(g_cluster))])
-        reward_grp = -0.25 * coll_grp.sum()   # 0,1,2,~ max grp num
-        '''
-        
-        # 220124
-        if policy_list == 'concat_LM' or policy_list =='stacked_LM' or policy_list=='LM' or policy_list=='depth_LM' or policy_list=='baseline_LM' or policy_list=='baseline_ours_LM' or policy_list=='ours_LM':
-            reward = reward_g + reward_c + reward_w + penalty_lidar # 220119 관측된 lidar dist 비례 페널티 추가
-        elif policy_list == '' or policy_list =='ORCA':
-            reward = reward_g + reward_c + reward_w
-        #reward = reward_g + reward_c + reward_w  # original befrom 220119
-        #reward = reward_g + reward_c + reward_w + reward_grp  # 211231 dynamic group collision penalty added
-        #reward = reward_g + reward_c + reward_w + r_back # 211221   # raw policy에서 뒤로 갈때 페널티
 
-        return reward, terminate, result   # float, T or F(base), description
+        return reward, terminate, result
     
     def boundary_dist(self, velocity, rel_ang, laser_flag, const=0.354163):
         # Parameters from Rachel Kirby's thesis
@@ -986,8 +962,8 @@ class StageWorld():
 
     def reset_pose(self):
         random_pose = self.generate_random_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
-        #random_pose = self.generate_random_circle_pose()   # return [x, y, theta]   [-9~9,-9~9], dist>9     # this lines are for random start pose
-        rospy.sleep(0.01)
+        #rospy.sleep(0.01)
+        rospy.sleep(1.0)   # 220708 from CZwan
         self.control_pose(random_pose)   # create pose(Euler or quartanion) for ROS
         [x_robot, y_robot, theta] = self.get_self_stateGT()   # Ground Truth Pose
 
@@ -995,7 +971,10 @@ class StageWorld():
         while np.abs(random_pose[0] - x_robot) > 0.2 or np.abs(random_pose[1] - y_robot) > 0.2:  # np.bas: absolute, compare # generated random pose with topic pose
             [x_robot, y_robot, theta] = self.get_self_stateGT()    # same
             self.control_pose(random_pose)
-        rospy.sleep(0.01)
+        #rospy.sleep(0.01)
+        rospy.sleep(1.0)   # 220708 from CZwan
+        self.is_dead = False
+
 
     def control_vel(self, action):   # real action as array[0.123023, -0.242424]. from
         move_cmd = Twist()
@@ -1007,6 +986,7 @@ class StageWorld():
         move_cmd.angular.z = action[1]
         self.cmd_vel.publish(move_cmd)
         
+    # ADDED
     def control_vel_specific(self, action, index):   # real action as array[0.123023, -0.242424]. from
         move_cmd = Twist()
         move_cmd.linear.x = action[0]
@@ -1063,6 +1043,13 @@ class StageWorld():
     def generate_random_pose(self):
         #x = np.random.uniform(-9, 9)
         #y = np.random.uniform(-9, 9)
+        #dis = np.sqrt(x ** 2 + y ** 2)
+        #while (dis > 9) and not rospy.is_shutdown():
+        #    x = np.random.uniform(-9, 9)
+        #    y = np.random.uniform(-9, 9)
+        #    dis = np.sqrt(x ** 2 + y ** 2)   
+        #theta = np.random.uniform(0, 0.5 * np.pi)
+        #return [x, y, theta]     
         if self.index == 0:  # For robot
             x = 0
             y = -8
@@ -1082,14 +1069,7 @@ class StageWorld():
         else:
             x = np.random.uniform(-7, 7)
             y = np.random.uniform(-7, 7)
-        #dis = np.sqrt(x ** 2 + y ** 2)
-        #while (dis > 9) and not rospy.is_shutdown():
-        #    x = np.random.uniform(-9, 9)
-        #    y = np.random.uniform(-9, 9)
-        #    dis = np.sqrt(x ** 2 + y ** 2)
         theta = np.random.uniform(0, 0.5 * np.pi)
-        #if self.index ==0:
-        #    theta = np.pi*0.5
         return [x, y, theta]
 
     # 211110
