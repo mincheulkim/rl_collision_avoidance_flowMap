@@ -209,8 +209,8 @@ def run(comm, env, agent, policy_path, args):
             
             for i in range(num_human):
                 if i==0:
-                    #env.control_vel_specific(real_action, i)
-                    env.control_vel_specific([1.0,0], i)
+                    env.control_vel_specific(real_action, i)
+                    #env.control_vel_specific([1.0,0], i)
                 else:
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
@@ -301,9 +301,11 @@ def run(comm, env, agent, policy_path, args):
                             '################'.format(i_episode))
 
 
-        print("Episode: {}, episode steps: {}, reward: {}, result: {}".format(i_episode, episode_steps, round(reward, 2), result))
+        #print("Episode: {}, episode steps: {}, reward: {}, result: {}".format(i_episode, episode_steps, round(reward, 2), result))
+        print("Episode: {}, episode steps: {}, reward: {}, result: {}".format(i_episode, episode_steps, episode_reward, result))  # 220711. 1.round제거 2.reward->episode_reward
 
-        avg_reward += round(episode_reward, 2)
+        #avg_reward += round(episode_reward, 2)
+        avg_reward += episode_reward  # 220711
         if avg_cnt % 100 == 0:
             print("Average reward: {}".format(avg_reward/avg_cnt))
             writer.add_scalar('Avg.reward/100', avg_reward/avg_cnt, avg_cnt/100)   # ADDED
@@ -362,13 +364,14 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_3500'
-        file_critic_1 = policy_path + '/critic_1_epi_3500'
-        file_critic_2 = policy_path + '/critic_2_epi_3500'
+        file_policy = policy_path + '/policy_epi_500'
+        file_critic_1 = policy_path + '/critic_1_epi_500'
+        file_critic_2 = policy_path + '/critic_2_epi_500'
 
         if os.path.exists(file_policy):
             logger.info('###########################################')
             logger.info('############Loading Policy Model###########')
+            print(file_policy)
             logger.info('###########################################')
             state_dict = torch.load(file_policy)
             agent.policy.load_state_dict(state_dict)
