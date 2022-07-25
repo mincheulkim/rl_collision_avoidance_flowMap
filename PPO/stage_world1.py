@@ -141,7 +141,8 @@ class StageWorld():
         
         for i in range(self.num_human):
         #for i in range(21):   # 220102
-            sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
+            #sub = message_filters.Subscriber('robot_' + str(i) + '/base_pose_ground_truth', Odometry)
+            sub = message_filters.Subscriber('robot_' + str(i) + '/odom', Odometry)   # 220720  http://wiki.ros.org/stage_ros
             sub_list.append(sub)
             
             crash_sub = message_filters.Subscriber('robot_' + str(i) + '/is_crashed', Int8)
@@ -353,7 +354,7 @@ class StageWorld():
 
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
-        #scan_sparse = scan_sparse[::-1]    # 211115  fliped input    # 이거 내가 추가했던거 TODO 
+        scan_sparse = scan_sparse[::-1]    # 211115  fliped input    # 이거 내가 추가했던거 TODO 
 
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
     
@@ -373,7 +374,8 @@ class StageWorld():
         
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
         
-        for j in range(3):  # pos, velx,vely
+        #for j in range(3):  # pos, velx,vely
+        for j in range(2):  # velx, vely
             for i, pose in enumerate(pose_list):
                 diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
                 #print('로봇 rot:',robot_rot)
@@ -395,18 +397,21 @@ class StageWorld():
                 #print('index max:',index)
                 
                 if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
+                    '''
                     if j==0:   # grp idx    
                         # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
-                        #local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=(index[i-1]+1)/(np.max(index)+1)  # 220119 grp index starts from 0...
                         local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
-                        #print(index)
-                        #print(i,'번째 사람의 index:',index[i-1]+1 , num_grp_dist_array[index[i-1]])
-                        #print(i, 1/num_grp_dist_array[index[i-1]])
                     # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
                     elif j==1: # vel x
                         local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
                         #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
                     elif j==2: # vel y
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
+                        #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
+                    '''
+                    if j==0:   # grp idx    
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
+                    elif j==1: # vel x
                         local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
                         #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
             local_maps.append(local_map.tolist())
@@ -559,8 +564,8 @@ class StageWorld():
         # This function draws social group shapes
         # given the positions and velocities of the pedestrians.
 
-        #total_increments = 20 # controls the resolution of the blobs
-        total_increments = 80 # controls the resolution of the blobs  #0228 리포트때 480으로 함
+        total_increments = 20 # controls the resolution of the blobs
+        #total_increments = 80 # controls the resolution of the blobs  #0228 리포트때 480으로 함
         quater_increments = total_increments / 4
         angle_increment = 2 * np.pi / total_increments
 
@@ -681,6 +686,7 @@ class StageWorld():
         grp_labels=[]
         positions = []
         velocities = []
+        rotations = [] # 220723
         
         for idx, ped in enumerate(pedestrian_list):
             if pedestrian_list[idx][6] != 0:
@@ -693,13 +699,17 @@ class StageWorld():
                 grp_labels.append(grp_label)
                 positions.append(position)
                 velocities.append(velocity)
+                rotation = [np.arctan2(pedestrian_list[idx][1],pedestrian_list[idx][0])]    # 220723
+                rotations.append(rotation)   # 220723
 
-        #print(indiv_labels)    # [6, 8]    [1, 2, 3, 5, 9]
-        #print(grp_labels)      # [1, 1]    [1, 3, 1, 1, 2]
-        #print(positions)       # [[1,1],[2,2]]    [[2.8896498104205963, 2.6215839730271973], [0.5328502413870305, 1.8637225827143853], [2.2420605229240325, 3.9390001662482153], [2.7590289592251427, 1.4688141316473313], [1.3278307894609154, 1.2985722552877585]]
-        #print(velocities)      # [[0.2,0.2],[0.2,0.2]]   [[-0.511329087694693, -0.5343655529166533], [-0.6367084601515689, -0.4843576537760276], [-0.3653859186755444, -0.512861404743211], [-0.549097788376088, -0.47435513775756494], [-0.3493583111982035, 0.33289796577453096]]
+        #print('++++++++++++++++++++++++++++++')
+        #print('ind_label:',indiv_labels)    # [6, 8]    [1, 2, 3, 5, 9]
+        #print('grp_label:',grp_labels)      # [1, 1]    [1, 3, 1, 1, 2]
+        #print('pose:',positions)       # [[1,1],[2,2]]    [[2.8896498104205963, 2.6215839730271973], [0.5328502413870305, 1.8637225827143853], [2.2420605229240325, 3.9390001662482153], [2.7590289592251427, 1.4688141316473313], [1.3278307894609154, 1.2985722552877585]]
+        #print('vel:',velocities)      # [[0.2,0.2],[0.2,0.2]]   [[-0.511329087694693, -0.5343655529166533], [-0.6367084601515689, -0.4843576537760276], [-0.3653859186755444, -0.512861404743211], [-0.549097788376088, -0.47435513775756494], [-0.3493583111982035, 0.33289796577453096]]
+        #print('rot:',rotations)       # 220723 East(0) ~ West (3.14?)
 
-        ## 220303 HDBSCAN 결과 비쥬얼라이즈
+        ## 220303 HDBSCAN 결과 비쥬얼라이즈 (작동함)
         #img = np.zeros([12,12,3])  # 20 x 20 
         img = np.zeros([24,24,3])  # 20 x 20 
         img[:,:,0]=0
@@ -732,8 +742,39 @@ class StageWorld():
         #print(grp_space)
         grp_space=np.array(grp_space)
         
+        # 220723. 그룹별 Convex Hull에서 최소, 최대 angle finding
+        #print('grp_space.shape[0]:',grp_space.shape[0], grp_space.shape)        
+        heading_list = []
+        for i in range(grp_space.shape[0]):
+            #print('야:',i, grp_space[i])
+            max_heading = -999
+            min_heading = 999
+            for grp_pp in grp_space[i]:
+                heading = np.arctan2(grp_pp[1],grp_pp[0])
+                #print(heading)
+                if heading < min_heading:
+                    min_heading = heading
+                if heading > max_heading:
+                    max_heading = heading
+            #print(i,'의:', min_heading, max_heading)
+            heading_list.append([min_heading, max_heading])
+        #print(heading_list)
         
+        #220723 그룹별 최소, 최대 rot 기준 layer masking
+        mask_layer = np.zeros(512)
+        resolution = 512 / np.pi
+        for min_head, max_head in heading_list:
+            #print(min_head, max_head)
+            # 데이터 정제화
+            if min_head<0:
+                min_head = 0
+            if max_head>np.pi:
+                max_head=np.pi
+            mask_layer[np.int(resolution*min_head):np.int(resolution*max_head)] = 1  
+            mask_layer = mask_layer[::-1]
+        #print('mask layer:',mask_layer)
         
+        '''
         plt.title("Social group zones")
         
         #### 0303 SGZ visualize!
@@ -780,7 +821,7 @@ class StageWorld():
         plt.axis([-7, 7, -1, 7])      # [-6, 6, 0, 6]
         
         #plt.show(block=False)
-
+        '''
         
         #print(indiv_space.shape)      # (num_of_indiv, vertice numbers, (pos))   3, 20, 2
         
@@ -834,7 +875,8 @@ class StageWorld():
         reward = reward_g + reward_c + reward_w + reward_grp_sum# + reward_static_time
         #print('tot_R:',reward,'r_g:',reward_g,'r_c:',reward_c,'r_w:',reward_w,'r_grp:',reward_grp_sum)
 
-        return reward, terminate, result   # float, T or F(base), description
+        #return reward, terminate, result   # float, T or F(base), description
+        return reward, terminate, result, mask_layer   # 220723
     
     
     # individual score 220217
