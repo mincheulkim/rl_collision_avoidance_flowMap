@@ -85,8 +85,8 @@ args = parser.parse_args()
 robot_visible = False    # 220708
 
 evaluate = False   # 1. 220714
-#policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC)
 #policy = '' 
+#policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC) or ped_mask(SAC-mask)
 policy = 'ped_mask'   # 220725
 # for debug ##
 LIDAR_visualize = False
