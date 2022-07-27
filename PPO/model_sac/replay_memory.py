@@ -17,6 +17,12 @@ class ReplayMemory:
         self.buffer[self.position] = (frame,goal,speed, action, reward, n_frame, n_goal, n_speed, done, ped, n_ped)
         self.position = (self.position + 1) % self.capacity
         
+    def push_mask(self, frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, mask, n_mask):
+        if len(self.buffer) < self.capacity:   # 220720
+            self.buffer.append(None)
+        self.buffer[self.position] = (frame,goal,speed, action, reward, n_frame, n_goal, n_speed, done, mask, n_mask)
+        self.position = (self.position + 1) % self.capacity
+        
     def push(self, frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done):
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
@@ -27,6 +33,11 @@ class ReplayMemory:
         batch = random.sample(self.buffer, batch_size)
         frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, ped, n_ped = map(np.stack, zip(*batch))
         return frame, goal, speed, action, reward, n_frame,n_goal, n_speed, done, ped, n_ped
+    
+    def sample_mask(self, batch_size):   # 220720
+        batch = random.sample(self.buffer, batch_size)
+        frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, mask, n_mask = map(np.stack, zip(*batch))
+        return frame, goal, speed, action, reward, n_frame,n_goal, n_speed, done, mask, n_mask
     
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)

@@ -2,6 +2,7 @@ import os #test
 import logging
 import sys
 import socket
+from tokenize import group
 import numpy as np
 import rospy #test
 import torch #test
@@ -20,10 +21,13 @@ import cv2
 
 
 from stage_world1 import StageWorld 
-from model_sac.sac import SAC, SAC_PED
+from model_sac.sac import SAC, SAC_PED, SAC_MASK
 from model_sac.replay_memory import ReplayMemory
 
 from model.ppo import generate_action_human_sf  # 220708   사람 행동 모델링
+
+import model_sac.clustering as clustering   # 220725
+import model_sac.social_zone as social_zone  # 220725
 
 
 
@@ -81,9 +85,12 @@ args = parser.parse_args()
 robot_visible = False    # 220708
 
 evaluate = False   # 1. 220714
-policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC)
+#policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC)
+#policy = '' 
+policy = 'ped_mask'   # 220725
 # for debug ##
 LIDAR_visualize = False
+mask_visualize = False
 
 
 def run(comm, env, agent, policy_path, args):
@@ -158,8 +165,14 @@ def run(comm, env, agent, policy_path, args):
         ## output: ped_map (3x60x60)        
         ped_stack = deque([ped, ped, ped])
         
+        # 220723 group mask layer stack
+        mask = np.zeros(512)
+        mask_stack = deque([mask, mask, mask])
+        
         if policy == 'ped':   # 220720
             state = [frame_stack, goal, speed, ped_stack]
+        elif policy =='ped_mask':
+            state = [frame_stack, goal, speed, mask_stack]
         else:
             state = [frame_stack, goal, speed]
         
@@ -168,6 +181,18 @@ def run(comm, env, agent, policy_path, args):
         while not done and not rospy.is_shutdown():    
             
             state_list = comm.gather(state, root=0)
+            # state_list(=state) = [frame_stack, goal, speed]
+            
+            # POSTPROCESSING FOR MAKSED GROUP LABEL based on human information in sensor range
+            # [Done] 1. clstering된 pedestrain list 생성(DBSCAN 씀)
+            pedestrain_list = clustering.generate_pedestrain_list(env, pose_list, velocity_list)
+            # 0: dx, 1:dy, 2:dvx 3:rel.dvy 
+            # 4:indiv.id(if detected, else 0) , 5:grp.id(if detected, else 0) , 6:visibility(As 1)
+            #print('페드맵:',pedestrain_list)
+            # [DONE] 4. Generate individual, group convexhull based on pedestrain_map
+            #           and create group_mask_layer
+            mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list)
+            
             
             # Robot action
             if env.index == 0:                
@@ -180,9 +205,8 @@ def run(comm, env, agent, policy_path, args):
                 
             # Generate human actions
             robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32   # ADDED
-            #pose_list= env.pose_list   # ADDED
             goal_global_list = init_goals   # ADDED
-            pose_list = np.array(pose_list)   # ADDED
+            pose_list = np.array(pose_list) # ADDED
             
             speed_poly_list = env.speed_poly_list   # ADDED
             speed_poly_list =np.array(speed_poly_list)   # ADDED
@@ -222,7 +246,9 @@ def run(comm, env, agent, policy_path, args):
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(real_action, i)
-                    #env.control_vel_specific([1.0,0], i)
+                    #env.control_vel_specific([0.5,0], i)
+                #elif i==1:   # DEBUG 특정 i번째 사람
+                #    env.control_vel_specific([0.2, -0.5], i)
                 else:
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
@@ -268,6 +294,16 @@ def run(comm, env, agent, policy_path, args):
             left = frame_stack.popleft()
             frame_stack.append(next_frame)
             
+            # Get next group mask # 220725
+            # update mask_Stack
+            
+            pose_next_list = env.pose_list 
+            velocity_next_list = env.speed_poly_list  
+            pedestrain_list_new = clustering.generate_pedestrain_list(env, pose_next_list, velocity_next_list)
+            mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list_new)
+            left_r = mask_stack.popleft()
+            mask_stack.append(mask_layer)
+            
             # 220711 ADDED Pedestrain map visualize
             # ped_stack: 왼쪽부터 빠짐 (t-2, t-1, t) 가장 오른쪽에 append[2]된게 최신
                            # 앞칼럼: 시간(t-2, t-1, t), 뒷칼럼(pose, vx, vy)
@@ -291,6 +327,8 @@ def run(comm, env, agent, policy_path, args):
             
             if policy == 'ped':   # 220720
                 next_state = [frame_stack, next_goal, next_speed, ped_stack]  # 220712
+            elif policy == 'ped_mask':
+                next_state = [frame_stack, next_goal, next_speed, mask_stack]  # 220712
             else:
                 next_state = [frame_stack, next_goal, next_speed]
             #print(episode_steps, '의 next ped_stack:', ped_stack)
@@ -311,12 +349,27 @@ def run(comm, env, agent, policy_path, args):
                         memory.push_ped(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
                                 state_list[i][3], next_state_list[i][3])  # added ped_map, next_ped_map  220712
+                    elif policy == 'ped_mask':
+                         memory.push_mask(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
+                                next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
+                                state_list[i][3], next_state_list[i][3])  # added mask, next_mask 220725
                     else:  # 220720 (오리지널)
                         memory.push(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i], 
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i]) # Append transition to memory
 
 
             state = next_state  
+            
+            if mask_visualize:
+                ## 220725 mask visualize
+                # mask visualize
+                masking = np.stack((255-(mask_stack[0])*255, 255-(mask_stack[1])*255, 255-(mask_stack[2])*255), axis=0)   # RGB?
+                masking = np.uint8(masking)
+
+                masking = cv2.resize(masking, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
+                cv2.imshow("Local masking map", masking)
+                cv2.waitKey(1) 
+            
             
             
 
@@ -399,6 +452,8 @@ if __name__ == '__main__':
         print("action_bound.shape: ", action_bound.shape, "action_bound", action_bound)
         if policy == 'ped':
             agent = SAC_PED(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   # PPO에서 policy 선언하는 것과 동일
+        elif policy == 'ped_mask':
+            agent = SAC_MASK(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
         else:
             agent = SAC(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   # PPO에서 policy 선언하는 것과 동일
 
@@ -406,9 +461,9 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_2000'
-        file_critic_1 = policy_path + '/critic_1_epi_2000'
-        file_critic_2 = policy_path + '/critic_2_epi_2000'
+        file_policy = policy_path + '/policy_epi_400'
+        file_critic_1 = policy_path + '/critic_1_epi_400'
+        file_critic_2 = policy_path + '/critic_2_epi_400'
 
         if os.path.exists(file_policy):
             logger.info('###########################################')
