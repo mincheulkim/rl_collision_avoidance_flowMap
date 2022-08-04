@@ -193,6 +193,12 @@ def run(comm, env, agent, policy_path, args):
             #           and create group_mask_layer
             mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list)
             
+            '''
+            # lidar sensor data 및 mask 로깅
+            logger_lidar.info('{}'.format(frame_stack[2]))
+            logger_mask.info('{}'.format(mask_stack[2]))
+            '''
+            
             
             # Robot action
             if env.index == 0:                
@@ -429,6 +435,20 @@ if __name__ == '__main__':
     cal_f_handler = logging.FileHandler(cal_file, mode='a')
     file_handler.setLevel(logging.INFO)
     logger_cal.addHandler(cal_f_handler)
+    
+    #220727 Logging Lidar and mask
+    lidar_file = './log/' + hostname + '/lidar.log'
+    mask_file = './log/' + hostname + '/mask.log'
+    logger_lidar = logging.getLogger('loggerlidar')
+    logger_mask = logging.getLogger('loggermask')
+    logger_lidar.setLevel(logging.INFO)
+    logger_mask.setLevel(logging.INFO)
+    lidar_file_handler = logging.FileHandler(lidar_file, mode='a')
+    mask_file_handler = logging.FileHandler(mask_file, mode='a')
+    lidar_file_handler.setLevel(logging.INFO)
+    mask_file_handler.setLevel(logging.INFO)
+    logger_lidar.addHandler(lidar_file_handler)
+    logger_mask.addHandler(mask_file_handler)
 
     comm = MPI.COMM_WORLD    # instantize the communication world
     rank = comm.Get_rank()   # get this particular processes' `rank` ID

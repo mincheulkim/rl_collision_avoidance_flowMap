@@ -15,6 +15,8 @@ from model_sac.net import GaussianPolicy_MASK, QNetwork_1_MASK, QNetwork_2_MASK 
 from model_sac.utils import soft_update, hard_update
 from torch.optim import Adam
 
+
+# 220727 아래 부분은 전혀 사용되지 않는 부분이다
 hostname = socket.gethostname()
 if not os.path.exists('./log/' + hostname):
     os.makedirs('./log/' + hostname)

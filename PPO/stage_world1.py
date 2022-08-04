@@ -221,8 +221,10 @@ class StageWorld():
             Euler = tf.transformations.euler_from_quaternion([Quaternious.x, Quaternious.y, Quaternious.z, Quaternious.w])
             #self.state_GT = [msg.pose.pose.position.x, msg.pose.pose.position.y, Euler[2]]
             x,y=msg.pose.pose.position.x, msg.pose.pose.position.y
-            vx=msg.twist.twist.linear.x
-            vy=msg.twist.twist.linear.y
+            vx=msg.twist.twist.linear.x    # Linear speed
+            #vy=msg.twist.twist.linear.y
+            #vy=msg.twist.twist.angular.z   # 220725 Angular speed https://www.programcreek.com/python/example/70251/geometry_msgs.msg.Twist
+            vy=Euler[2]  # 220725. 각속도를 그냥 heading으로 간주함. 왜냐하면 만약 vel이 polar에서 (1,0)일 경우, cartesian에서 표현 불가 
             pose_list.append([x,y, Euler[2]])
             speed_poly_list.append([vx,vy])
             
@@ -369,7 +371,7 @@ class StageWorld():
         robot_rot = pose_list[0,2]
         robot_rot += np.pi*3/2   # 220125   # from generate_action_corl
     
-        
+    
         speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
         
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
