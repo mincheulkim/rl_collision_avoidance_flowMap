@@ -85,9 +85,9 @@ args = parser.parse_args()
 robot_visible = False    # 220708
 
 evaluate = False   # 1. 220714
-#policy = '' 
+policy = '' 
 #policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC) or ped_mask(SAC-mask)
-policy = 'ped_mask'   # 220725
+#policy = 'ped_mask'   # 220725
 # for debug ##
 LIDAR_visualize = False
 mask_visualize = False
@@ -178,7 +178,7 @@ def run(comm, env, agent, policy_path, args):
         
 
         # Episode start
-        while not done and not rospy.is_shutdown():    
+        while not done and not rospy.is_shutdown():                
             
             state_list = comm.gather(state, root=0)
             # state_list(=state) = [frame_stack, goal, speed]

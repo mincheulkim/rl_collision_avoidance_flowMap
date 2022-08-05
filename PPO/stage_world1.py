@@ -73,7 +73,7 @@ class StageWorld():
         ## Narrow corrido
         #self.scenario = 'GrpCorridor_h8_grp3'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         ## Group Circle Cross(원)
-        self.scenario = 'GrpCC_h10_grp3'     # 써클, 그룹3, 10명
+        #self.scenario = 'GrpCC_h10_grp3'     # 써클, 그룹3, 10명
         #self.scenario = 'GrpCC_h13_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         #self.scenario = 'GrpCC_h15_grp4'     # 0222 for test
         #self.scenario = 'GrpCC_h21_grp5'     # 써클, 그룹 5, 21명
@@ -81,6 +81,10 @@ class StageWorld():
         #self.scenario = 'GrpCross_h14_grp4'     # CC_h5, GrpCC_h10_grp3, GrpCC_h13_grp4, GrpCC_h21_grp5  ||  GrpCorridor_h8_grp3  || GrpCross_h14_grp4
         # Group Station (역, 아래입구 as main, NW 입구 as 상행, NE 입구 as 하행), Main->NE or NW, NE -> Main, NW -< Main
         #self.scenario = 'GrpStation_h22_grp4'
+        
+        #### CCTV mode
+        #self.scenario = 'CCTV_alone' 
+        self.scenario = 'CCTV_dynamic'
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -131,6 +135,20 @@ class StageWorld():
             self.groups = [0, 1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]    # station, h22, group 2+2+2
             #self.human_list=[[0],[1,2,3,4,5],[6,7,8],[9,10,11],[12,13,14,15],[16,17,18],[19,20,21,22]]   # GC, h21, grp5
             self.human_list=[[0],[1],[2],[3],[4],[5],[6],[7],[8],[9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22]]
+       
+        # 220804    
+        elif self.scenario == 'CCTV_alone':
+            self.rule = 'robot_alone'
+            self.num_human = 2        
+            self.groups = [0, 1]   
+            self.human_list = [[0],[1]]   
+        
+        # 220805
+        elif self.scenario == 'CCTV_dynamic':
+            self.rule = 'cctv_dynamic'
+            self.num_human = 6        # 로봇 1+ 스탠딩 1+ 어퍼 1+ 페어LtoR 2 + 솔로 1
+            self.groups = [0, 1, 2, 3, 4, 5]    
+            self.human_list = [[0],[1],[2],[3],[4],[5]]   
         else:
             print('Wrong Scenario')
         
@@ -1358,7 +1376,115 @@ class StageWorld():
             init_goal_list[0]=[-px[0],-py[0]]
             #init_pose_list[0]=[6,-6,np.pi/2]  # 왜넣었지?
             #init_goal_list[0]=[-6,6]
+        
+        ## 220804 cctv_alone.world 용
+        ## 두개의 에이전트. 하나는 로봇, 하나는 사람(ghost)    
+        elif rule=='robot_alone':   #        
+            init_pose_list=[]
+            init_goal_list=[]
+            circle_radius = 8.
+            square_width = 9.
+            
 
+            groups_pose = []
+            groups_goal = []
+            
+            #np.random.seed(5)  #1  4 5  for cherry piccking 0222
+            # 리턴입니다
+            for i in self.human_list:
+                #print(i)
+                while True:            
+                    angle = np.random.random() * np.pi * 2
+                    #px = circle_radius * np.cos(angle)
+                    #py = circle_radius * np.sin(angle)
+                    px = np.random.uniform(-square_width, square_width)
+                    py = np.random.uniform(-square_width, square_width)
+                    #gx = -px
+                    #gy = -py
+                    gx = np.random.choice([-square_width, square_width], 1)
+                    gy = np.random.choice([-square_width, square_width], 1)
+                    gx = gx[0]
+                    gy = gy[0]
+                    
+                    
+                    
+                    collide = False
+                    for grp_pose, grp_goal in zip(groups_pose, groups_goal):
+                        #min_dist = 1
+                        min_dist = 9  # 220804 cctv_alone.world 용
+                        if np.linalg.norm((px-grp_pose[0],py-grp_pose[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
+                            collide=True
+                            break
+                        #print(grp_pose[0],grp_pose[1],grp_goal[0],grp_goal[1])
+                    if not collide:
+                        break
+                theta = np.arctan2(gy, gx)
+                init_pose_list.append([px,py, theta])
+                init_goal_list.append([gx,gy])
+            
+            # 사람 위치 강제로 fix    
+            init_pose_list[1]=[0,-15,0]
+            init_goal_list[1]=[0, -15]
+            #print('pose list:',init_pose_list)
+            #print('goal list:',init_goal_list)
+            
+        elif rule=='cctv_dynamic':   # 220805 로봇 1+ 사람 5명
+            init_pose_list=[]
+            init_goal_list=[]
+            circle_radius = 8.
+            square_width = 9.
+            
+
+            groups_pose = []
+            groups_goal = []
+            
+            #np.random.seed(5)  #1  4 5  for cherry piccking 0222
+            # 리턴입니다
+            for i in self.human_list:
+                #print(i)
+                while True:            
+                    angle = np.random.random() * np.pi * 2
+                    #px = circle_radius * np.cos(angle)
+                    #py = circle_radius * np.sin(angle)
+                    px = np.random.uniform(-square_width, square_width)
+                    py = np.random.uniform(-square_width, square_width)
+                    #gx = -px
+                    #gy = -py
+                    gx = np.random.choice([-square_width, square_width], 1)
+                    gy = np.random.choice([-square_width, square_width], 1)
+                    gx = gx[0]
+                    gy = gy[0]
+                    
+                    
+                    
+                    collide = False
+                    for grp_pose, grp_goal in zip(groups_pose, groups_goal):
+                        #min_dist = 1
+                        min_dist = 9  # 220804 cctv_alone.world 용
+                        if np.linalg.norm((px-grp_pose[0],py-grp_pose[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
+                            collide=True
+                            break
+                        #print(grp_pose[0],grp_pose[1],grp_goal[0],grp_goal[1])
+                    if not collide:
+                        break
+                theta = np.arctan2(gy, gx)
+                init_pose_list.append([px,py, theta])
+                init_goal_list.append([gx,gy])
+            
+            # 사람 위치 강제로 fix   220805  
+            init_pose_list[1]=[3,-8,0]       # 첫번째 사람(스탠딩)
+            init_goal_list[1]=[3, -8]
+            init_pose_list[2]=[7,8.5,np.pi]  # 두번째 사람(upper), 왼쪽보고 있음
+            init_goal_list[2]=[-8, 8.5]
+            init_pose_list[3]=[-4,-2,0]      # 세번째 사람(LtoR), 왼쪽보고 있음
+            init_goal_list[3]=[8, -2]
+            init_pose_list[4]=[-4,-3.5,0]    # 네번째 사람(LtoR), 왼쪽보고 있음
+            init_goal_list[4]=[8, -3.5]
+            init_pose_list[5]=[-8.5,-4.5,np.pi*0.5]    # 오번째 사람(left), 위보고 있음
+            init_goal_list[5]=[-8.5, 5]
+            
+            #print('pose list:',init_pose_list)
+            #print('goal list:',init_goal_list)
 
         elif 'circle_crossing':
             pass
