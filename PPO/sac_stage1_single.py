@@ -24,7 +24,7 @@ from stage_world1 import StageWorld
 from model_sac.sac import SAC, SAC_PED, SAC_MASK
 from model_sac.replay_memory import ReplayMemory
 
-from model.ppo import generate_action_human_sf  # 220708   사람 행동 모델링
+from model.ppo import generate_action_human_sf, human_arrive_goal  # 220708   사람 행동 모델링, 220805 도착여부 판단
 
 import model_sac.clustering as clustering   # 220725
 import model_sac.social_zone as social_zone  # 220725
@@ -133,12 +133,7 @@ def run(comm, env, agent, policy_path, args):
         init_goals = None         
         
         num_human = env.num_human
-        
-        # 220121
-        done_list = []
-        for i in range(num_human):
-            done_list.append(False)
-        
+    
         rule = env.rule            
         #rule = 'group_circle_crossing'  # crossing
         print('시나리오:',rule)
@@ -175,6 +170,8 @@ def run(comm, env, agent, policy_path, args):
             state = [frame_stack, goal, speed, mask_stack]
         else:
             state = [frame_stack, goal, speed]
+            
+        goal_global_list = init_goals   # ADDED
         
 
         # Episode start
@@ -211,9 +208,7 @@ def run(comm, env, agent, policy_path, args):
                 
             # Generate human actions
             robot_state = state_list[0:1]   # 211126 https://jinisbonusbook.tistory.com/32   # ADDED
-            goal_global_list = init_goals   # ADDED
             pose_list = np.array(pose_list) # ADDED
-            
             speed_poly_list = env.speed_poly_list   # ADDED
             speed_poly_list =np.array(speed_poly_list)   # ADDED
             human_actions, scaled_position=generate_action_human_sf(env=env, pose_list=pose_list[:,0:2], goal_global_list=goal_global_list, num_env=num_human, robot_visible=robot_visible, grp_list=env.human_list, scenario=env.scenario)   # ADDED
@@ -225,7 +220,7 @@ def run(comm, env, agent, policy_path, args):
     
                     if len(memory) > args.batch_size:
                         # Number of updates per step in environment
-                        for i in range(args.updates_per_step):
+                        for i in range(args.updates_per_step):    # TODO : 늘려봐야겠다   # TODO sac 최신버전 entropy 학습유무(target entropy) action의 디멘젼
                             # Update parameters of all the networks
                             critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, args.batch_size, updates)  # batch_size = 1024, updates = 1
 
@@ -252,7 +247,7 @@ def run(comm, env, agent, policy_path, args):
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(real_action, i)
-                    #env.control_vel_specific([0.5,0], i)
+                    #env.control_vel_specific([0.0,0], i)
                 #elif i==1:   # DEBUG 특정 i번째 사람
                 #    env.control_vel_specific([0.2, -0.5], i)
                 else:
@@ -302,10 +297,7 @@ def run(comm, env, agent, policy_path, args):
             
             # Get next group mask # 220725
             # update mask_Stack
-            
-            pose_next_list = env.pose_list 
-            velocity_next_list = env.speed_poly_list  
-            pedestrain_list_new = clustering.generate_pedestrain_list(env, pose_next_list, velocity_next_list)
+            pedestrain_list_new = clustering.generate_pedestrain_list(env, env.pose_list , env.speed_poly_list)
             mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list_new)
             left_r = mask_stack.popleft()
             mask_stack.append(mask_layer)
@@ -375,12 +367,21 @@ def run(comm, env, agent, policy_path, args):
                 masking = cv2.resize(masking, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
                 cv2.imshow("Local masking map", masking)
                 cv2.waitKey(1) 
-            
-            
-            
+                
+            ## 220805 check human arrived at the init goal
+            human_arrival_list = human_arrive_goal(pose_list, goal_global_list, num_human)
+            #print('도착리스트:',human_arrival_list)  # [[0][1][0][0][0][0]]
+            for i, arrival in enumerate(human_arrival_list):
+                if arrival == 1 and i!=0:
+                    #print(i,'번째는 도착했습니다',arrival)
+                    goal_global_list[i] = init_poses[i][:2]
 
         if total_numsteps > args.num_steps:
             break        
+        
+        #220812 end after 100 episode
+        #if i_episode > 100:
+        #    break
             
         avg_cnt += 1
 
@@ -481,9 +482,9 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_400'
-        file_critic_1 = policy_path + '/critic_1_epi_400'
-        file_critic_2 = policy_path + '/critic_2_epi_400'
+        file_policy = policy_path + '/policy_epi_3400'
+        file_critic_1 = policy_path + '/critic_1_epi_3400'
+        file_critic_2 = policy_path + '/critic_2_epi_3400'
 
         if os.path.exists(file_policy):
             logger.info('###########################################')

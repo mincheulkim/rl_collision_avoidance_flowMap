@@ -83,8 +83,8 @@ class StageWorld():
         #self.scenario = 'GrpStation_h22_grp4'
         
         #### CCTV mode
-        #self.scenario = 'CCTV_alone' 
-        self.scenario = 'CCTV_dynamic'
+        #self.scenario = 'CCTV_alone'      # 220804
+        self.scenario = 'CCTV_dynamic'   # 220805
               
         if self.scenario == 'GrpCorridor_h8_grp3':
             self.rule = 'group_corridor_crossing'
@@ -176,7 +176,6 @@ class StageWorld():
         crash_mf = message_filters.ApproximateTimeSynchronizer(sub_crash_list, queue_size, delay, allow_headerless=True)
         crash_mf.registerCallback(self.crash_callback_mf)
 
-        self.is_dead = False
 
         # -----------Publisher-------------
         cmd_vel_topic = 'robot_' + str(index) + '/cmd_vel'
@@ -191,6 +190,7 @@ class StageWorld():
 
         laser_topic = 'robot_' + str(index) + '/base_scan'
         self.laser_sub = rospy.Subscriber(laser_topic, LaserScan, self.laser_scan_callback)
+        
 
         odom_topic = 'robot_' + str(index) + '/odom'
         self.odom_sub = rospy.Subscriber(odom_topic, Odometry, self.odometry_callback)
@@ -280,15 +280,6 @@ class StageWorld():
                            scan.scan_time, scan.range_min, scan.range_max]
         self.scan = np.array(scan.ranges)
         self.laser_cb_num += 1
-        
-    def laser_dead_callback(self, dead_scan):   # no meaning?
-        self.scan_dead = np.array(dead_scan.ranges)
-        self.scan_dead[np.isnan(self.scan_dead)] = 0.6
-        self.scan_dead[np.isinf(self.scan_dead)] = 0.6
-        dead_scan_min = np.min(self.scan_dead)
-        if dead_scan_min < 0.6:
-            self.is_dead = True
-
 
     def odometry_callback(self, odometry):
         Quaternions = odometry.pose.pose.orientation
@@ -526,14 +517,10 @@ class StageWorld():
             reward_c = -1.
             result = 'Crashed'
 
-        if self.is_dead == 1:
-            terminate = True
-            reward_c = -1.
-            result = 'Crashed'
-
         reward = reward_g + reward_c 
 
-        if t >= 1000 and (not is_crash or not self.is_dead) :
+        #if t >= 1000 and not is_crash :
+        if t >= self.time_limit and not is_crash :  # 220805 500
             reward = -0.1 
             terminate = True
             result = 'Time out'
@@ -1035,7 +1022,6 @@ class StageWorld():
             self.control_pose(random_pose)
         #rospy.sleep(0.01)
         rospy.sleep(1.0)   # 220708 from CZwan
-        self.is_dead = False
 
 
     def control_vel(self, action):   # real action as array[0.123023, -0.242424]. from
@@ -1395,12 +1381,8 @@ class StageWorld():
                 #print(i)
                 while True:            
                     angle = np.random.random() * np.pi * 2
-                    #px = circle_radius * np.cos(angle)
-                    #py = circle_radius * np.sin(angle)
                     px = np.random.uniform(-square_width, square_width)
                     py = np.random.uniform(-square_width, square_width)
-                    #gx = -px
-                    #gy = -py
                     gx = np.random.choice([-square_width, square_width], 1)
                     gy = np.random.choice([-square_width, square_width], 1)
                     gx = gx[0]
@@ -1444,12 +1426,8 @@ class StageWorld():
                 #print(i)
                 while True:            
                     angle = np.random.random() * np.pi * 2
-                    #px = circle_radius * np.cos(angle)
-                    #py = circle_radius * np.sin(angle)
                     px = np.random.uniform(-square_width, square_width)
                     py = np.random.uniform(-square_width, square_width)
-                    #gx = -px
-                    #gy = -py
                     gx = np.random.choice([-square_width, square_width], 1)
                     gy = np.random.choice([-square_width, square_width], 1)
                     gx = gx[0]
@@ -1459,12 +1437,10 @@ class StageWorld():
                     
                     collide = False
                     for grp_pose, grp_goal in zip(groups_pose, groups_goal):
-                        #min_dist = 1
                         min_dist = 9  # 220804 cctv_alone.world 용
                         if np.linalg.norm((px-grp_pose[0],py-grp_pose[1])) < min_dist or np.linalg.norm((gx-grp_goal[0],gy-grp_goal[1]))<min_dist:
                             collide=True
                             break
-                        #print(grp_pose[0],grp_pose[1],grp_goal[0],grp_goal[1])
                     if not collide:
                         break
                 theta = np.arctan2(gy, gx)
