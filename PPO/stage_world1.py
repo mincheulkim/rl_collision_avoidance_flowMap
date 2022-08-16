@@ -39,6 +39,7 @@ class StageWorld():
         self.pose_list = []
         self.speed_poly_list = []  # 220104
         self.crash_list = []  # 220107
+        self.lidar_list = []  # 220812
 
         self.beam_mum = beam_num   # 512
         self.laser_cb_num = 0
@@ -156,6 +157,7 @@ class StageWorld():
         # Define Subscriber
         sub_list = []          # https://velog.io/@suasue/Python-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90args%EC%99%80-%ED%82%A4%EC%9B%8C%EB%93%9C-%EA%B0%80%EB%B3%80%EC%9D%B8%EC%9E%90kwargs
         sub_crash_list = []
+        sub_lidar_list = []
         
         for i in range(self.num_human):
         #for i in range(21):   # 220102
@@ -166,6 +168,10 @@ class StageWorld():
             crash_sub = message_filters.Subscriber('robot_' + str(i) + '/is_crashed', Int8)
             sub_crash_list.append(crash_sub)
             
+            # 220812 for lidar
+            lidar_sub = message_filters.Subscriber('robot_' + str(i) + '/base_scan', LaserScan)
+            sub_lidar_list.append(lidar_sub)
+            
         queue_size = 10
         fps = 1000.
         delay = 1 / fps * 0.5
@@ -175,6 +181,10 @@ class StageWorld():
         
         crash_mf = message_filters.ApproximateTimeSynchronizer(sub_crash_list, queue_size, delay, allow_headerless=True)
         crash_mf.registerCallback(self.crash_callback_mf)
+        
+        #220812
+        lidar_mf = message_filters.ApproximateTimeSynchronizer(sub_lidar_list, queue_size, delay)
+        lidar_mf.registerCallback(self.lidar_callback_mf)
 
 
         # -----------Publisher-------------
@@ -245,7 +255,7 @@ class StageWorld():
             vy=Euler[2]  # 220725. 각속도를 그냥 heading으로 간주함. 왜냐하면 만약 vel이 polar에서 (1,0)일 경우, cartesian에서 표현 불가 
             pose_list.append([x,y, Euler[2]])
             speed_poly_list.append([vx,vy])
-            
+
             #self.pose_list.append([x,y, Euler[2]])
         self.pose_list = pose_list
         self.speed_poly_list = speed_poly_list
@@ -255,6 +265,47 @@ class StageWorld():
         #    x,y=msg_list[i].pose.pose.position.x, msg_list[i].pose.pose.position.y
         #    pose_list.append([x,y])
         #print('pose_list:',pose_list)
+        
+    def lidar_callback_mf(self, *msgs):
+        lidar_list = []
+        
+        for msg in msgs:
+            # from laser_scan_callback
+            scan_lidar = copy.deepcopy(msg)
+            self.scan_param_lidar = [scan_lidar.angle_min, scan_lidar.angle_max, scan_lidar.angle_increment, scan_lidar.time_increment,
+                           scan_lidar.scan_time, scan_lidar.range_min, scan_lidar.range_max]
+            self.scan_lidar = np.array(scan_lidar.ranges)
+
+            # from get_laser_observation
+            scan_lidar = copy.deepcopy(self.scan_lidar)  # from laser_scan_callback   # self.scan = np.array(scan.ranges)
+            scan_lidar[np.isnan(scan_lidar)] = 6.0       # NaN or INF set 6    # CZwang은 10.0으로 함
+            scan_lidar[np.isinf(scan_lidar)] = 6.0
+            raw_beam_num = len(scan_lidar)
+            sparse_beam_num = self.beam_mum   # 512
+            step = float(raw_beam_num) / sparse_beam_num   # 1.0
+            sparse_scan_left = []   # left scan
+            index = 0.
+            
+            for x in range(int(sparse_beam_num / 2)):   # 256
+                sparse_scan_left.append(scan_lidar[int(index)])
+                index += step    # 1~256
+
+            sparse_scan_right = []   # right scan
+            index = raw_beam_num - 1.
+            for x in range(int(sparse_beam_num / 2)):
+                sparse_scan_right.append(scan_lidar[int(index)])
+                index -= step    # 510~255
+                #print(index, step)
+
+            scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
+            #scan_sparse = np.flip(scan_sparse)    # 211115
+            scan_sparse = scan_sparse[::-1]    # 211115  fliped input    # 이거 내가 추가했던거 TODO 
+
+            lidar_list.append(scan_sparse / 6.0 - 0.5)
+            
+        self.lidar_list = lidar_list    
+            
+        #print(lidar_list)
         
     def crash_callback_mf(self, *msgs):
         crash = []
@@ -1076,7 +1127,7 @@ class StageWorld():
         assert len(pose)==3
         pose_cmd.position.x = pose[0]   # x
         pose_cmd.position.y = pose[1]   # y
-        pose_cmd.position.z = 0         # 0(don't care rot cause pose?)
+        pose_cmd.position.z = pose[2]         # 0(don't care rot cause pose?)
 
         qtn = tf.transformations.quaternion_from_euler(0, 0, pose[2], 'rxyz')
         pose_cmd.orientation.x = qtn[0]
@@ -1447,6 +1498,7 @@ class StageWorld():
                 init_pose_list.append([px,py, theta])
                 init_goal_list.append([gx,gy])
             
+            '''
             # 사람 위치 강제로 fix   220805  
             init_pose_list[1]=[3,-8,0]       # 첫번째 사람(스탠딩)
             init_goal_list[1]=[3, -8]
@@ -1458,9 +1510,20 @@ class StageWorld():
             init_goal_list[4]=[8, -3.5]
             init_pose_list[5]=[-8.5,-4.5,np.pi*0.5]    # 오번째 사람(left), 위보고 있음
             init_goal_list[5]=[-8.5, 5]
+            '''
             
-            #print('pose list:',init_pose_list)
-            #print('goal list:',init_goal_list)
+            # 사람 as 고정된 CCTV 220812
+            init_pose_list[1]=[2,-8,0]       # 첫번째 사람(스탠딩) 아래쪽
+            init_goal_list[1]=[2, -8]
+            init_pose_list[2]=[7,10.5,np.pi*.25*6]  # 두번째 사람(upper), 왼쪽보고 있음  0 왼쪽, 2 위, 4 왼 6 아래
+            init_goal_list[2]=[7,10.5]
+            init_pose_list[3]=[-4.9,-2, 0]      # 세번째 사람(LtoR), 왼쪽보고 있음
+            init_goal_list[3]=[-4.9,-2]
+            init_pose_list[4]=[6,-4.5,np.pi*.25*2]    # 네번째 사람(LtoR), 왼쪽보고 있음
+            init_goal_list[4]=[6,-4.5]
+            init_pose_list[5]=[-10.5,-0.5,np.pi*.25]    # 오번째 사람(left), 위보고 있음
+            init_goal_list[5]=[-10.5,-0.5]
+            
 
         elif 'circle_crossing':
             pass

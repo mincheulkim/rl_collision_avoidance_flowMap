@@ -23,6 +23,12 @@ class ReplayMemory:
         self.buffer[self.position] = (frame,goal,speed, action, reward, n_frame, n_goal, n_speed, done, mask, n_mask)
         self.position = (self.position + 1) % self.capacity
         
+    def push_cctv(self, frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, lidar1, n_lidar1, lidar2, n_lidar2,lidar3, n_lidar3,lidar4, n_lidar4,lidar5, n_lidar5):  # 220812
+        if len(self.buffer) < self.capacity:   # 220720
+            self.buffer.append(None)
+        self.buffer[self.position] = (frame,goal,speed, action, reward, n_frame, n_goal, n_speed, done, lidar1, n_lidar1, lidar2, n_lidar2,lidar3, n_lidar3,lidar4, n_lidar4,lidar5, n_lidar5)
+        self.position = (self.position + 1) % self.capacity
+        
     def push(self, frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done):
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
@@ -38,6 +44,11 @@ class ReplayMemory:
         batch = random.sample(self.buffer, batch_size)
         frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, mask, n_mask = map(np.stack, zip(*batch))
         return frame, goal, speed, action, reward, n_frame,n_goal, n_speed, done, mask, n_mask
+    
+    def sample_cctv(self, batch_size):   # 220812
+        batch = random.sample(self.buffer, batch_size)
+        frame, goal, speed, action, reward, n_frame, n_goal, n_speed, done, lidar1, n_lidar1, lidar2, n_lidar2,lidar3, n_lidar3,lidar4, n_lidar4,lidar5, n_lidar5 = map(np.stack, zip(*batch))
+        return frame, goal, speed, action, reward, n_frame,n_goal, n_speed, done, lidar1, n_lidar1, lidar2, n_lidar2,lidar3, n_lidar3,lidar4, n_lidar4,lidar5, n_lidar5
     
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)

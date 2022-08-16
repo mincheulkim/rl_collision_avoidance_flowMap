@@ -21,7 +21,7 @@ import cv2
 
 
 from stage_world1 import StageWorld 
-from model_sac.sac import SAC, SAC_PED, SAC_MASK
+from model_sac.sac import SAC, SAC_PED, SAC_MASK, SAC_CCTV
 from model_sac.replay_memory import ReplayMemory
 
 from model.ppo import generate_action_human_sf, human_arrive_goal  # 220708   사람 행동 모델링, 220805 도착여부 판단
@@ -85,12 +85,14 @@ args = parser.parse_args()
 robot_visible = False    # 220708
 
 evaluate = False   # 1. 220714
-policy = '' 
+#policy = '' 
 #policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC) or ped_mask(SAC-mask)
 #policy = 'ped_mask'   # 220725
+policy = 'cctv'   # stage_world1.py에서 1520부분 해제요
 # for debug ##
 LIDAR_visualize = False
 mask_visualize = False
+CCTV_visualize = False
 
 
 def run(comm, env, agent, policy_path, args):
@@ -151,7 +153,7 @@ def run(comm, env, agent, policy_path, args):
         frame_stack = deque([frame, frame, frame])
         goal = np.asarray(env.get_local_goal())
         speed = np.asarray(env.get_self_speed())
-        
+          
         # 220711 ADDED
         pose_list = env.pose_list
         velocity_list = env.speed_poly_list
@@ -159,6 +161,13 @@ def run(comm, env, agent, policy_path, args):
         ## input: state_list, pose_list, velocity_list
         ## output: ped_map (3x60x60)        
         ped_stack = deque([ped, ped, ped])
+        lidar_list = env.lidar_list
+        lidar1_stack = deque([lidar_list[1], lidar_list[1], lidar_list[1]])
+        lidar2_stack = deque([lidar_list[2], lidar_list[2], lidar_list[2]])
+        lidar3_stack = deque([lidar_list[3], lidar_list[3], lidar_list[3]])
+        lidar4_stack = deque([lidar_list[4], lidar_list[4], lidar_list[4]])
+        lidar5_stack = deque([lidar_list[5], lidar_list[5], lidar_list[5]])
+        
         
         # 220723 group mask layer stack
         mask = np.zeros(512)
@@ -168,6 +177,8 @@ def run(comm, env, agent, policy_path, args):
             state = [frame_stack, goal, speed, ped_stack]
         elif policy =='ped_mask':
             state = [frame_stack, goal, speed, mask_stack]
+        elif policy =='cctv':  # 220812
+            state = [frame_stack, goal, speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack]
         else:
             state = [frame_stack, goal, speed]
             
@@ -264,11 +275,14 @@ def run(comm, env, agent, policy_path, args):
                     
                     length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
                     scaled_action = (length, diff)   
-                    
-                    env.control_vel_specific(scaled_action, i)
+                    if policy != 'cctv':
+                        env.control_vel_specific(scaled_action, i)
+                    elif policy == 'cctv':
+                        #env.control_pose_specific(init_poses[i], i)
+                        pass
             rospy.sleep(0.001)
             
-            
+             
             # LIDAR visualize, 3 * 512 2D LIDAR history map  # 211220
             if LIDAR_visualize:
                 greyscale = False
@@ -282,7 +296,19 @@ def run(comm, env, agent, policy_path, args):
                     #lidar = cv2.applyColorMap(255-lidar, cv2.COLORMAP_JET)
                 lidar = cv2.resize(lidar, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
                 cv2.imshow("Local flow map", lidar)
-                cv2.waitKey(1)      
+                cv2.waitKey(1)    
+                
+            # CCTV visualize, 3 * 512 2D LIDAR history map  # 211220
+            if CCTV_visualize:
+                #cctv = np.stack(((lidar3_stack[0])*255, (lidar3_stack[1])*255, (lidar3_stack[2])*255), axis=0) 
+                cctv = np.stack(((lidar3_stack[0]+0.5)*255, (lidar3_stack[1]+0.5)*255, (lidar3_stack[2]+0.5)*255), axis=0) 
+                            # 여기 1 3개를 2~5로 바꿔주면 됨
+                cctv = np.uint8(cctv)
+                    #lidar = cv2.applyColorMap(lidar, cv2.COLORMAP_BONE)
+                    #lidar = cv2.applyColorMap(255-lidar, cv2.COLORMAP_JET)
+                cctv = cv2.resize(cctv, dsize=(512,256), interpolation=cv2.INTER_NEAREST)   # ColorMap flag: https://076923.github.io/posts/Python-opencv-8/
+                cv2.imshow("CCTV1", cctv)
+                cv2.waitKey(1)   
 
             ## Get reward and terminal state
             reward, done, result = env.get_reward_and_terminate(episode_steps)
@@ -295,12 +321,25 @@ def run(comm, env, agent, policy_path, args):
             left = frame_stack.popleft()
             frame_stack.append(next_frame)
             
+             # Get next lidars # 220812
+            lidar_list = env.lidar_list
+            left = lidar1_stack.popleft()
+            lidar1_stack.append(lidar_list[1])
+            left = lidar2_stack.popleft()
+            lidar2_stack.append(lidar_list[2])
+            left = lidar3_stack.popleft()
+            lidar3_stack.append(lidar_list[3])
+            left = lidar4_stack.popleft()
+            lidar4_stack.append(lidar_list[4])
+            left = lidar5_stack.popleft()
+            lidar5_stack.append(lidar_list[5])
+            
             # Get next group mask # 220725
             # update mask_Stack
             pedestrain_list_new = clustering.generate_pedestrain_list(env, env.pose_list , env.speed_poly_list)
             mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list_new)
             left_r = mask_stack.popleft()
-            mask_stack.append(mask_layer)
+            mask_stack.append(mask_layer)        
             
             # 220711 ADDED Pedestrain map visualize
             # ped_stack: 왼쪽부터 빠짐 (t-2, t-1, t) 가장 오른쪽에 append[2]된게 최신
@@ -327,6 +366,8 @@ def run(comm, env, agent, policy_path, args):
                 next_state = [frame_stack, next_goal, next_speed, ped_stack]  # 220712
             elif policy == 'ped_mask':
                 next_state = [frame_stack, next_goal, next_speed, mask_stack]  # 220712
+            elif policy == 'cctv':  # 220812
+                next_state = [frame_stack, next_goal, next_speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack]  # 220812
             else:
                 next_state = [frame_stack, next_goal, next_speed]
             #print(episode_steps, '의 next ped_stack:', ped_stack)
@@ -351,6 +392,11 @@ def run(comm, env, agent, policy_path, args):
                          memory.push_mask(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
                                 state_list[i][3], next_state_list[i][3])  # added mask, next_mask 220725
+                    elif policy == 'cctv':  # 220812
+                        memory.push_cctv(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
+                                next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
+                                state_list[i][3], state_list[i][4], state_list[i][5], state_list[i][6], state_list[i][7], 
+                                next_state_list[i][3], next_state_list[i][4], next_state_list[i][5], next_state_list[i][6], next_state_list[i][7]) 
                     else:  # 220720 (오리지널)
                         memory.push(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i], 
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i]) # Append transition to memory
@@ -382,7 +428,7 @@ def run(comm, env, agent, policy_path, args):
         #220812 end after 100 episode
         #if i_episode > 100:
         #    break
-            
+        
         avg_cnt += 1
 
         if env.index == 0:
@@ -475,6 +521,8 @@ if __name__ == '__main__':
             agent = SAC_PED(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   # PPO에서 policy 선언하는 것과 동일
         elif policy == 'ped_mask':
             agent = SAC_MASK(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
+        elif policy == 'cctv':
+            agent = SAC_CCTV(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
         else:
             agent = SAC(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   # PPO에서 policy 선언하는 것과 동일
 
@@ -482,9 +530,9 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_3400'
-        file_critic_1 = policy_path + '/critic_1_epi_3400'
-        file_critic_2 = policy_path + '/critic_2_epi_3400'
+        file_policy = policy_path + '/policy_epi_1800'   # 220813 ~2200   220814 ~2400  220815 ~1600  220816 ~1800
+        file_critic_1 = policy_path + '/critic_1_epi_1800'
+        file_critic_2 = policy_path + '/critic_2_epi_1800'
 
         if os.path.exists(file_policy):
             logger.info('###########################################')

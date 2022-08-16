@@ -2390,3 +2390,25 @@ def build_occupancy_maps(human_states, human_velocities):  # velocity: nonholono
     #print('occupancy map:', occupancy_maps)
     return occupancy_maps
     # return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()
+    
+def human_arrive_goal(pose_list, goal_global_list, num_env):   # 220805
+    human_max_speed = 0.8
+    scaled_action = []
+    scaled_position = []
+    
+    #print('포즈 리스트:',pose_list)
+    #print('골 리스트:',goal_global_list)
+
+    dist_to_goal = np.zeros((num_env, 1))
+    arrival_list = np.zeros((num_env, 1))
+    for i in range(num_env):  # 0 ~ 사람수
+        dist = np.sqrt((pose_list[i][0] - goal_global_list[i][0]) ** 2 + (pose_list[i][1] - goal_global_list[i][1]) ** 2)
+        dist_to_goal[i]=dist
+        
+        # dist가 0.5보다 작으면 도착(done, 1)로 보자
+        if dist < 0.5:
+            arrival_list[i] = 1
+
+    #print('dist_to_goal:',dist_to_goal)
+    return arrival_list
+    
