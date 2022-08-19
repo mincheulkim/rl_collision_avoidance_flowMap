@@ -614,7 +614,7 @@ class SAC_CCTV(object):
         lidar4_list = np.asarray(lidar4_list)
         lidar5_list = np.asarray(lidar5_list)
         
-        lidar_visualize = True
+        lidar_visualize = False
         if lidar_visualize:
             #cctv1 = np.stack(((lidar1_list[0])*255, (lidar1_list[1])*255, (lidar1_list[2])*255), axis=0) 
             lidar = (frame_list[0]+0.5)*255
@@ -625,22 +625,22 @@ class SAC_CCTV(object):
             cctv1 = np.uint8(cctv1)
             cctv1 = cv2.resize(cctv1, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
             cv2.imshow("CCTV1", cctv1)
-            cctv2 = (lidar2_list[0]+0.5)*255
-            cctv2 = np.uint8(cctv2)
-            cctv2 = cv2.resize(cctv2, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
-            cv2.imshow("CCTV2", cctv2)
-            cctv3 = (lidar3_list[0]+0.5)*255
-            cctv3 = np.uint8(cctv3)
-            cctv3 = cv2.resize(cctv3, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
-            cv2.imshow("CCTV3", cctv3)
-            cctv4 = (lidar4_list[0]+0.5)*255
-            cctv4 = np.uint8(cctv4)
-            cctv4 = cv2.resize(cctv4, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
-            cv2.imshow("CCTV4", cctv4)
-            cctv5 = (lidar5_list[0]+0.5)*255
-            cctv5 = np.uint8(cctv5)
-            cctv5 = cv2.resize(cctv5, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
-            cv2.imshow("CCTV5", cctv5)
+            #cctv2 = (lidar2_list[0]+0.5)*255
+            #cctv2 = np.uint8(cctv2)
+            #cctv2 = cv2.resize(cctv2, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
+            #cv2.imshow("CCTV2", cctv2)
+            #cctv3 = (lidar3_list[0]+0.5)*255
+            #cctv3 = np.uint8(cctv3)
+            #cctv3 = cv2.resize(cctv3, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
+            #cv2.imshow("CCTV3", cctv3)
+            #cctv4 = (lidar4_list[0]+0.5)*255
+            #cctv4 = np.uint8(cctv4)
+            #cctv4 = cv2.resize(cctv4, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
+            #cv2.imshow("CCTV4", cctv4)
+            #cctv5 = (lidar5_list[0]+0.5)*255
+            #cctv5 = np.uint8(cctv5)
+            #cctv5 = cv2.resize(cctv5, dsize=(512,256), interpolation=cv2.INTER_NEAREST)  
+            #cv2.imshow("CCTV5", cctv5)
             cv2.waitKey(1)   
 
 
@@ -746,3 +746,5 @@ class SAC_CCTV(object):
             soft_update(self.critic_2_target, self.critic_2, self.tau)
 
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
+        #       critic_1_loss,   critic_2_loss,    policy_loss,           ent_loss,          alpha
+        #        loss/critic_1,  loss/critic_2,    loss/policy,           loss/entropy,      entropy_temprature/alpha

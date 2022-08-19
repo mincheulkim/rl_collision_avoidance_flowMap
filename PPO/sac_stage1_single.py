@@ -39,11 +39,11 @@ parser.add_argument('--policy', default="Gaussian",
 parser.add_argument('--eval', type=bool, default=True,
                     help='Evaluates a policy a policy every 10 episode (default: True)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
-                    help='discount factor for reward (default: 0.99)')
+                    help='discount factor for reward (default: 0.99)')   # HY도 0.99
 parser.add_argument('--tau', type=float, default=0.005, metavar='G',
-                    help='target smoothing coefficient(\tau) (default: 0.005)')
+                    help='target smoothing coefficient(\tau) (default: 0.005)')   # HY도 0.005
 parser.add_argument('--lr', type=float, default=0.0003, metavar='G',
-                    help='learning rate (default: 0.0003)')
+                    help='learning rate (default: 0.0003)')   # HY도 3*10^-4
 parser.add_argument('--alpha', type=float, default=0.2, metavar='G',
                     help='Temperature parameter \alpha determines the relative importance of the entropy\
                             term against the reward (default: 0.2)')
@@ -62,7 +62,7 @@ parser.add_argument('--start_steps', type=int, default=10000, metavar='N',
 parser.add_argument('--target_update_interval', type=int, default=1, metavar='N',
                     help='Value target update per no. of updates per step (default: 1)')
 parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
-                    help='size of replay buffer (default: 10000000)')
+                    help='size of replay buffer (default: 10000000)')   # HY는 500000
 parser.add_argument('--cuda', type=bool, default=True,
                     help='run on CUDA (default: False)')
 parser.add_argument('--laser_beam', type=int, default=512,
@@ -115,6 +115,10 @@ def run(comm, env, agent, policy_path, args):
 
     avg_reward = 0
     avg_cnt = 0
+    
+    rule = env.rule            
+    #rule = 'group_circle_crossing'  # crossing
+    print('시나리오:',rule)
 
     for i_episode in range(args.num_steps):
     
@@ -136,9 +140,7 @@ def run(comm, env, agent, policy_path, args):
         
         num_human = env.num_human
     
-        rule = env.rule            
-        #rule = 'group_circle_crossing'  # crossing
-        print('시나리오:',rule)
+        
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
@@ -383,7 +385,6 @@ def run(comm, env, agent, policy_path, args):
                 #meomry.list_push(state_list, action, r_list, next_state_list, done_list)
                 #for i in range(np.asarray(state_list).shape[0]):
                 for i in range(np.asarray(state_list, dtype=object).shape[0]):  # 220711 https://stackoverflow.com/questions/63097829/debugging-numpy-visibledeprecationwarning-ndarray-from-ragged-nested-sequences
-                    
                     if policy == 'ped':   # 220720
                         memory.push_ped(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
@@ -530,9 +531,9 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_1800'   # 220813 ~2200   220814 ~2400  220815 ~1600  220816 ~1800
-        file_critic_1 = policy_path + '/critic_1_epi_1800'
-        file_critic_2 = policy_path + '/critic_2_epi_1800'
+        file_policy = policy_path + '/policy_epi_800'   # 600 + 
+        file_critic_1 = policy_path + '/critic_1_epi_800'
+        file_critic_2 = policy_path + '/critic_2_epi_800'
 
         if os.path.exists(file_policy):
             logger.info('###########################################')

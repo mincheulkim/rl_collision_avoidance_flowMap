@@ -1524,6 +1524,94 @@ class StageWorld():
             init_pose_list[5]=[-10.5,-0.5,np.pi*.25]    # 오번째 사람(left), 위보고 있음
             init_goal_list[5]=[-10.5,-0.5]
             
+            # 로봇 fixed된 랜덤한 지역 10개에 생성 220816 (Addon)
+            robot_start_rand_idx =  np.random.randint(10, size=1)
+            robot_end_rand_idx = np.random.randint(10, size=1)
+            #print('s:',robot_start_rand_idx[0],'e:',robot_end_rand_idx[0])
+            #robot_start_rand_idx = 9  # for DEBUG
+            if robot_start_rand_idx ==0:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(-9,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi]
+            elif robot_start_rand_idx ==1:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi*1.25]
+            elif robot_start_rand_idx ==2:
+                a = np.random.normal(0,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_pose_list[0]=[a[0],b[0],0]
+            elif robot_start_rand_idx ==3:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi*1.75]
+            elif robot_start_rand_idx ==4:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(6,0.5,1)
+                init_pose_list[0]=[a[0],b[0],0]
+            elif robot_start_rand_idx ==5:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(-4,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi*0.5]
+            elif robot_start_rand_idx ==6:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(-9.5,0.5,1)
+                init_pose_list[0]=[a[0],b[0],0]
+            elif robot_start_rand_idx ==7:
+                a = np.random.normal(-3.5,0.5,1)
+                b = np.random.normal(4,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi*1.75]
+            elif robot_start_rand_idx ==8:
+                a = np.random.normal(0,0.5,1)
+                b = np.random.normal(-3,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi*0.5]
+            elif robot_start_rand_idx ==9:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(-3,0.5,1)
+                init_pose_list[0]=[a[0],b[0],np.pi]
+            if robot_end_rand_idx ==0:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(-9,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==1:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==2:
+                a = np.random.normal(0,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==3:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(9,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==4:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(6,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==5:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(-4,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==6:
+                a = np.random.normal(-9,0.5,1)
+                b = np.random.normal(-9.5,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==7:
+                a = np.random.normal(-3.5,0.5,1)
+                b = np.random.normal(4,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==8:
+                a = np.random.normal(0,0.5,1)
+                b = np.random.normal(-3,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            elif robot_end_rand_idx ==9:
+                a = np.random.normal(9,0.5,1)
+                b = np.random.normal(-3,0.5,1)
+                init_goal_list[0]=[a[0],b[0]]
+            print('로봇 start_id[',robot_start_rand_idx,']',init_pose_list[0],'end_id[',robot_end_rand_idx,']',init_goal_list[0])
+            
+            
 
         elif 'circle_crossing':
             pass

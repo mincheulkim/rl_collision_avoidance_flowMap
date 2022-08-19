@@ -580,7 +580,7 @@ class QNetwork_2_MASK(nn.Module):
         
         return x2
 
-class ValueNetwork_MASK(nn.Module):
+class ValueNetwork_MASK(nn.Module):   # SAC 두번째 논문부터는 value network없이 Q-network로만 구현
     def __init__(self, num_frame_obs, num_goal_obs, num_vel_obs, hidden_dim):
         super(ValueNetwork_MASK, self).__init__()
 
@@ -754,6 +754,7 @@ class QNetwork_1_CCTV(nn.Module):
         self.lidar1_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar1_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar1_fc1 = nn.Linear(128*32, 256)
+        '''
         self.lidar2_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar2_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar2_fc1 = nn.Linear(128*32, 256)
@@ -766,9 +767,13 @@ class QNetwork_1_CCTV(nn.Module):
         self.lidar5_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar5_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar5_fc1 = nn.Linear(128*32, 256)
+        '''
        
         # Q1 architecture
-        self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256*5, hidden_dim)
+        '''
+        self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256*5, hidden_dim)  # 5 CCTVs
+        '''
+        self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256, hidden_dim)  # 1 CCTV
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear3 = nn.Linear(hidden_dim, 1)
 
@@ -786,6 +791,7 @@ class QNetwork_1_CCTV(nn.Module):
         l1 = F.relu(self.lidar1_cv2(l1))
         l1 = l1.view(l1.shape[0], -1)   # (1, 4096)
         l1 = F.relu(self.lidar1_fc1(l1))   # (1, 256)
+        '''
         l2 = F.relu(self.lidar2_cv1(lidar2))   
         l2 = F.relu(self.lidar2_cv2(l2))
         l2 = l2.view(l2.shape[0], -1)   # (1, 4096)
@@ -802,8 +808,11 @@ class QNetwork_1_CCTV(nn.Module):
         l5 = F.relu(self.lidar5_cv2(l5))
         l5 = l5.view(l5.shape[0], -1)   # (1, 4096)
         l5 = F.relu(self.lidar5_fc1(l5))   # (1, 256)
-        
-        xu = torch.cat((o1, goal, vel, action, l1, l2, l3, l4, l5), dim=-1) # observation + action
+        '''
+        '''
+        xu = torch.cat((o1, goal, vel, action, l1, l2, l3, l4, l5), dim=-1) # 5 CCTVs
+        '''
+        xu = torch.cat((o1, goal, vel, action, l1), dim=-1) # 1 CCTV
         
         x1 = F.relu(self.linear1(xu))
         x1 = F.relu(self.linear2(x1))
@@ -822,6 +831,7 @@ class QNetwork_2_CCTV(nn.Module):
         self.lidar1_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar1_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar1_fc1 = nn.Linear(128*32, 256)
+        '''
         self.lidar2_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar2_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar2_fc1 = nn.Linear(128*32, 256)
@@ -834,10 +844,14 @@ class QNetwork_2_CCTV(nn.Module):
         self.lidar5_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar5_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar5_fc1 = nn.Linear(128*32, 256)
+        '''
 
 
         # Q2 architecture
-        self.linear4 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256*5, hidden_dim)
+        '''
+        self.linear4 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256*5, hidden_dim)  # 5 CCTVs
+        '''
+        self.linear4 = nn.Linear(256 + num_goal_obs + num_vel_obs + num_actions + 256, hidden_dim)  # 1 CCTV
         self.linear5 = nn.Linear(hidden_dim, hidden_dim)
         self.linear6 = nn.Linear(hidden_dim, 1)
 
@@ -855,6 +869,7 @@ class QNetwork_2_CCTV(nn.Module):
         l1 = F.relu(self.lidar1_cv2(l1))
         l1 = l1.view(l1.shape[0], -1)   # (1, 4096)
         l1 = F.relu(self.lidar1_fc1(l1))   # (1, 256)
+        '''
         l2 = F.relu(self.lidar2_cv1(lidar2))   
         l2 = F.relu(self.lidar2_cv2(l2))
         l2 = l2.view(l2.shape[0], -1)   # (1, 4096)
@@ -871,9 +886,12 @@ class QNetwork_2_CCTV(nn.Module):
         l5 = F.relu(self.lidar5_cv2(l5))
         l5 = l5.view(l5.shape[0], -1)   # (1, 4096)
         l5 = F.relu(self.lidar5_fc1(l5))   # (1, 256)
+        '''
         
-        
-        xu = torch.cat((o1, goal, vel, action, l1, l2, l3, l4, l5), dim=-1) # observation + action
+        '''
+        xu = torch.cat((o1, goal, vel, action, l1, l2, l3, l4, l5), dim=-1) # 5 CCTVs  220813
+        '''
+        xu = torch.cat((o1, goal, vel, action, l1), dim=-1) # 1 CCTVs 220816
         
         x2 = F.relu(self.linear4(xu))
         x2 = F.relu(self.linear5(x2))
@@ -896,6 +914,7 @@ class GaussianPolicy_CCTV(nn.Module):
         self.lidar1_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar1_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar1_fc1 = nn.Linear(128*32, 256)
+        '''
         self.lidar2_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar2_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar2_fc1 = nn.Linear(128*32, 256)
@@ -908,10 +927,13 @@ class GaussianPolicy_CCTV(nn.Module):
         self.lidar5_cv1 = nn.Conv1d(in_channels=num_frame_obs, out_channels=32, kernel_size=5, stride=2, padding=1)
         self.lidar5_cv2 = nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.lidar5_fc1 = nn.Linear(128*32, 256)
-        
+        '''
         
         #self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs, hidden_dim)
+        '''
         self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs + 256*5, hidden_dim)
+        '''
+        self.linear1 = nn.Linear(256 + num_goal_obs + num_vel_obs + 256, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
 
         self.mean_linear = nn.Linear(hidden_dim, num_actions) # Different from PPO
@@ -954,6 +976,7 @@ class GaussianPolicy_CCTV(nn.Module):
         l1 = F.relu(self.lidar1_cv2(l1))
         l1 = l1.view(l1.shape[0], -1)   # (1, 4096)
         l1 = F.relu(self.lidar1_fc1(l1))   # (1, 256)
+        '''
         l2 = F.relu(self.lidar2_cv1(lidar2))   
         l2 = F.relu(self.lidar2_cv2(l2))
         l2 = l2.view(l2.shape[0], -1)   # (1, 4096)
@@ -970,11 +993,13 @@ class GaussianPolicy_CCTV(nn.Module):
         l5 = F.relu(self.lidar5_cv2(l5))
         l5 = l5.view(l5.shape[0], -1)   # (1, 4096)
         l5 = F.relu(self.lidar5_fc1(l5))   # (1, 256)
-        
-        
+        '''
 
         # concat lidar_frame, local_goal, velocity
-        state = torch.cat((o1, goal, vel, l1, l2, l3, l4, l5), dim=-1) # observation   # (1, 260)
+        '''
+        state = torch.cat((o1, goal, vel, l1, l2, l3, l4, l5), dim=-1) # 5 CCTVs 220813
+        '''
+        state = torch.cat((o1, goal, vel, l1), dim=-1) # 5 CCTVs 220813
 
         x = F.relu(self.linear1(state))   # (1, 256)
         x = F.relu(self.linear2(x))   # (1, 256)
