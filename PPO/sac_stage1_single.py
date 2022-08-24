@@ -1,3 +1,5 @@
+# https://github.com/CzJaewan/rl_local_planner
+
 import os #test
 import logging
 import sys
@@ -21,13 +23,14 @@ import cv2
 
 
 from stage_world1 import StageWorld 
-from model_sac.sac import SAC, SAC_PED, SAC_MASK, SAC_CCTV
+from model_sac.sac import SAC, SAC_PED, SAC_MASK, SAC_CCTV, SAC_IROS, SAC_CCTV_HEADER
 from model_sac.replay_memory import ReplayMemory
 
 from model.ppo import generate_action_human_sf, human_arrive_goal  # 220708   사람 행동 모델링, 220805 도착여부 판단
 
 import model_sac.clustering as clustering   # 220725
 import model_sac.social_zone as social_zone  # 220725
+
 
 
 
@@ -51,7 +54,8 @@ parser.add_argument('--automatic_entropy_tuning', type=bool, default=True, metav
                     help='Automaically adjust \alpha (default: True)')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',
                     help='random seed (default: 123456)')
-parser.add_argument('--batch_size', type=int, default=1024, metavar='N',
+#parser.add_argument('--batch_size', type=int, default=1024, metavar='N',
+parser.add_argument('--batch_size', type=int, default=512, metavar='N',    # 220818 IROS2021하면서 GPU ram 부족해서
                     help='batch size (default: 256)')
 parser.add_argument('--num_steps', type=int, default=1000001, metavar='N',
                     help='maximum number of steps (default: 1000000)')
@@ -88,7 +92,9 @@ evaluate = False   # 1. 220714
 #policy = '' 
 #policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC) or ped_mask(SAC-mask)
 #policy = 'ped_mask'   # 220725
-policy = 'cctv'   # stage_world1.py에서 1520부분 해제요
+#policy = 'cctv'   # stage_world1.py에서 1520부분 해제요
+policy = 'cctv_header'   # 220822 cctv_에서 header(cctv 상대위치) 정보 추가한거
+#policy = 'IROS2021'  # 220819 as baseline   # args.aprser에서 batch 1024 -> 512로 수정
 # for debug ##
 LIDAR_visualize = False
 mask_visualize = False
@@ -99,7 +105,8 @@ def run(comm, env, agent, policy_path, args):
     
     test_interval = 10
     #save_interval = 500
-    save_interval = 200   # 220715
+    #save_interval = 200   # 220715
+    save_interval = 100   # 220819
     # Training Loop
     total_numsteps = 0
     updates = 0
@@ -154,6 +161,8 @@ def run(comm, env, agent, policy_path, args):
         frame = env.get_laser_observation()   # frame = obs
         frame_stack = deque([frame, frame, frame])
         goal = np.asarray(env.get_local_goal())
+        if policy == 'IROS2021':  # 220819 local goal(x, y, theta)
+            goal = np.asarray(env.get_local_goal_three())
         speed = np.asarray(env.get_self_speed())
           
         # 220711 ADDED
@@ -162,25 +171,38 @@ def run(comm, env, agent, policy_path, args):
         ped = env.get_pedestrain_observation(pose_list, velocity_list)   # 애초에 get_pedestrain_observation에서 ped(as flow map)을 만들어 줘야 할듯
         ## input: state_list, pose_list, velocity_list
         ## output: ped_map (3x60x60)        
-        ped_stack = deque([ped, ped, ped])
-        lidar_list = env.lidar_list
-        lidar1_stack = deque([lidar_list[1], lidar_list[1], lidar_list[1]])
-        lidar2_stack = deque([lidar_list[2], lidar_list[2], lidar_list[2]])
-        lidar3_stack = deque([lidar_list[3], lidar_list[3], lidar_list[3]])
-        lidar4_stack = deque([lidar_list[4], lidar_list[4], lidar_list[4]])
-        lidar5_stack = deque([lidar_list[5], lidar_list[5], lidar_list[5]])
-        
+        if policy == 'ped':
+            ped_stack = deque([ped, ped, ped])
+        # 220816 CCTV
+        if policy == 'cctv' or policy == 'cctv_header':
+            lidar_list = env.lidar_list
+            lidar1_stack = deque([lidar_list[1], lidar_list[1], lidar_list[1]])
+            lidar2_stack = deque([lidar_list[2], lidar_list[2], lidar_list[2]])
+            lidar3_stack = deque([lidar_list[3], lidar_list[3], lidar_list[3]])
+            lidar4_stack = deque([lidar_list[4], lidar_list[4], lidar_list[4]])
+            lidar5_stack = deque([lidar_list[5], lidar_list[5], lidar_list[5]])
+        # 220819 IROS stack
+        iros_map = np.concatenate((env.map1, ped), axis=0)
         
         # 220723 group mask layer stack
-        mask = np.zeros(512)
-        mask_stack = deque([mask, mask, mask])
+        if policy == 'ped_mask':
+            mask = np.zeros(512)
+            mask_stack = deque([mask, mask, mask])
         
+        # 220822 get relative pose of cctv            
+        if policy == 'cctv_header':
+            cctv_pose = env.get_relative_pose_cctv(pose_list)
+            
         if policy == 'ped':   # 220720
             state = [frame_stack, goal, speed, ped_stack]
         elif policy =='ped_mask':
             state = [frame_stack, goal, speed, mask_stack]
         elif policy =='cctv':  # 220812
             state = [frame_stack, goal, speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack]
+        elif policy =='cctv_header':  # 220822
+            state = [frame_stack, goal, speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack, cctv_pose]
+        elif policy == 'IROS2021':
+            state = [frame_stack, goal, speed, iros_map]
         else:
             state = [frame_stack, goal, speed]
             
@@ -192,22 +214,22 @@ def run(comm, env, agent, policy_path, args):
             
             state_list = comm.gather(state, root=0)
             # state_list(=state) = [frame_stack, goal, speed]
+            if policy == 'ped_mask':
+                # POSTPROCESSING FOR MAKSED GROUP LABEL based on human information in sensor range
+                # [Done] 1. clstering된 pedestrain list 생성(DBSCAN 씀)
+                pedestrain_list = clustering.generate_pedestrain_list(env, pose_list, velocity_list)
+                # 0: dx, 1:dy, 2:dvx 3:rel.dvy 
+                # 4:indiv.id(if detected, else 0) , 5:grp.id(if detected, else 0) , 6:visibility(As 1)
+                #print('페드맵:',pedestrain_list)
+                # [DONE] 4. Generate individual, group convexhull based on pedestrain_map
+                #           and create group_mask_layer
+                mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list)
             
-            # POSTPROCESSING FOR MAKSED GROUP LABEL based on human information in sensor range
-            # [Done] 1. clstering된 pedestrain list 생성(DBSCAN 씀)
-            pedestrain_list = clustering.generate_pedestrain_list(env, pose_list, velocity_list)
-            # 0: dx, 1:dy, 2:dvx 3:rel.dvy 
-            # 4:indiv.id(if detected, else 0) , 5:grp.id(if detected, else 0) , 6:visibility(As 1)
-            #print('페드맵:',pedestrain_list)
-            # [DONE] 4. Generate individual, group convexhull based on pedestrain_map
-            #           and create group_mask_layer
-            mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list)
-            
-            '''
-            # lidar sensor data 및 mask 로깅
-            logger_lidar.info('{}'.format(frame_stack[2]))
-            logger_mask.info('{}'.format(mask_stack[2]))
-            '''
+                '''
+                # lidar sensor data 및 mask 로깅
+                logger_lidar.info('{}'.format(frame_stack[2]))
+                logger_mask.info('{}'.format(mask_stack[2]))
+                '''
             
             
             # Robot action
@@ -260,9 +282,9 @@ def run(comm, env, agent, policy_path, args):
             for i in range(num_human):
                 if i==0:
                     env.control_vel_specific(real_action, i)
-                    #env.control_vel_specific([0.0,0], i)
+                    #env.control_vel_specific([1.0,0], i)
                 #elif i==1:   # DEBUG 특정 i번째 사람
-                #    env.control_vel_specific([0.2, -0.5], i)
+                #    env.control_vel_specific([1.0, 0.0], i)
                 else:
                     angles = np.arctan2(human_actions[i][1], human_actions[i][0])     # 
                     #diff = angles - rot   # problem
@@ -277,11 +299,11 @@ def run(comm, env, agent, policy_path, args):
                     
                     length = np.sqrt([human_actions[i][0]**2+human_actions[i][1]**2])
                     scaled_action = (length, diff)   
-                    if policy != 'cctv':
-                        env.control_vel_specific(scaled_action, i)
-                    elif policy == 'cctv':
-                        #env.control_pose_specific(init_poses[i], i)
+                    if policy == 'cctv' or policy == 'cctv_header' or policy == 'IROS2021':
                         pass
+                    else:
+                        env.control_vel_specific(scaled_action, i)
+                        #env.control_pose_specific(init_poses[i], i)
             rospy.sleep(0.001)
             
              
@@ -323,31 +345,33 @@ def run(comm, env, agent, policy_path, args):
             left = frame_stack.popleft()
             frame_stack.append(next_frame)
             
-             # Get next lidars # 220812
-            lidar_list = env.lidar_list
-            left = lidar1_stack.popleft()
-            lidar1_stack.append(lidar_list[1])
-            left = lidar2_stack.popleft()
-            lidar2_stack.append(lidar_list[2])
-            left = lidar3_stack.popleft()
-            lidar3_stack.append(lidar_list[3])
-            left = lidar4_stack.popleft()
-            lidar4_stack.append(lidar_list[4])
-            left = lidar5_stack.popleft()
-            lidar5_stack.append(lidar_list[5])
+            if policy == 'cctv' or policy == 'cctv_header': 
+                # Get next lidars # 220812
+                lidar_list = env.lidar_list
+                left = lidar1_stack.popleft()
+                lidar1_stack.append(lidar_list[1])
+                left = lidar2_stack.popleft()
+                lidar2_stack.append(lidar_list[2])
+                left = lidar3_stack.popleft()
+                lidar3_stack.append(lidar_list[3])
+                left = lidar4_stack.popleft()
+                lidar4_stack.append(lidar_list[4])
+                left = lidar5_stack.popleft()
+                lidar5_stack.append(lidar_list[5])
             
             # Get next group mask # 220725
             # update mask_Stack
             pedestrain_list_new = clustering.generate_pedestrain_list(env, env.pose_list , env.speed_poly_list)
-            mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list_new)
-            left_r = mask_stack.popleft()
-            mask_stack.append(mask_layer)        
+            if policy == 'ped_mask':
+                mask_layer = social_zone.create_group_mask_layer(env, pedestrain_list_new)
+                left_r = mask_stack.popleft()
+                mask_stack.append(mask_layer)        
             
             # 220711 ADDED Pedestrain map visualize
             # ped_stack: 왼쪽부터 빠짐 (t-2, t-1, t) 가장 오른쪽에 append[2]된게 최신
                            # 앞칼럼: 시간(t-2, t-1, t), 뒷칼럼(pose, vx, vy)
-            dist = cv2.resize(ped_stack[2][0], dsize=(600,600))#, interpolation=cv2.INTER_LINEAR)  vx
-            dist2 = cv2.resize(ped_stack[2][1], dsize=(480,480))#, interpolation=cv2.INTER_LINEAR)  vy
+            #dist = cv2.resize(ped_stack[2][0], dsize=(600,600))#, interpolation=cv2.INTER_LINEAR)  vx
+            #dist2 = cv2.resize(ped_stack[2][1], dsize=(480,480))#, interpolation=cv2.INTER_LINEAR)  vy
             #dist3 = cv2.resize(ped_stack[2][2], dsize=(480,480))#, interpolation=cv2.INTER_LINEAR)
             #cv2.imshow("Local flow map1", dist)
             #cv2.imshow("Local flow map2", dist2)
@@ -358,11 +382,22 @@ def run(comm, env, agent, policy_path, args):
             pose_list = env.pose_list
             velocity_list = env.speed_poly_list
             next_ped = env.get_pedestrain_observation(pose_list, velocity_list)
-            left = ped_stack.popleft()
-            ped_stack.append(next_ped)
+            if policy == 'ped':
+                left = ped_stack.popleft()
+                ped_stack.append(next_ped)
             
             next_goal = np.asarray(env.get_local_goal())
+            # 220819
+            if policy == 'IROS2021':
+                next_goal = np.asarray(env.get_local_goal_three())
             next_speed = np.asarray(env.get_self_speed())
+            
+            # iros_map 갱신 220819
+            next_iros_map = np.concatenate((env.map1, next_ped), axis=0)
+            
+            # 220822 CCTV_header(rel cctv pose) 갱신
+            if policy == 'cctv_header':
+                cctv_pose = env.get_relative_pose_cctv(pose_list)
             
             if policy == 'ped':   # 220720
                 next_state = [frame_stack, next_goal, next_speed, ped_stack]  # 220712
@@ -370,14 +405,17 @@ def run(comm, env, agent, policy_path, args):
                 next_state = [frame_stack, next_goal, next_speed, mask_stack]  # 220712
             elif policy == 'cctv':  # 220812
                 next_state = [frame_stack, next_goal, next_speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack]  # 220812
+            elif policy == 'cctv_header':  # 220822
+                next_state = [frame_stack, next_goal, next_speed, lidar1_stack, lidar2_stack, lidar3_stack, lidar4_stack, lidar5_stack, cctv_pose]  # 220812
+            elif policy == 'IROS2021':   # 220819
+                next_state = [frame_stack, next_goal, next_speed, next_iros_map]  # 220819
             else:
                 next_state = [frame_stack, next_goal, next_speed]
-            #print(episode_steps, '의 next ped_stack:', ped_stack)
 
             r_list = comm.gather(reward, root=0)
             done_list = comm.gather(done, root=0)
             next_state_list = comm.gather(next_state, root=0)
-
+            
             # Ignore the "done" signal if it comes from hitting the time horizon.
             # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
             
@@ -394,10 +432,20 @@ def run(comm, env, agent, policy_path, args):
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
                                 state_list[i][3], next_state_list[i][3])  # added mask, next_mask 220725
                     elif policy == 'cctv':  # 220812
-                        memory.push_cctv(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
+                        memory.push_cctv(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i], 
+                                         next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
+                                         state_list[i][3], state_list[i][4], state_list[i][5], state_list[i][6], state_list[i][7], 
+                                         next_state_list[i][3], next_state_list[i][4], next_state_list[i][5], next_state_list[i][6], next_state_list[i][7]) 
+                    elif policy == 'cctv_header':  # 220822
+                        memory.push_cctv_header(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i], 
+                                         next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
+                                         state_list[i][3], state_list[i][4], state_list[i][5], state_list[i][6], state_list[i][7], 
+                                         next_state_list[i][3], next_state_list[i][4], next_state_list[i][5], next_state_list[i][6], next_state_list[i][7], 
+                                         next_state_list[i][8])   # cctv_header
+                    elif policy == 'IROS2021':   # 22819
+                        memory.push_iros(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i],  # Append transition to memory
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i], 
-                                state_list[i][3], state_list[i][4], state_list[i][5], state_list[i][6], state_list[i][7], 
-                                next_state_list[i][3], next_state_list[i][4], next_state_list[i][5], next_state_list[i][6], next_state_list[i][7]) 
+                                state_list[i][3], next_state_list[i][3])  # 220819 iros map
                     else:  # 220720 (오리지널)
                         memory.push(state_list[i][0], state_list[i][1], state_list[i][2], action[i], r_list[i], 
                                 next_state_list[i][0], next_state_list[i][1], next_state_list[i][2], done_list[i]) # Append transition to memory
@@ -405,7 +453,7 @@ def run(comm, env, agent, policy_path, args):
 
             state = next_state  
             
-            if mask_visualize:
+            if mask_visualize and policy == 'ped_mask':
                 ## 220725 mask visualize
                 # mask visualize
                 masking = np.stack((255-(mask_stack[0])*255, 255-(mask_stack[1])*255, 255-(mask_stack[2])*255), axis=0)   # RGB?
@@ -454,7 +502,7 @@ def run(comm, env, agent, policy_path, args):
         avg_reward += episode_reward  # 220711
         if avg_cnt % 100 == 0:
             print("Average reward: {}".format(avg_reward/avg_cnt))
-            writer.add_scalar('Avg.reward/100', avg_reward/avg_cnt, avg_cnt/100)   # ADDED
+            writer.add_scalar('Avg.reward/100', avg_reward/avg_cnt, avg_cnt/100)   # ADDED    
 
 
 
@@ -467,6 +515,7 @@ if __name__ == '__main__':
     cal_file = './log/' + hostname + '/cal.log'
 
     # config log
+    '''
     logger = logging.getLogger('mylogger')
     logger.setLevel(logging.INFO)
 
@@ -483,8 +532,10 @@ if __name__ == '__main__':
     cal_f_handler = logging.FileHandler(cal_file, mode='a')
     file_handler.setLevel(logging.INFO)
     logger_cal.addHandler(cal_f_handler)
+    '''
     
     #220727 Logging Lidar and mask
+    '''
     lidar_file = './log/' + hostname + '/lidar.log'
     mask_file = './log/' + hostname + '/mask.log'
     logger_lidar = logging.getLogger('loggerlidar')
@@ -497,6 +548,7 @@ if __name__ == '__main__':
     mask_file_handler.setLevel(logging.INFO)
     logger_lidar.addHandler(lidar_file_handler)
     logger_mask.addHandler(mask_file_handler)
+    '''
 
     comm = MPI.COMM_WORLD    # instantize the communication world
     rank = comm.Get_rank()   # get this particular processes' `rank` ID
@@ -524,6 +576,10 @@ if __name__ == '__main__':
             agent = SAC_MASK(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
         elif policy == 'cctv':
             agent = SAC_CCTV(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
+        elif policy == 'cctv_header':
+            agent = SAC_CCTV_HEADER(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   
+        elif policy == 'IROS2021':
+            agent = SAC_IROS(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)
         else:
             agent = SAC(num_frame_obs=args.laser_hist, num_goal_obs=2, num_vel_obs=2, action_space=action_bound, args=args)   # PPO에서 policy 선언하는 것과 동일
 
@@ -531,43 +587,49 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_800'   # 600 + 
-        file_critic_1 = policy_path + '/critic_1_epi_800'
-        file_critic_2 = policy_path + '/critic_2_epi_800'
+        file_policy = policy_path + '/policy_epi_400'   
+        file_critic_1 = policy_path + '/critic_1_epi_400'
+        file_critic_2 = policy_path + '/critic_2_epi_400'
 
         if os.path.exists(file_policy):
-            logger.info('###########################################')
-            logger.info('############Loading Policy Model###########')
+            #logger.info('###########################################')
+            #logger.info('############Loading Policy Model###########')
+            print('loading policy model')
             print(file_policy)
-            logger.info('###########################################')
+            #logger.info('###########################################')
             state_dict = torch.load(file_policy)
             agent.policy.load_state_dict(state_dict)
         else:
-            logger.info('###########################################')
-            logger.info('############Start policy Training###########')
-            logger.info('###########################################')
+            #logger.info('###########################################')
+            #logger.info('############Start policy Training###########')
+            #logger.info('###########################################')
+            print('start policy training')
 
         if os.path.exists(file_critic_1):
-            logger.info('###########################################')
-            logger.info('############Loading critic_1 Model###########')
-            logger.info('###########################################')
+            #logger.info('###########################################')
+            #logger.info('############Loading critic_1 Model###########')
+            #logger.info('###########################################')
+            print('loadinc critic 1')
             state_dict = torch.load(file_critic_1)
             agent.critic_1.load_state_dict(state_dict)
         else:
-            logger.info('###########################################')
-            logger.info('############Start critic_1 Training###########')
-            logger.info('###########################################')
+            #logger.info('###########################################')
+            #logger.info('############Start critic_1 Training###########')
+            #logger.info('###########################################')
+            print('start critic 1')
     
         if os.path.exists(file_critic_2):
-            logger.info('###########################################')
-            logger.info('############Loading critic_2 Model###########')
-            logger.info('###########################################')
+            #logger.info('###########################################')
+            #logger.info('############Loading critic_2 Model###########')
+            #logger.info('###########################################')
+            print('loading critic 2')
             state_dict = torch.load(file_critic_2)
             agent.critic_2.load_state_dict(state_dict)
         else:
-            logger.info('###########################################')
-            logger.info('############Start critic_2 Training###########')
-            logger.info('###########################################')    
+            #logger.info('###########################################')
+            #logger.info('############Start critic_2 Training###########')
+            #logger.info('###########################################')    
+            print('start critic 2')
 
     else:   # rank != 0인것들 신경 x
         agent = None
