@@ -254,7 +254,10 @@ class StageWorld():
             #vy=msg.twist.twist.angular.z   # 220725 Angular speed https://www.programcreek.com/python/example/70251/geometry_msgs.msg.Twist
             vy=Euler[2]  # 220725. 각속도를 그냥 heading으로 간주함. 왜냐하면 만약 vel이 polar에서 (1,0)일 경우, cartesian에서 표현 불가 
             pose_list.append([x,y, Euler[2]])
-            speed_poly_list.append([vx,vy])
+            # 기존
+            #speed_poly_list.append([vx,vy])
+            # 바꿈 220819 linear vx, angular vy -> vx, vy
+            speed_poly_list.append([vx*np.cos(vy),vx*np.sin(vy)])
 
             #self.pose_list.append([x,y, Euler[2]])
         self.pose_list = pose_list
@@ -371,7 +374,8 @@ class StageWorld():
         
         # 220124 create 2D Grid map(3x3, forward of robot, back is dark) from lidar_sensor
         [x, y, theta] = self.get_self_stateGT()     # robot's pose
-        map1 = np.ones((60, 60)) * 0.0   # 60 by 60 with default value as 0.5
+        #map1 = np.ones((60, 60)) * 0.0   # 60 y6655by 60 with default value as 0.5
+        map1 = np.zeros((60, 60)) * 0.0   # 220819
         inc_angle = np.pi/sparse_beam_num     # np.pi(3.14=180deg) / 512 = 0.00625deg...
         end_list = []
         for i in range(sparse_beam_num):
@@ -392,14 +396,17 @@ class StageWorld():
             line = lg.bresenham((30, 30), (int(mod_y),int(mod_x)))
             for l in line:
                 #self.map1[l[0]][l[1]] = 0.5
-                map1[l[0]][l[1]] = 0.5
+                map1[l[0]][l[1]] = 1
+
+        # 220819 (60, 60) -> (1, 60, 60) for ped map과 맞추기 위해                
+        map1 = np.expand_dims(map1, axis=0)
                 
         self.map1 = map1
         
-        '''
         # Visualize
+        '''
         hsv=cv2.resize(self.map1, dsize=(480,480), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow('image',hsv)
+        cv2.imshow('map1',hsv)
         cv2.waitKey(1)
         '''
     
@@ -417,13 +424,14 @@ class StageWorld():
         scan_sparse = np.concatenate((sparse_scan_left, sparse_scan_right[::-1]), axis=0)   # concat left, right scan(flip)
         #scan_sparse = np.flip(scan_sparse)    # 211115
         scan_sparse = scan_sparse[::-1]    # 211115  fliped input    # 이거 내가 추가했던거 TODO 
-
+        
         return scan_sparse / 6.0 - 0.5   # because sensor are front of robot(50cm)
     
     # 220711 from ppo.py. generate_action_baseline_LM()
     def get_pedestrain_observation(self, pose_list, velocity_list):
         # Build occupancy map
-        cell_size=1*0.5   # Resolution
+        #cell_size=1*0.5   # Resolution
+        cell_size=1*0.1   # Resolution
         map_size=6        # Lidar Sensor Arrange
         local_maps = []
         
@@ -435,52 +443,63 @@ class StageWorld():
         speed_poly_list = np.asarray(velocity_list)     # 220105 robot+human poly speed
         
         local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))   # [-3~3, 0~6]
-        
-        #for j in range(3):  # pos, velx,vely
-        for j in range(2):  # velx, vely
-            for i, pose in enumerate(pose_list):
+         
+        for j in range(3):  # pos, linear v, angular w
+        #for j in range(2):  # velx, vely
+            for i, (pose, vel) in enumerate(zip(pose_list, speed_poly_list)):
                 diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
-                #print('로봇 rot:',robot_rot)
                 # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
                 dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
                 dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
                 
-                diff_vel = speed_poly_list - speed_poly_list[0]
-                dvx_rot = diff_vel[0]*np.cos(robot_rot)+diff_vel[1]*np.sin(robot_rot)
-                dvy_rot = -diff_vel[0]*np.sin(robot_rot)+diff_vel[1]*np.cos(robot_rot)
+                # 220819  local view에 따라 gloval dvx, dvy를 치환(만약 이부분 없으면 글로벌로 치환 가능)
+                diff_vel = vel - speed_poly_list[0]
+                diff_velx_rot = diff_vel[0]*np.cos(robot_rot)+diff_vel[1]*np.sin(robot_rot)
+                diff_vely_rot = -diff_vel[0]*np.sin(robot_rot)+diff_vel[1]*np.cos(robot_rot)
                 
-                # 220110 추가. 로봇은 전방 6m만 바라봄(전방x-axis 0~6m, 가로세로y-axis -3~3m)
-                # 현재 아래 mod_diff는 로봇 중심 정사각형(360도)로 볼수 있게 한거
                 mod_diff_x = np.floor((dx_rot+3)/cell_size)
-                #mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
-                mod_diff_y = np.ceil((map_size-dy_rot)/cell_size)
-                            
-                
-                #print('index max:',index)
+                # Option 1   # 전방 3m만 바라봄
+                mod_diff_y = np.ceil((map_size/2-dy_rot)/cell_size)
+                # Option 2   # 로봇 중심 정사각형(360도)로 볼수 있게 한거
+                #mod_diff_y = np.ceil((map_size-dy_rot)/cell_size)
                 
                 if mod_diff_x >=0 and mod_diff_x <(map_size/cell_size) and mod_diff_y >=0 and mod_diff_y <(map_size/cell_size) and i != 0:
-                    '''
-                    if j==0:   # grp idx    
-                        # 220110 추가. pose occpuancy(1) 대신 group occupancy(group id)
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1  # 220121 그룹별 평균 거리 역순으로 들어감(가까울수록 큰 거리)
-                    # 220110 수정. 로봇 rotation에 따라 변환된 vx, vy 들어감
-                    elif j==1: # vel x
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
-                        #print(i,'번째 사람의 vx:',diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot))
-                    elif j==2: # vel y
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
-                        #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
-                    '''
-                    if j==0:   # grp idx    
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vel[i][0]*np.cos(robot_rot)+diff_vel[i][1]*np.sin(robot_rot)
-                    elif j==1: # vel x
-                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot)
-                        #print(i,'번째 사람의 vy:',-diff_vel[i][0]*np.sin(robot_rot)+diff_vel[i][1]*np.cos(robot_rot))
+                    if j==0:   # pose exsistance  
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=1 
+                    elif j==1: # linear v (local view)
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_velx_rot  # diff_vel[i][0]
+                    elif j==2: # angular w (local view)
+                        local_map[np.int(mod_diff_y)][np.int(mod_diff_x)]=diff_vely_rot  # diff_vel[i][1]
             local_maps.append(local_map.tolist())
             local_map = np.zeros((int(map_size/cell_size),int(map_size/cell_size)))
             
         local_maps = np.array(local_maps) # 3,60,60
+        
+        # visualize
+        '''
+        hsv=cv2.resize(local_maps[0], dsize=(480,480), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('local_map',hsv)
+        cv2.waitKey(1)
+        '''
         return local_maps
+    
+    def get_relative_pose_cctv(self, pose_list):
+        pose_list = np.asarray(pose_list)
+        robot_rot = pose_list[0,2]
+        robot_rot += np.pi*3/2   # 220125   # from generate_action_corl
+        
+        rel_pose_list = []
+    
+        for i, pose in enumerate(pose_list):
+            diff = pose-pose_list[0]   # 0[0,0], ~, 13[-0.232, -9.2323]
+            # 220110 추가. 로봇 현재 rotation에 따라 변화하는 LM
+            dx_rot = diff[0]*np.cos(robot_rot)+diff[1]*np.sin(robot_rot)
+            dy_rot = -diff[0]*np.sin(robot_rot)+diff[1]*np.cos(robot_rot)
+            rel_pose_list.append([dx_rot, dy_rot])
+        
+        return rel_pose_list
+            
+        
 
     # ADDED
     def collision_laser_flag(self, r):
@@ -527,6 +546,15 @@ class StageWorld():
         local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   # relative robot aspect to goal(local goal)
         return [local_x, local_y]
     
+    # 220819
+    def get_local_goal_three(self):
+        [x, y, theta] = self.get_self_stateGT()   
+        [goal_x, goal_y] = self.goal_point        
+        local_x = (goal_x - x) * np.cos(theta) + (goal_y - y) * np.sin(theta)
+        local_y = -(goal_x - x) * np.sin(theta) + (goal_y - y) * np.cos(theta)   
+        local_theta = np.arctan2(local_y, local_x)  # 220819
+        return [local_x, local_y, local_theta]
+    
     def reset_world(self):
         self.reset_stage()
         self.self_speed = [0.0, 0.0]
@@ -534,7 +562,8 @@ class StageWorld():
         self.step_r_cnt = 0.
         self.start_time = time.time()
         #rospy.sleep(0.5)
-        rospy.sleep(1.0)   # 211214 이게 원래 디폴트로 되어있던거임
+        #rospy.sleep(1.0)   # 211214 이게 원래 디폴트로 되어있던거임
+        rospy.sleep(5.0)   # 220822 더 길게 슬립해서 메모리 이슈 해결?
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
@@ -1609,12 +1638,14 @@ class StageWorld():
                 a = np.random.normal(9,0.5,1)
                 b = np.random.normal(-3,0.5,1)
                 init_goal_list[0]=[a[0],b[0]]
-            print('로봇 start_id[',robot_start_rand_idx,']',init_pose_list[0],'end_id[',robot_end_rand_idx,']',init_goal_list[0])
+            #print('로봇 start_id[',robot_start_rand_idx,']',init_pose_list[0],'end_id[',robot_end_rand_idx,']',init_goal_list[0])
             
             
 
         elif 'circle_crossing':
             pass
+        
+        rospy.sleep(5.0)   # 220822 추가
 
         return init_pose_list, init_goal_list
         
