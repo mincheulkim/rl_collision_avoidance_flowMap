@@ -2,6 +2,7 @@ show_clock 0
 show_clock_interval 10000
 resolution 0.2
 threads 16
+#threads 12  # 220819 for safe
 # -1: for maximum run time
 #speedup 20
 speedup 5

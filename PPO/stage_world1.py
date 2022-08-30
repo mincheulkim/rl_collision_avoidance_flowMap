@@ -562,8 +562,8 @@ class StageWorld():
         self.step_r_cnt = 0.
         self.start_time = time.time()
         #rospy.sleep(0.5)
-        #rospy.sleep(1.0)   # 211214 이게 원래 디폴트로 되어있던거임
-        rospy.sleep(5.0)   # 220822 더 길게 슬립해서 메모리 이슈 해결?
+        rospy.sleep(1.0)   # 211214 이게 원래 디폴트로 되어있던거임
+        #rospy.sleep(5.0)   # 220822 더 길게 슬립해서 메모리 이슈 해결?
 
     def generate_goal_point(self):
         [x_g, y_g] = self.generate_random_goal()   # generate goal 1) dist to zero > 9, 2) 8<dist to agent<10
@@ -1645,7 +1645,8 @@ class StageWorld():
         elif 'circle_crossing':
             pass
         
-        rospy.sleep(5.0)   # 220822 추가
+        #rospy.sleep(5.0)   # 220822 추가
+        rospy.sleep(0.01)   # 220825
 
         return init_pose_list, init_goal_list
         

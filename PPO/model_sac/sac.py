@@ -1003,7 +1003,8 @@ class SAC_IROS(object):
             self.automatic_entropy_tuning = False
             #self.policy = DeterministicPolicy(num_frame_obs, num_goal_obs, num_vel_obs, self.action_space.shape[0], args.hidden_size, self.action_space).to(self.device)
             self.policy = GaussianPolicy_IROS(num_frame_obs, num_goal_obs, num_vel_obs, self.action_space.shape[0], args.hidden_size, self.action_space).to(self.device)
-
+            #원래는 위에 determinsitic이 주석풀고ㄷ 되야 함
+            
             self.policy_optim = Adam(self.policy.parameters(), lr=args.lr)
 
     def select_action(self, state_list, evaluate=False):   # state_list = [frame_stack, goal, speed]

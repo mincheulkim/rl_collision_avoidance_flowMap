@@ -92,8 +92,8 @@ evaluate = False   # 1. 220714
 #policy = '' 
 #policy = 'ped'     # 2. 220720 ped(SAC-ped) or ''(SAC) or ped_mask(SAC-mask)
 #policy = 'ped_mask'   # 220725
-#policy = 'cctv'   # stage_world1.py에서 1520부분 해제요
-policy = 'cctv_header'   # 220822 cctv_에서 header(cctv 상대위치) 정보 추가한거
+policy = 'cctv'   # stage_world1.py에서 1520부분 해제요
+#policy = 'cctv_header'   # 220822 cctv_에서 header(cctv 상대위치) 정보 추가한거
 #policy = 'IROS2021'  # 220819 as baseline   # args.aprser에서 batch 1024 -> 512로 수정
 # for debug ##
 LIDAR_visualize = False
@@ -105,8 +105,8 @@ def run(comm, env, agent, policy_path, args):
     
     test_interval = 10
     #save_interval = 500
-    #save_interval = 200   # 220715
-    save_interval = 100   # 220819
+    save_interval = 200   # 220715
+    #save_interval = 100   # 220819
     # Training Loop
     total_numsteps = 0
     updates = 0
@@ -147,7 +147,7 @@ def run(comm, env, agent, policy_path, args):
         
         num_human = env.num_human
     
-        
+
         init_poses, init_goals = env.initialize_pose_robot_humans(rule)   # as [[0,0],[0,1],...] and [[1,1],[2,2],...]
         for i, init_pose in enumerate(init_poses):
             env.control_pose_specific(init_pose, i)
@@ -493,6 +493,15 @@ def run(comm, env, agent, policy_path, args):
                 torch.save(agent.critic_2.state_dict(), policy_path + '/critic_2_epi_{}'.format(i_episode))
                 print('########################## critic model saved when update {} times#########'
                             '################'.format(i_episode))
+                
+                ## 220825 save_dict 추가     # https://github.com/pranz24/pytorch-soft-actor-critic/blob/master/sac.py
+                torch.save(agent.critic_1_target.state_dict(), policy_path + '/critic_1_target_epi_{}'.format(i_episode))
+                torch.save(agent.critic_2_target.state_dict(), policy_path + '/critic_2_target_epi_{}'.format(i_episode))
+                torch.save(agent.policy_optim.state_dict(), policy_path + '/policy_optim_epi_{}'.format(i_episode))
+                torch.save(agent.critic_1_optim.state_dict(), policy_path + '/critic_1_optim_epi_{}'.format(i_episode))
+                torch.save(agent.critic_2_optim.state_dict(), policy_path + '/critic_2_optim_epi_{}'.format(i_episode))
+                
+                
 
 
         #print("Episode: {}, episode steps: {}, reward: {}, result: {}".format(i_episode, episode_steps, round(reward, 2), result))
@@ -587,9 +596,16 @@ if __name__ == '__main__':
             os.makedirs(policy_path)
 
         # Load specific policy
-        file_policy = policy_path + '/policy_epi_400'   
-        file_critic_1 = policy_path + '/critic_1_epi_400'
-        file_critic_2 = policy_path + '/critic_2_epi_400'
+        file_policy = policy_path + '/policy_epi_2200'   
+        file_critic_1 = policy_path + '/critic_1_epi_2200'
+        file_critic_2 = policy_path + '/critic_2_epi_2200'
+        # 0825
+        file_critic_1_target = policy_path + '/critic_1_target_epi_2200'
+        file_critic_2_target = policy_path + '/critic_2_target_epi_2200'
+        file_policy_optim = policy_path + '/policy_optim_epi_2200'
+        file_critic_1_optim = policy_path + '/critic_1_optim_epi_2200'
+        file_critic_2_optim = policy_path + '/critic_2_optim_epi_2200'
+        #복구
 
         if os.path.exists(file_policy):
             #logger.info('###########################################')
@@ -599,6 +615,19 @@ if __name__ == '__main__':
             #logger.info('###########################################')
             state_dict = torch.load(file_policy)
             agent.policy.load_state_dict(state_dict)
+            ## 220825 따라 밑에 추가 안하고 critic_1,2_target, critic_1,2_optim, policy_optim 불러오게 함
+            state_dict_critic1_target = torch.load(file_critic_1_target)
+            state_dict_critic2_target = torch.load(file_critic_2_target)
+            state_dict_policy_optim = torch.load(file_policy_optim)
+            #state_dict_critic_1_optim = torch.load(file_critic_1_optim)
+            state_dict_critic_2_optim = torch.load(file_critic_2_optim)
+            agent.critic_1_target.load_state_dict(state_dict_critic1_target)
+            agent.critic_2_target.load_state_dict(state_dict_critic2_target)
+            agent.policy_optim.load_state_dict(state_dict_policy_optim)
+            #agent.critic_1_optim.load_state_dict(state_dict_critic_1_optim)
+            agent.critic_2_optim.load_state_dict(state_dict_critic_2_optim)
+            
+            
         else:
             #logger.info('###########################################')
             #logger.info('############Start policy Training###########')
